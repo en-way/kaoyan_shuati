@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0e17">
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -23,7 +26,7 @@
     </div>
 
     <div class="header-center">
-      <!-- Session / Question Timers -->
+      <!-- Question Stopwatch Timer -->
       <div class="timer-badge" title="当前题目用时">
         <span class="timer-icon">⏱️</span>
         <span class="timer-label">单题:</span>
@@ -37,7 +40,8 @@
     </div>
 
     <div class="header-right">
-      <nav class="nav-links">
+      <!-- Desktop Nav Buttons -->
+      <nav class="nav-links desktop-only">
         <button id="navHubBtn" class="nav-btn active" onclick="App.navigateTo('hub')">
           <span class="nav-icon">📚</span> 章节题库
         </button>
@@ -49,15 +53,25 @@
           <span id="globalMistakeBadge" class="badge-count">0</span>
         </button>
       </nav>
-      <button class="icon-btn" onclick="App.exportProgress()" title="导出刷题进度与错题到JSON文件">
-        💾 备份进度
-      </button>
-      <button class="icon-btn" onclick="App.importProgress()" title="从JSON文件恢复刷题进度">
-        📥 导入进度
-      </button>
-      <button class="icon-btn" onclick="App.openLanModal()" title="在 iPad/手机上做题">
-        📱 移动端
-      </button>
+
+      <div class="desktop-only header-tools">
+        <button class="icon-btn" onclick="App.exportProgress()" title="导出刷题进度与错题到JSON文件">
+          💾 备份
+        </button>
+        <button class="icon-btn" onclick="App.importProgress()" title="从JSON文件恢复刷题进度">
+          📥 恢复
+        </button>
+      </div>
+
+      <!-- Mobile Quick Actions -->
+      <div class="mobile-only mobile-header-actions">
+        <button class="m-icon-btn" onclick="App.openDrawer()" title="打开答题卡">
+          📋 <span id="mHeaderProgress">1/10</span>
+        </button>
+        <button class="m-icon-btn" onclick="App.openMoreMenu()" title="更多功能">
+          ⚙️
+        </button>
+      </div>
     </div>
   </header>
 
@@ -69,8 +83,18 @@
       <div class="hub-header">
         <div class="hub-welcome">
           <h2>考研政治 1000 题 · 官方全真题库</h2>
-          <p class="hub-desc">肖秀荣《2027 考研政治 1000 题》全收录 · 配备全部 1,148 道官方标准答案、详细简析与名师点拨</p>
+          <p class="hub-desc">肖秀荣《2027 考研政治 1000 题》全收录 · 配备全部 1,148 道官方标准答案、出处定位、详细简析与名师点拨</p>
         </div>
+
+        <div class="hub-quick-toolbar">
+          <button class="btn-tool-pill" onclick="App.exportProgress()">
+            💾 备份我的进度
+          </button>
+          <button class="btn-tool-pill" onclick="App.importProgress()">
+            📥 导入同步进度
+          </button>
+        </div>
+
         <div class="hub-stats-bar">
           <div class="stat-pill">
             <span class="stat-title">总题量</span>
@@ -81,11 +105,11 @@
             <span class="stat-number color-cyan" id="hubAnsweredQ">0</span>
           </div>
           <div class="stat-pill">
-            <span class="stat-title">总正确率</span>
+            <span class="stat-title">正确率</span>
             <span class="stat-number color-green" id="hubAccuracyRate">0%</span>
           </div>
           <div class="stat-pill">
-            <span class="stat-title">待攻克错题</span>
+            <span class="stat-title">错题待攻克</span>
             <span class="stat-number color-coral" id="hubMistakesQ">0</span>
           </div>
         </div>
@@ -107,12 +131,29 @@
       <div class="practice-container">
         <!-- Top Toolbar -->
         <div class="practice-toolbar">
-          <div class="p-info-left">
-            <span id="pSubjectTag" class="p-subject-tag">马克思主义基本原理</span>
-            <span id="pChapterTag" class="p-chapter-tag">导论</span>
-            <span id="pTypeTag" class="p-type-tag type-single">单项选择题</span>
+          <div class="p-toolbar-top-row">
+            <div class="p-meta-tags">
+              <span id="pSubjectTag" class="p-subject-tag">马原</span>
+              <span id="pChapterTag" class="p-chapter-tag">导论</span>
+              <span id="pTypeTag" class="p-type-tag type-single">单选</span>
+              <span id="pModeTag" class="p-mode-tag" style="display:none;">错题专训</span>
+            </div>
 
-            <!-- Mode Switcher Pill Group -->
+            <div class="p-actions-group">
+              <button id="pFlagBtn" class="btn-flag" onclick="App.toggleFlagCurrent()">
+                <span id="flagIcon">☆</span> 标记
+              </button>
+              <button id="pToggleExplBtn" class="btn-flag" onclick="App.toggleExplanationFold()">
+                💡 解析
+              </button>
+              <button class="btn-drawer desktop-only" onclick="App.openDrawer()">
+                📋 答题卡 (M)
+              </button>
+            </div>
+          </div>
+
+          <!-- Mode Switcher Pill Group -->
+          <div class="p-toolbar-bottom-row">
             <div class="mode-switch-group">
               <button id="modeBtnInstant" class="btn-mode-pill active" onclick="App.switchMode('instant')">
                 ⚡ 即做即判
@@ -125,24 +166,11 @@
               </button>
             </div>
 
-            <span id="pModeTag" class="p-mode-tag" style="display:none;">错题专训</span>
-          </div>
-
-          <div class="p-info-right">
             <div class="progress-indicator">
               <span class="p-num" id="pCurrentNum">1</span>
               <span class="p-sep">/</span>
               <span class="p-total" id="pTotalNum">10</span>
             </div>
-            <button id="pFlagBtn" class="btn-flag" onclick="App.toggleFlagCurrent()">
-              <span id="flagIcon">☆</span> 标记 (F)
-            </button>
-            <button id="pToggleExplBtn" class="btn-flag" onclick="App.toggleExplanationFold()">
-              💡 解析 (E)
-            </button>
-            <button class="btn-drawer" onclick="App.openDrawer()">
-              📋 答题卡 (M)
-            </button>
           </div>
         </div>
 
@@ -153,8 +181,8 @@
               <span class="q-badge" id="qNumberBadge">第 1 题</span>
               <span class="q-tag-badge" id="qSpecialTag" style="display:none;">时政储备题</span>
             </div>
-            <div class="q-status-tags" id="qStatusTags">
-              <!-- e.g. 正确 / 错误 / 未作答 -->
+            <div class="q-swipe-hint mobile-only">
+              <span>左右滑动切题</span>
             </div>
           </div>
 
@@ -174,21 +202,21 @@
           <!-- Multi-choice Submit Action (Only visible for multi-choice in instant mode) -->
           <div id="multiSubmitBar" class="multi-submit-bar" style="display:none;">
             <button class="btn-submit-multi" onclick="App.submitCurrentMultiChoice()">
-              ✓ 确认提交本题 (Enter / Space)
+              ✓ 确认提交本题
             </button>
-            <span class="multi-tip-text">请选择至少两个选项后点击提交</span>
+            <span class="multi-tip-text">请勾选选项后提交判分</span>
           </div>
 
           <!-- RICH EXPLANATION PANEL (平滑折叠解析卡片) -->
           <div class="explanation-panel" id="explanationPanel" style="display:none;">
             <div class="expl-header">
               <div class="expl-ans-tag">
-                <span class="label">标准答案:</span>
+                <span class="label">官方答案:</span>
                 <span class="ans-val" id="explAnswerVal">A</span>
               </div>
               <div class="expl-source-tag" id="explSourceWrap" style="display:none;">
                 <span class="source-icon">📖</span>
-                <span id="explSourceText">精讲P3考点2拓展与点拨3</span>
+                <span id="explSourceText">精讲P3考点2</span>
               </div>
             </div>
 
@@ -215,10 +243,10 @@
         <!-- Practice Bottom Action Bar -->
         <div class="practice-bottom-bar">
           <button class="ctrl-btn btn-prev" onclick="App.prevQuestion()">
-            <span class="arrow">←</span> 上一题 (J)
+            <span class="arrow">←</span> 上一题
           </button>
           
-          <div class="keyboard-hints">
+          <div class="keyboard-hints desktop-only">
             <span><kbd>A</kbd>-<kbd>D</kbd> 选项</span>
             <span><kbd>Enter</kbd> 确认/下题</span>
             <span><kbd>E</kbd> 开关解析</span>
@@ -228,11 +256,11 @@
 
           <!-- In exam mode, shows Submit Exam button -->
           <button id="btnExamSubmit" class="ctrl-btn btn-exam-finish" style="display:none;" onclick="App.submitExam()">
-            📝 提交模考交卷
+            📝 交卷评分
           </button>
 
           <button class="ctrl-btn btn-next" onclick="App.nextQuestion()">
-            下一题 (K) <span class="arrow">→</span>
+            下一题 <span class="arrow">→</span>
           </button>
         </div>
       </div>
@@ -244,11 +272,11 @@
         <div class="mistakes-header">
           <div class="m-head-left">
             <h2>错题攻坚集</h2>
-            <p>做题时做错的题目已自动汇聚在此，支持查看官方出处与解析，一键重刷错题直至彻底攻克</p>
+            <p>做题时做错的题目已自动收录在此，支持专项逐题攻坚复刷</p>
           </div>
           <div class="m-head-right">
             <button class="btn-primary" onclick="App.startMistakesTraining()">
-              ⚡ 立即开始全部错题特训
+              ⚡ 立即全部错题特训
             </button>
           </div>
         </div>
@@ -275,6 +303,63 @@
 
   </main>
 
+  <!-- MOBILE BOTTOM NAVIGATION BAR -->
+  <nav class="mobile-bottom-nav mobile-only">
+    <button id="mNavHubBtn" class="m-nav-item active" onclick="App.navigateTo('hub')">
+      <span class="m-nav-icon">📚</span>
+      <span class="m-nav-label">题库</span>
+    </button>
+    <button id="mNavPracticeBtn" class="m-nav-item" onclick="App.navigateTo('practice')">
+      <span class="m-nav-icon">⚡</span>
+      <span class="m-nav-label">刷题</span>
+    </button>
+    <button id="mNavMistakesBtn" class="m-nav-item" onclick="App.navigateTo('mistakes')">
+      <span class="m-nav-icon">❌</span>
+      <span class="m-nav-label">错题</span>
+      <span id="mGlobalMistakeBadge" class="m-badge-count">0</span>
+    </button>
+    <button class="m-nav-item" onclick="App.openMoreMenu()">
+      <span class="m-nav-icon">⚙️</span>
+      <span class="m-nav-label">设置</span>
+    </button>
+  </nav>
+
+  <!-- MODAL: MOBILE MORE MENU (移动端设置与备份面板) -->
+  <div id="moreMenuModal" class="modal-backdrop" style="display:none;" onclick="App.closeMoreMenu(event)">
+    <div class="modal-card modal-bottom-sheet" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">⚙️</span>
+          <h3>功能与数据备份</h3>
+        </div>
+        <button class="modal-close" onclick="App.closeMoreMenu()">&times;</button>
+      </div>
+      <div class="modal-body sheet-body">
+        <div class="sheet-action-list">
+          <button class="sheet-btn" onclick="App.exportProgress(); App.closeMoreMenu();">
+            <span class="sheet-btn-icon">💾</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title">备份我的刷题记录</span>
+              <span class="sheet-btn-sub">导出作答记录、做对数与错题本到 JSON 文件</span>
+            </div>
+          </button>
+          <button class="sheet-btn" onclick="App.importProgress(); App.closeMoreMenu();">
+            <span class="sheet-btn-icon">📥</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title">恢复/导入刷题进度</span>
+              <span class="sheet-btn-sub">从其他设备或备份文件导入进度与错题</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="mobile-app-tip-box">
+          <span class="tip-title">📱 手机全屏使用小技巧：</span>
+          <p>在 Safari 浏览器中点击底部的 <b>“分享”</b> 图标，选择 <b>“添加到主屏幕”</b>，即可像原生 App 一样全屏沉浸刷题，无浏览器地址栏干扰！</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: EXAM SCORE REPORT (模考成绩单) -->
   <div id="examReportModal" class="modal-backdrop" style="display:none;">
     <div class="modal-card">
@@ -290,7 +375,7 @@
         <div class="exam-summary-card">
           <div class="accuracy-circle">
             <span id="examReportAccuracy">0%</span>
-            <span class="accuracy-label">正确率</span>
+            <span class="accuracy-label">得分率</span>
           </div>
           <div class="report-metrics">
             <div class="metric-item">
@@ -318,9 +403,9 @@
       </div>
 
       <div class="modal-footer">
-        <button class="btn-secondary" onclick="App.closeExamReportModal()">完成</button>
+        <button class="btn-secondary" onclick="App.closeExamReportModal()">返回大厅</button>
         <button class="btn-primary" onclick="App.reviewExamQuestions()">
-          🔍 逐题复盘看详细解析
+          🔍 逐题复盘看解析
         </button>
       </div>
     </div>
@@ -350,27 +435,6 @@
         <button id="drawerExamSubmitBtn" class="btn-block" onclick="App.submitExam()" style="display:none;">
           📝 立即交卷评分
         </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: MOBILE / LAN ACCESS (移动端局域网访问) -->
-  <div id="lanModal" class="modal-backdrop" style="display:none;">
-    <div class="modal-card modal-sm">
-      <div class="modal-header">
-        <div class="modal-title">
-          <span class="modal-icon">📱</span>
-          <h3>在 iPad / 手机上使用</h3>
-        </div>
-        <button class="modal-close" onclick="App.closeLanModal()">&times;</button>
-      </div>
-      <div class="modal-body" style="text-align:center;">
-        <p>让手机或 iPad 与电脑连接<b>同一 Wi-Fi</b>，然后在移动端浏览器输入：</p>
-        <div class="lan-url-box" id="lanUrlBox">
-          http://127.0.0.1:8000
-        </div>
-        <button class="btn-ghost" onclick="App.copyLanUrl()">📋 复制链接</button>
-        <p class="lan-tips">页面已做全面移动端触屏适配，大按键触控操作更顺手！</p>
       </div>
     </div>
   </div>

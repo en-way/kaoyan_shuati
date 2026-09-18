@@ -397,6 +397,7 @@ const App = {
   async init() {
     this.startSessionTimer();
     this.bindGlobalKeys();
+    this.bindTouchGestures();
     await DB.init();
     this.loadOverview();
     this.initLanUrl();
@@ -443,14 +444,19 @@ const App = {
     this.state.currentView = viewName;
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.m-nav-item').forEach(btn => btn.classList.remove('active'));
 
     if (viewName === 'hub') {
       document.getElementById('viewHub').classList.add('active');
       document.getElementById('navHubBtn').classList.add('active');
+      const mBtn = document.getElementById('mNavHubBtn');
+      if (mBtn) mBtn.classList.add('active');
       this.loadOverview();
     } else if (viewName === 'practice') {
       document.getElementById('viewPractice').classList.add('active');
       document.getElementById('navPracticeBtn').classList.add('active');
+      const mBtn = document.getElementById('mNavPracticeBtn');
+      if (mBtn) mBtn.classList.add('active');
       if (!this.state.questions.length) {
         this.startPractice('第一部分 马克思主义基本原理', '导论', '', 'instant');
       } else {
@@ -459,6 +465,8 @@ const App = {
     } else if (viewName === 'mistakes') {
       document.getElementById('viewMistakes').classList.add('active');
       document.getElementById('navMistakesBtn').classList.add('active');
+      const mBtn = document.getElementById('mNavMistakesBtn');
+      if (mBtn) mBtn.classList.add('active');
       this.loadMistakes();
     }
   },
@@ -475,6 +483,8 @@ const App = {
     
     const badge = document.getElementById('globalMistakeBadge');
     if (badge) badge.textContent = data.total_mistakes;
+    const mBadge = document.getElementById('mGlobalMistakeBadge');
+    if (mBadge) mBadge.textContent = data.total_mistakes;
 
     this.renderSubjectTabs();
     this.renderChaptersGrid();
@@ -630,6 +640,10 @@ const App = {
 
     document.getElementById('pCurrentNum').textContent = this.state.currentIndex + 1;
     document.getElementById('pTotalNum').textContent = this.state.questions.length;
+    const mHeaderProg = document.getElementById('mHeaderProgress');
+    if (mHeaderProg) {
+      mHeaderProg.textContent = `${this.state.currentIndex + 1}/${this.state.questions.length}`;
+    }
     document.getElementById('qNumberBadge').textContent = `第 ${q.num} 题`;
 
     const tagEl = document.getElementById('qSpecialTag');
@@ -1107,6 +1121,56 @@ const App = {
     });
   },
 
+  // ================== MOBILE MORE MENU ==================
+  openMoreMenu() {
+    const modal = document.getElementById('moreMenuModal');
+    if (modal) modal.style.display = 'flex';
+  },
+
+  closeMoreMenu(event) {
+    if (event && event.target && event.target.id !== 'moreMenuModal' && !event.target.classList.contains('modal-close')) {
+      return;
+    }
+    const modal = document.getElementById('moreMenuModal');
+    if (modal) modal.style.display = 'none';
+  },
+
+  // ================== TOUCH GESTURES (MOBILE SWIPE) ==================
+  bindTouchGestures() {
+    const card = document.getElementById('questionCard');
+    if (!card) return;
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    card.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    card.addEventListener('touchend', (e) => {
+      if (e.changedTouches && e.changedTouches.length === 1) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        const diffX = touchEndX - touchStartX;
+        const diffY = touchEndY - touchStartY;
+
+        // Ensure horizontal swipe is dominant and above threshold (50px)
+        if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+          if (diffX < 0) {
+            // Swipe left -> Next question
+            this.nextQuestion();
+          } else {
+            // Swipe right -> Prev question
+            this.prevQuestion();
+          }
+        }
+      }
+    }, { passive: true });
+  },
+
   // ================== GLOBAL KEYBOARD SHORTCUTS ==================
   bindGlobalKeys() {
     window.addEventListener('keydown', (e) => {
@@ -1115,6 +1179,7 @@ const App = {
         if (e.key === 'Escape') {
           this.closeDrawer();
           this.closeLanModal();
+          this.closeMoreMenu();
           this.closeExamReportModal();
         }
         return;
@@ -1123,6 +1188,7 @@ const App = {
       if (e.key === 'Escape') {
         this.closeDrawer();
         this.closeLanModal();
+        this.closeMoreMenu();
         this.closeExamReportModal();
         return;
       }
