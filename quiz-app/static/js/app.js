@@ -135,6 +135,43 @@ const DB = {
     return userData;
   },
 
+  setFromCloud(cloudData) {
+    const newUserData = { answers: {}, mistakes: {} };
+    const cloudAnswers = cloudData ? (cloudData.answers || {}) : {};
+    const cloudMistakes = cloudData ? (cloudData.mistakes || {}) : {};
+
+    for (const [qid, cloudArr] of Object.entries(cloudAnswers)) {
+      if (!cloudArr) continue;
+      const selStr = Array.isArray(cloudArr) ? cloudArr[0] : (cloudArr.choice || '');
+      const isCorr = Array.isArray(cloudArr) ? Boolean(cloudArr[1]) : Boolean(cloudArr.correct);
+      const cloudTime = Array.isArray(cloudArr) ? (cloudArr[2] || 0) : (cloudArr.time || 0);
+      newUserData.answers[qid] = {
+        selected: selStr ? selStr.split('') : [],
+        is_correct: isCorr,
+        time_spent: 0,
+        updated_at: new Date(cloudTime || Date.now()).toISOString()
+      };
+    }
+
+    for (const [qid, cloudArr] of Object.entries(cloudMistakes)) {
+      if (!cloudArr) continue;
+      const wrongCnt = Array.isArray(cloudArr) ? cloudArr[0] : (cloudArr.count || 1);
+      const lastSelStr = Array.isArray(cloudArr) ? cloudArr[1] : (cloudArr.lastChoice || '');
+      const cloudTime = Array.isArray(cloudArr) ? (cloudArr[2] || 0) : (cloudArr.time || 0);
+      const mastered = Array.isArray(cloudArr) ? Boolean(cloudArr[3]) : false;
+      newUserData.mistakes[qid] = {
+        question_id: parseInt(qid, 10) || qid,
+        wrong_count: wrongCnt,
+        last_selected: lastSelStr ? lastSelStr.split('') : [],
+        last_wrong_time: new Date(cloudTime || Date.now()).toISOString(),
+        mastered: mastered
+      };
+    }
+
+    localStorage.setItem('quiz_user_data_2027', JSON.stringify(newUserData));
+    return newUserData;
+  },
+
   getOverview() {
     const userData = this.getUserData();
     const answers = userData.answers || {};
@@ -681,10 +718,13 @@ const App = {
         this.setSession(data.token, data.user);
         this.closeAuthModal();
 
-        // 登录成功瞬间自动触发双向智能合并同步
-        await this.syncProgress(true);
+        // 关键防污染：先彻底清空本地临时/游客做题数据
+        localStorage.removeItem('quiz_user_data_2027');
+
+        // 仅通过 GET 请求拉取该账号在云端的真实进度覆盖本地，杜绝污染
+        await this.fetchCloudProgress();
         App.loadOverview();
-        alert(`欢迎回来，${data.user.nickname || data.user.username}！已为您自动连接云端数据。`);
+        alert(`欢迎回来，${data.user.nickname || data.user.username}！已为您清除本地临时数据，并成功载入您的专属云端进度。`);
       } catch (err) {
         this.showNotice(err.message, 'error');
       } finally {
@@ -725,10 +765,15 @@ const App = {
         this.setSession(data.token, data.user);
         this.closeAuthModal();
 
-        // 注册成功上传本地已有做题记录
-        await this.syncProgress(true);
+        // 关键防污染：新账号彻底清空本地临时做题数据，以 0 进度全新起步（不上传本地脏数据）
+        localStorage.removeItem('quiz_user_data_2027');
+        DB.setFromCloud({ answers: {}, mistakes: {}, updatedAt: Date.now() });
+        this.lastSyncTime = Date.now();
+        localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
+        this.isDirty = false;
+        this.updateSyncUI();
         App.loadOverview();
-        alert(`注册成功！已为您自动登录，本地刷题进度已同步至云端。`);
+        alert(`注册成功！已为您自动登录，新账号初始进度为 0，请开始学习！`);
       } catch (err) {
         this.showNotice(err.message, 'error');
       } finally {
@@ -769,9 +814,11 @@ const App = {
         this.setSession(data.token, data.user);
         this.closeAuthModal();
 
-        await this.syncProgress(true);
+        // 关键防污染：先清除本地临时数据，再拉取真实云端记录覆盖
+        localStorage.removeItem('quiz_user_data_2027');
+        await this.fetchCloudProgress();
         App.loadOverview();
-        alert('密码重置成功！已自动为您登录并同步学习记录。');
+        alert('密码重置成功！已自动为您登录，并载入您的云端学习记录。');
       } catch (err) {
         this.showNotice(err.message, 'error');
       } finally {
@@ -957,6 +1004,38 @@ const App = {
     resetLocalData() {
       if (confirm('⚠️ 确定要清空本机所有的刷题记录与错题本吗？此操作不可撤销！')) {
         this.purgeAllUserData('本地所有刷题记录与错题本已成功清空。');
+      }
+    },
+
+    // 纯粹拉取云端数据并覆盖本地（只读 GET，彻底防本地脏数据污染云端）
+    async fetchCloudProgress() {
+      if (!this.token) return;
+      try {
+        const res = await fetch('/api/progress/sync', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${this.token}`
+          }
+        });
+
+        if (res.status === 404 || res.status === 401) {
+          this.purgeAllUserData('您的账号已被管理员注销或下线，本地数据已自动清空。');
+          return;
+        }
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || '获取云端数据失败');
+        }
+
+        // 以云端权威数据全量覆盖本地
+        DB.setFromCloud(data);
+        this.lastSyncTime = data.updatedAt || Date.now();
+        localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
+        this.isDirty = false;
+        this.updateSyncUI();
+      } catch (err) {
+        console.warn('Fetch cloud progress failed:', err);
       }
     },
 
