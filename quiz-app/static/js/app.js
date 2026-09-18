@@ -398,6 +398,7 @@ const App = {
     this.startSessionTimer();
     this.bindGlobalKeys();
     this.bindTouchGestures();
+    this.registerServiceWorker();
     await DB.init();
     this.loadOverview();
     this.initLanUrl();
@@ -1119,6 +1120,31 @@ const App = {
       reader.readAsText(file);
     };
     input.click();
+  },
+
+  // ================== PWA & SERVICE WORKER ==================
+  registerServiceWorker() {
+    if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { scope: './' })
+          .then((reg) => {
+            console.log('[PWA] Service Worker registered with scope:', reg.scope);
+            reg.onupdatefound = () => {
+              const installingWorker = reg.installing;
+              if (installingWorker) {
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('[PWA] New version installed in background.');
+                  }
+                };
+              }
+            };
+          })
+          .catch((err) => {
+            console.warn('[PWA] Service Worker registration failed:', err);
+          });
+      });
+    }
   },
 
   // ================== LAN / MOBILE ==================
