@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="theme-dark">
+  <!-- Top Global Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand" onclick="App.navigateTo('hub')">
+        <span class="brand-badge">2027</span>
+        <span class="brand-title">考研政治 1000 题</span>
+        <span class="brand-sub">官方全解析版</span>
+      </div>
+      <div id="breadcrumb" class="breadcrumb">
+        <span class="crumb-item" onclick="App.navigateTo('hub')">题库大厅</span>
+        <span class="crumb-sep">/</span>
+        <span id="crumbSubject" class="crumb-active">马原</span>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <!-- Session / Question Timers -->
+      <div class="timer-badge" title="当前题目用时">
+        <span class="timer-icon">⏱️</span>
+        <span class="timer-label">单题:</span>
+        <span id="questionTimer" class="timer-val">00:00</span>
+      </div>
+      <div class="timer-badge total-timer" title="今日刷题总用时">
+        <span class="timer-icon">⏳</span>
+        <span class="timer-label">总计:</span>
+        <span id="sessionTimer" class="timer-val">00:00:00</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <nav class="nav-links">
+        <button id="navHubBtn" class="nav-btn active" onclick="App.navigateTo('hub')">
+          <span class="nav-icon">📚</span> 章节题库
+        </button>
+        <button id="navPracticeBtn" class="nav-btn" onclick="App.navigateTo('practice')">
+          <span class="nav-icon">⚡</span> 沉浸刷题
+        </button>
+        <button id="navMistakesBtn" class="nav-btn" onclick="App.navigateTo('mistakes')">
+          <span class="nav-icon">❌</span> 错题本
+          <span id="globalMistakeBadge" class="badge-count">0</span>
+        </button>
+      </nav>
+      <button class="icon-btn" onclick="App.openLanModal()" title="在 iPad/手机上做题">
+        📱 移动端
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="main-content">
+    
+    <!-- VIEW 1: CHAPTER HUB (题库目录大厅) -->
+    <section id="viewHub" class="view-section active">
+      <div class="hub-header">
+        <div class="hub-welcome">
+          <h2>考研政治 1000 题 · 官方全真题库</h2>
+          <p class="hub-desc">肖秀荣《2027 考研政治 1000 题》全收录 · 配备全部 1,148 道官方标准答案、详细简析与名师点拨</p>
+        </div>
+        <div class="hub-stats-bar">
+          <div class="stat-pill">
+            <span class="stat-title">总题量</span>
+            <span class="stat-number" id="hubTotalQ">1,148</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-title">已作答</span>
+            <span class="stat-number color-cyan" id="hubAnsweredQ">0</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-title">总正确率</span>
+            <span class="stat-number color-green" id="hubAccuracyRate">0%</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-title">待攻克错题</span>
+            <span class="stat-number color-coral" id="hubMistakesQ">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subject Tabs -->
+      <div class="subject-tabs" id="subjectTabsContainer">
+        <!-- Injected dynamically -->
+      </div>
+
+      <!-- Chapter Cards Grid -->
+      <div class="chapters-grid" id="chaptersGridContainer">
+        <!-- Injected dynamically -->
+      </div>
+    </section>
+
+    <!-- VIEW 2: PRACTICE STREAM (沉浸式卡片流) -->
+    <section id="viewPractice" class="view-section">
+      <div class="practice-container">
+        <!-- Top Toolbar -->
+        <div class="practice-toolbar">
+          <div class="p-info-left">
+            <span id="pSubjectTag" class="p-subject-tag">马克思主义基本原理</span>
+            <span id="pChapterTag" class="p-chapter-tag">导论</span>
+            <span id="pTypeTag" class="p-type-tag type-single">单项选择题</span>
+
+            <!-- Mode Switcher Pill Group -->
+            <div class="mode-switch-group">
+              <button id="modeBtnInstant" class="btn-mode-pill active" onclick="App.switchMode('instant')">
+                ⚡ 即做即判
+              </button>
+              <button id="modeBtnExam" class="btn-mode-pill" onclick="App.switchMode('exam')">
+                📝 模考自测
+              </button>
+              <button id="modeBtnRecite" class="btn-mode-pill" onclick="App.switchMode('recite')">
+                📖 直接背题
+              </button>
+            </div>
+
+            <span id="pModeTag" class="p-mode-tag" style="display:none;">错题专训</span>
+          </div>
+
+          <div class="p-info-right">
+            <div class="progress-indicator">
+              <span class="p-num" id="pCurrentNum">1</span>
+              <span class="p-sep">/</span>
+              <span class="p-total" id="pTotalNum">10</span>
+            </div>
+            <button id="pFlagBtn" class="btn-flag" onclick="App.toggleFlagCurrent()">
+              <span id="flagIcon">☆</span> 标记 (F)
+            </button>
+            <button id="pToggleExplBtn" class="btn-flag" onclick="App.toggleExplanationFold()">
+              💡 解析 (E)
+            </button>
+            <button class="btn-drawer" onclick="App.openDrawer()">
+              📋 答题卡 (M)
+            </button>
+          </div>
+        </div>
+
+        <!-- Question Card Box -->
+        <div class="question-card" id="questionCard">
+          <div class="q-header">
+            <div class="q-badges-wrap">
+              <span class="q-badge" id="qNumberBadge">第 1 题</span>
+              <span class="q-tag-badge" id="qSpecialTag" style="display:none;">时政储备题</span>
+            </div>
+            <div class="q-status-tags" id="qStatusTags">
+              <!-- e.g. 正确 / 错误 / 未作答 -->
+            </div>
+          </div>
+
+          <!-- Question Stem -->
+          <div class="q-stem" id="qStem">
+            正在加载题目...
+          </div>
+
+          <!-- Sub-items list (①②③④) if any -->
+          <div class="q-sub-items" id="qSubItems" style="display:none;"></div>
+
+          <!-- Options Grid -->
+          <div class="q-options" id="qOptions">
+            <!-- Options A, B, C, D injected here -->
+          </div>
+
+          <!-- Multi-choice Submit Action (Only visible for multi-choice in instant mode) -->
+          <div id="multiSubmitBar" class="multi-submit-bar" style="display:none;">
+            <button class="btn-submit-multi" onclick="App.submitCurrentMultiChoice()">
+              ✓ 确认提交本题 (Enter / Space)
+            </button>
+            <span class="multi-tip-text">请选择至少两个选项后点击提交</span>
+          </div>
+
+          <!-- RICH EXPLANATION PANEL (平滑折叠解析卡片) -->
+          <div class="explanation-panel" id="explanationPanel" style="display:none;">
+            <div class="expl-header">
+              <div class="expl-ans-tag">
+                <span class="label">标准答案:</span>
+                <span class="ans-val" id="explAnswerVal">A</span>
+              </div>
+              <div class="expl-source-tag" id="explSourceWrap" style="display:none;">
+                <span class="source-icon">📖</span>
+                <span id="explSourceText">精讲P3考点2拓展与点拨3</span>
+              </div>
+            </div>
+
+            <!-- Analysis content -->
+            <div class="expl-body" id="explBodyWrap">
+              <div class="expl-section-title">【核心简析】</div>
+              <div class="expl-text" id="explAnalysisText">
+                详细解析正在加载...
+              </div>
+            </div>
+
+            <!-- Tips callout box (名师点拨) -->
+            <div class="expl-tips-box" id="explTipsWrap" style="display:none;">
+              <div class="tips-title">
+                <span class="tips-icon">🎯</span> 【名师点拨与真题考向】
+              </div>
+              <div class="tips-content" id="explTipsText">
+                点拨内容
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Practice Bottom Action Bar -->
+        <div class="practice-bottom-bar">
+          <button class="ctrl-btn btn-prev" onclick="App.prevQuestion()">
+            <span class="arrow">←</span> 上一题 (J)
+          </button>
+          
+          <div class="keyboard-hints">
+            <span><kbd>A</kbd>-<kbd>D</kbd> 选项</span>
+            <span><kbd>Enter</kbd> 确认/下题</span>
+            <span><kbd>E</kbd> 开关解析</span>
+            <span><kbd>F</kbd> 标记</span>
+            <span><kbd>M</kbd> 答题卡</span>
+          </div>
+
+          <!-- In exam mode, shows Submit Exam button -->
+          <button id="btnExamSubmit" class="ctrl-btn btn-exam-finish" style="display:none;" onclick="App.submitExam()">
+            📝 提交模考交卷
+          </button>
+
+          <button class="ctrl-btn btn-next" onclick="App.nextQuestion()">
+            下一题 (K) <span class="arrow">→</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: MISTAKES VAULT (错题攻坚集) -->
+    <section id="viewMistakes" class="view-section">
+      <div class="mistakes-container">
+        <div class="mistakes-header">
+          <div class="m-head-left">
+            <h2>错题攻坚集</h2>
+            <p>做题时做错的题目已自动汇聚在此，支持查看官方出处与解析，一键重刷错题直至彻底攻克</p>
+          </div>
+          <div class="m-head-right">
+            <button class="btn-primary" onclick="App.startMistakesTraining()">
+              ⚡ 立即开始全部错题特训
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="mistakes-filters">
+          <select id="mPartFilter" onchange="App.filterMistakes()">
+            <option value="">全部科目</option>
+          </select>
+          <select id="mChapterFilter" onchange="App.filterMistakes()">
+            <option value="">全部章节</option>
+          </select>
+          <div class="m-stats-summary" id="mMistakesCountText">
+            共 0 道待攻克错题
+          </div>
+        </div>
+
+        <!-- Mistakes List -->
+        <div class="mistakes-list" id="mistakesListContainer">
+          <!-- Injected dynamically -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: EXAM SCORE REPORT (模考成绩单) -->
+  <div id="examReportModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">🏆</span>
+          <h3>模考测评成绩单</h3>
+        </div>
+        <button class="modal-close" onclick="App.closeExamReportModal()">&times;</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="exam-summary-card">
+          <div class="accuracy-circle">
+            <span id="examReportAccuracy">0%</span>
+            <span class="accuracy-label">正确率</span>
+          </div>
+          <div class="report-metrics">
+            <div class="metric-item">
+              <span class="m-label">总题数</span>
+              <span class="m-val" id="examTotalQ">0</span>
+            </div>
+            <div class="metric-item color-green">
+              <span class="m-label">做对</span>
+              <span class="m-val" id="examCorrectQ">0</span>
+            </div>
+            <div class="metric-item color-coral">
+              <span class="m-label">做错</span>
+              <span class="m-val" id="examWrongQ">0</span>
+            </div>
+            <div class="metric-item color-gray">
+              <span class="m-label">未作答</span>
+              <span class="m-val" id="examUnansweredQ">0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="report-list-box" id="examReportList">
+          <!-- Results list -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="App.closeExamReportModal()">完成</button>
+        <button class="btn-primary" onclick="App.reviewExamQuestions()">
+          🔍 逐题复盘看详细解析
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER: QUESTION GRID (答题卡抽屉) -->
+  <div id="questionDrawer" class="drawer-backdrop" style="display:none;" onclick="App.closeDrawer(event)">
+    <div class="drawer-panel" onclick="event.stopPropagation()">
+      <div class="drawer-header">
+        <h3>答题卡导航</h3>
+        <button class="drawer-close" onclick="App.closeDrawer()">&times;</button>
+      </div>
+
+      <div class="drawer-legend">
+        <span class="legend-item"><i class="dot dot-unanswered"></i> 未答</span>
+        <span class="legend-item"><i class="dot dot-answered"></i> 已选</span>
+        <span class="legend-item"><i class="dot dot-flagged"></i> 标记</span>
+        <span class="legend-item"><i class="dot dot-correct"></i> 正确</span>
+        <span class="legend-item"><i class="dot dot-wrong"></i> 错误</span>
+      </div>
+
+      <div class="drawer-body" id="drawerGridContainer">
+        <!-- Numbers grid injected here -->
+      </div>
+
+      <div class="drawer-footer">
+        <button id="drawerExamSubmitBtn" class="btn-block" onclick="App.submitExam()" style="display:none;">
+          📝 立即交卷评分
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MOBILE / LAN ACCESS (移动端局域网访问) -->
+  <div id="lanModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">📱</span>
+          <h3>在 iPad / 手机上使用</h3>
+        </div>
+        <button class="modal-close" onclick="App.closeLanModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <p>让手机或 iPad 与电脑连接<b>同一 Wi-Fi</b>，然后在移动端浏览器输入：</p>
+        <div class="lan-url-box" id="lanUrlBox">
+          http://127.0.0.1:8000
+        </div>
+        <button class="btn-ghost" onclick="App.copyLanUrl()">📋 复制链接</button>
+        <p class="lan-tips">页面已做全面移动端触屏适配，大按键触控操作更顺手！</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
