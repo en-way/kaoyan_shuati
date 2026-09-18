@@ -71,8 +71,42 @@
         </button>
       </div>
 
+      <!-- Cloud User Profile & Sync Area -->
+      <div id="userProfileArea" class="user-profile-area desktop-only">
+        <button id="btnOpenAuth" class="btn-auth-login" onclick="App.auth.openAuthModal('login')">
+          👤 登录 / 同步
+        </button>
+        <div id="userLoggedInBlock" class="user-logged-in-block" style="display:none;">
+          <button id="btnSyncCloud" class="btn-sync-pill" onclick="App.auth.syncProgress()" title="同步做题进度至 Cloudflare D1">
+            <span class="sync-icon" id="desktopSyncIcon">☁️</span>
+            <span id="desktopSyncText">立即同步</span>
+          </button>
+          <div class="user-badge" onclick="App.auth.toggleUserMenu(event)">
+            <span class="user-avatar-dot"></span>
+            <span id="userNicknameDisplay" class="user-nickname">考研学子</span>
+            <span class="user-arrow">▾</span>
+          </div>
+          <div id="userDropdownMenu" class="user-dropdown-menu" style="display:none;" onclick="event.stopPropagation()">
+            <div class="user-menu-header">
+              <strong id="menuUsername">@username</strong>
+              <span class="menu-sync-time" id="menuSyncTime">云端已同步</span>
+            </div>
+            <div class="user-menu-divider"></div>
+            <button class="user-menu-item" onclick="App.auth.syncProgress(); App.auth.closeUserMenu();">
+              <span>☁️ 立即同步至 D1</span>
+            </button>
+            <button class="user-menu-item color-coral" onclick="App.auth.logout(); App.auth.closeUserMenu();">
+              <span>🚪 退出登录</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Mobile Quick Actions -->
       <div class="mobile-only mobile-header-actions">
+        <button class="m-icon-btn" id="mBtnSync" onclick="App.auth.syncProgress()" title="同步进度" style="display:none;">
+          ☁️
+        </button>
         <button class="m-icon-btn" onclick="App.openDrawer()" title="打开答题卡">
           📋 <span id="mHeaderProgress">1/10</span>
         </button>
@@ -362,6 +396,34 @@
             <span class="sheet-timer-label">⏳ 今日累计刷题</span>
             <span class="sheet-timer-val color-green" id="mSheetSessionTimer">00:00:00</span>
           </div>
+        <!-- Mobile User Account & Cloud Sync Card -->
+        <div class="m-user-card" id="mUserCard">
+          <div id="mUserNotLoggedIn" class="m-user-prompt">
+            <div class="m-user-prompt-text">
+              <span class="m-user-title">👤 考研政治云端同步</span>
+              <span class="m-user-sub">登录后做题记录与错题持久化保存至 D1</span>
+            </div>
+            <button class="btn-primary btn-sm" onclick="App.closeMoreMenu(); App.auth.openAuthModal('login');">
+              登录 / 注册
+            </button>
+          </div>
+          <div id="mUserLoggedIn" class="m-user-status" style="display:none;">
+            <div class="m-user-prompt-text">
+              <div class="m-user-badge-row">
+                <span class="user-avatar-dot"></span>
+                <span class="m-user-title" id="mUserNickname">考研学子</span>
+              </div>
+              <span class="m-user-sub" id="mUserSyncStatus">云端已同步</span>
+            </div>
+            <div class="m-user-btn-group">
+              <button class="btn-sync-pill" onclick="App.auth.syncProgress()">
+                ☁️ 立即同步
+              </button>
+              <button class="btn-secondary btn-sm" onclick="App.auth.logout()">
+                退出
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="sheet-action-list">
@@ -503,6 +565,146 @@
         <button id="drawerExamSubmitBtn" class="btn-block" onclick="App.submitExam()" style="display:none;">
           📝 立即交卷评分
         </button>
+      </div>
+    </div>
+  <!-- MODAL: AUTH MODAL (登录 / 注册 / 密码重置三合一) -->
+  <div id="authModal" class="modal-backdrop" style="display:none;" onclick="App.auth.closeAuthModal(event)">
+    <div class="modal-card auth-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">🔐</span>
+          <h3 id="authModalTitle">考研政治 · 云端账号</h3>
+        </div>
+        <button class="modal-close" onclick="App.auth.closeAuthModal()">&times;</button>
+      </div>
+
+      <!-- Auth Tabs -->
+      <div class="auth-tabs">
+        <button id="authTabLogin" class="auth-tab-btn active" onclick="App.auth.switchTab('login')">用户登录</button>
+        <button id="authTabRegister" class="auth-tab-btn" onclick="App.auth.switchTab('register')">新用户注册</button>
+        <button id="authTabReset" class="auth-tab-btn" onclick="App.auth.switchTab('reset')">重置密码</button>
+      </div>
+
+      <div class="modal-body auth-body">
+        <!-- Error / Status Notice -->
+        <div id="authNotice" class="auth-notice" style="display:none;"></div>
+
+        <!-- TAB 1: LOGIN -->
+        <form id="formLogin" onsubmit="App.auth.handleLogin(event)">
+          <div class="form-group">
+            <label>账号 / 用户名</label>
+            <input type="text" id="loginUsername" class="form-control" placeholder="请输入你的账号" autocomplete="username" required>
+          </div>
+          <div class="form-group">
+            <div class="label-row">
+              <label>密码</label>
+              <a href="javascript:void(0)" class="link-sub" onclick="App.auth.switchTab('reset')">忘记密码？</a>
+            </div>
+            <input type="password" id="loginPassword" class="form-control" placeholder="请输入密码" autocomplete="current-password" required>
+          </div>
+          <button type="submit" id="btnLoginSubmit" class="btn-primary btn-block" style="margin-top:16px;">
+            立即登录并同步
+          </button>
+          <div class="auth-switch-tip">
+            还没有账号？<a href="javascript:void(0)" onclick="App.auth.switchTab('register')">免费注册</a>
+          </div>
+        </form>
+
+        <!-- TAB 2: REGISTER -->
+        <form id="formRegister" style="display:none;" onsubmit="App.auth.handleRegister(event)">
+          <div class="form-group">
+            <label>注册账号 (用于登录)</label>
+            <input type="text" id="regUsername" class="form-control" placeholder="英文字母或数字，3~32位" autocomplete="username" required>
+          </div>
+          <div class="form-group">
+            <label>用户昵称 (界面展示)</label>
+            <input type="text" id="regNickname" class="form-control" placeholder="例如：政治冲刺80+ / 昵称" required>
+          </div>
+          <div class="form-group">
+            <label>设置密码</label>
+            <input type="password" id="regPassword" class="form-control" placeholder="至少6位密码" autocomplete="new-password" required>
+          </div>
+          <button type="submit" id="btnRegSubmit" class="btn-primary btn-block" style="margin-top:16px;">
+            立即注册
+          </button>
+          <div class="auth-switch-tip">
+            已有账号？<a href="javascript:void(0)" onclick="App.auth.switchTab('login')">返回登录</a>
+          </div>
+        </form>
+
+        <!-- TAB 3: RESET PASSWORD -->
+        <form id="formReset" style="display:none;" onsubmit="App.auth.handleResetPassword(event)">
+          <div class="form-info-banner">
+            ℹ️ 请联系管理员获取 6 位专属重置码，输入后可直接设置新密码并登录。
+          </div>
+          <div class="form-group">
+            <label>账号 / 用户名</label>
+            <input type="text" id="resetUsername" class="form-control" placeholder="请输入绑定的账号" required>
+          </div>
+          <div class="form-group">
+            <label>6 位密码重置码</label>
+            <input type="text" id="resetCode" class="form-control" placeholder="管理员发送的 6 位纯数字验证码" maxlength="6" required>
+          </div>
+          <div class="form-group">
+            <label>设置新密码</label>
+            <input type="password" id="resetNewPassword" class="form-control" placeholder="至少6位新密码" required>
+          </div>
+          <button type="submit" id="btnResetSubmit" class="btn-primary btn-block" style="margin-top:16px;">
+            确认重置并自动登录
+          </button>
+          <div class="auth-switch-tip">
+            想起密码了？<a href="javascript:void(0)" onclick="App.auth.switchTab('login')">返回登录</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer auth-footer">
+        <a href="javascript:void(0)" class="link-admin-secret" onclick="App.auth.openAdminModal()">
+          🔑 管理员通道
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADMIN CODE GENERATOR (管理员专属重置码发放面板) -->
+  <div id="adminModal" class="modal-backdrop" style="display:none;" onclick="App.auth.closeAdminModal(event)">
+    <div class="modal-card auth-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">🛠️</span>
+          <h3>管理员密码重置码发放</h3>
+        </div>
+        <button class="modal-close" onclick="App.auth.closeAdminModal()">&times;</button>
+      </div>
+
+      <div class="modal-body auth-body">
+        <p class="admin-desc">
+          输入管理员密钥 (<code>ADMIN_SECRET</code>) 与学员账号，为学员生成专属 6 位重置码（有效期 30 分钟）。
+        </p>
+
+        <div id="adminNotice" class="auth-notice" style="display:none;"></div>
+
+        <form onsubmit="App.auth.handleAdminGenerateCode(event)">
+          <div class="form-group">
+            <label>管理员密钥 (ADMIN_SECRET)</label>
+            <input type="password" id="adminSecretKey" class="form-control" placeholder="在 Cloudflare Pages 环境变量配置的密钥" required>
+          </div>
+          <div class="form-group">
+            <label>学员账号 / 用户名</label>
+            <input type="text" id="adminTargetUsername" class="form-control" placeholder="需找回密码的学员账号" required>
+          </div>
+          <button type="submit" id="btnAdminGenerate" class="btn-primary btn-block" style="margin-top:16px;">
+            ⚡ 生成 6 位重置验证码
+          </button>
+        </form>
+
+        <div id="adminResultBox" class="admin-result-box" style="display:none;">
+          <div class="result-title">重置码生成成功（30分钟内有效）：</div>
+          <div class="result-code-display" id="adminGeneratedCode">------</div>
+          <button type="button" class="btn-secondary btn-block" onclick="App.auth.copyAdminGeneratedCode()">
+            📋 一键复制重置信息发给学员
+          </button>
+        </div>
       </div>
     </div>
   </div>

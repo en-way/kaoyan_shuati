@@ -4,7 +4,7 @@
  * 具备离线可用性，断网时自动启用本地题库与应用代码
  */
 
-const CACHE_NAME = 'ky-quiz-v1';
+const CACHE_NAME = 'ky-quiz-v2';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -51,6 +51,9 @@ self.addEventListener('fetch', (event) => {
 
   // Skip browser-extension or chrome-extension requests
   if (!url.protocol.startsWith('http')) return;
+
+  // Do not intercept or cache backend API endpoints
+  if (url.pathname.startsWith('/api/')) return;
 
   event.respondWith(
     fetch(event.request)

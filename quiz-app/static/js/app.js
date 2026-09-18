@@ -55,9 +55,84 @@ const DB = {
   saveUserData(data) {
     try {
       localStorage.setItem('quiz_user_data_2027', JSON.stringify(data));
+      if (window.App && App.auth && typeof App.auth.markDirty === 'function') {
+        App.auth.markDirty();
+      }
     } catch (e) {
       console.error('Failed to save user data to localStorage:', e);
     }
+  },
+
+  toCompact() {
+    const userData = this.getUserData();
+    const compactAnswers = {};
+    const compactMistakes = {};
+
+    for (const [qid, rec] of Object.entries(userData.answers || {})) {
+      if (!rec) continue;
+      const selStr = Array.isArray(rec.selected) ? rec.selected.join('') : (rec.selected || '');
+      const isCorr = rec.is_correct ? 1 : 0;
+      const t = rec.updated_at ? (Date.parse(rec.updated_at) || Date.now()) : Date.now();
+      compactAnswers[qid] = [selStr, isCorr, t];
+    }
+
+    for (const [qid, rec] of Object.entries(userData.mistakes || {})) {
+      if (!rec) continue;
+      const lastSelStr = Array.isArray(rec.last_selected) ? rec.last_selected.join('') : (rec.last_selected || '');
+      const t = rec.last_wrong_time ? (Date.parse(rec.last_wrong_time) || Date.now()) : Date.now();
+      compactMistakes[qid] = [rec.wrong_count || 1, lastSelStr, t, rec.mastered ? 1 : 0];
+    }
+
+    return { answers: compactAnswers, mistakes: compactMistakes };
+  },
+
+  mergeFromCompact(cloudData) {
+    const userData = this.getUserData();
+    const cloudAnswers = cloudData.answers || {};
+    const cloudMistakes = cloudData.mistakes || {};
+
+    // 智能合并 answers: 以最新时间戳为准
+    for (const [qid, cloudArr] of Object.entries(cloudAnswers)) {
+      if (!cloudArr) continue;
+      const cloudTime = Array.isArray(cloudArr) ? (cloudArr[2] || 0) : (cloudArr.time || 0);
+      const localRec = userData.answers[qid];
+      const localTime = localRec && localRec.updated_at ? Date.parse(localRec.updated_at) || 0 : 0;
+
+      if (!localRec || cloudTime > localTime) {
+        const selStr = Array.isArray(cloudArr) ? cloudArr[0] : (cloudArr.choice || '');
+        const isCorr = Array.isArray(cloudArr) ? Boolean(cloudArr[1]) : Boolean(cloudArr.correct);
+        userData.answers[qid] = {
+          selected: selStr ? selStr.split('') : [],
+          is_correct: isCorr,
+          time_spent: localRec ? localRec.time_spent || 0 : 0,
+          updated_at: new Date(cloudTime || Date.now()).toISOString()
+        };
+      }
+    }
+
+    // 智能合并 mistakes
+    for (const [qid, cloudArr] of Object.entries(cloudMistakes)) {
+      if (!cloudArr) continue;
+      const cloudTime = Array.isArray(cloudArr) ? (cloudArr[2] || 0) : (cloudArr.time || 0);
+      const localRec = userData.mistakes[qid];
+      const localTime = localRec && localRec.last_wrong_time ? Date.parse(localRec.last_wrong_time) || 0 : 0;
+
+      if (!localRec || cloudTime > localTime) {
+        const wrongCnt = Array.isArray(cloudArr) ? cloudArr[0] : (cloudArr.count || 1);
+        const lastSelStr = Array.isArray(cloudArr) ? cloudArr[1] : (cloudArr.lastChoice || '');
+        const mastered = Array.isArray(cloudArr) ? Boolean(cloudArr[3]) : false;
+        userData.mistakes[qid] = {
+          question_id: parseInt(qid, 10) || qid,
+          wrong_count: wrongCnt,
+          last_selected: lastSelStr ? lastSelStr.split('') : [],
+          last_wrong_time: new Date(cloudTime || Date.now()).toISOString(),
+          mastered: mastered
+        };
+      }
+    }
+
+    localStorage.setItem('quiz_user_data_2027', JSON.stringify(userData));
+    return userData;
   },
 
   getOverview() {
@@ -400,8 +475,505 @@ const App = {
     this.bindTouchGestures();
     this.registerServiceWorker();
     await DB.init();
+    this.auth.init();
     this.loadOverview();
     this.initLanUrl();
+  },
+
+  // ================== CLOUD USER AUTH & SYNC CONTROLLER ==================
+  auth: {
+    currentUser: null,
+    token: localStorage.getItem('kaoyan_jwt_token_2027') || null,
+    isDirty: false,
+    lastSyncTime: localStorage.getItem('kaoyan_last_sync_time_2027') ? parseInt(localStorage.getItem('kaoyan_last_sync_time_2027'), 10) : null,
+    isSyncing: false,
+    _lastAdminResult: null,
+
+    init() {
+      // 点击页面任意空白处关闭用户下拉菜单
+      document.addEventListener('click', () => {
+        this.closeUserMenu();
+      });
+
+      if (this.token) {
+        this.checkSession();
+      } else {
+        this.renderAuthUI();
+      }
+      this.updateSyncUI();
+    },
+
+    markDirty() {
+      this.isDirty = true;
+      this.updateSyncUI();
+    },
+
+    // 渲染用户状态与界面各按钮
+    renderAuthUI() {
+      const btnOpenAuth = document.getElementById('btnOpenAuth');
+      const userLoggedInBlock = document.getElementById('userLoggedInBlock');
+      const userNicknameDisplay = document.getElementById('userNicknameDisplay');
+      const menuUsername = document.getElementById('menuUsername');
+      const mBtnSync = document.getElementById('mBtnSync');
+      const mUserNotLoggedIn = document.getElementById('mUserNotLoggedIn');
+      const mUserLoggedIn = document.getElementById('mUserLoggedIn');
+      const mUserNickname = document.getElementById('mUserNickname');
+
+      if (this.currentUser) {
+        // Desktop
+        if (btnOpenAuth) btnOpenAuth.style.display = 'none';
+        if (userLoggedInBlock) userLoggedInBlock.style.display = 'inline-flex';
+        if (userNicknameDisplay) userNicknameDisplay.textContent = this.currentUser.nickname || this.currentUser.username;
+        if (menuUsername) menuUsername.textContent = `@${this.currentUser.username}`;
+        
+        // Mobile
+        if (mBtnSync) mBtnSync.style.display = 'inline-block';
+        if (mUserNotLoggedIn) mUserNotLoggedIn.style.display = 'none';
+        if (mUserLoggedIn) mUserLoggedIn.style.display = 'flex';
+        if (mUserNickname) mUserNickname.textContent = this.currentUser.nickname || this.currentUser.username;
+      } else {
+        // Desktop
+        if (btnOpenAuth) btnOpenAuth.style.display = 'inline-block';
+        if (userLoggedInBlock) userLoggedInBlock.style.display = 'none';
+        
+        // Mobile
+        if (mBtnSync) mBtnSync.style.display = 'none';
+        if (mUserNotLoggedIn) mUserNotLoggedIn.style.display = 'flex';
+        if (mUserLoggedIn) mUserLoggedIn.style.display = 'none';
+      }
+
+      this.updateSyncUI();
+    },
+
+    // 更新同步指示灯与文字
+    updateSyncUI() {
+      const desktopSyncIcon = document.getElementById('desktopSyncIcon');
+      const desktopSyncText = document.getElementById('desktopSyncText');
+      const btnSyncCloud = document.getElementById('btnSyncCloud');
+      const menuSyncTime = document.getElementById('menuSyncTime');
+      const mUserSyncStatus = document.getElementById('mUserSyncStatus');
+
+      let timeStr = '未同步';
+      if (this.lastSyncTime) {
+        const d = new Date(this.lastSyncTime);
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const h = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        timeStr = `${m}-${day} ${h}:${min}`;
+      }
+
+      if (this.isSyncing) {
+        if (btnSyncCloud) {
+          btnSyncCloud.classList.add('syncing');
+          btnSyncCloud.classList.remove('dirty');
+        }
+        if (desktopSyncIcon) desktopSyncIcon.textContent = '🔄';
+        if (desktopSyncText) desktopSyncText.textContent = '同步中...';
+        if (mUserSyncStatus) mUserSyncStatus.textContent = '正在同步至云端...';
+      } else if (this.isDirty) {
+        if (btnSyncCloud) {
+          btnSyncCloud.classList.remove('syncing');
+          btnSyncCloud.classList.add('dirty');
+        }
+        if (desktopSyncIcon) desktopSyncIcon.textContent = '🟡';
+        if (desktopSyncText) desktopSyncText.textContent = '有新答题';
+        if (mUserSyncStatus) mUserSyncStatus.textContent = '本地有新作答，点击同步';
+        if (menuSyncTime) menuSyncTime.textContent = `上次同步: ${timeStr} (有未上传)`;
+      } else {
+        if (btnSyncCloud) {
+          btnSyncCloud.classList.remove('syncing', 'dirty');
+        }
+        if (desktopSyncIcon) desktopSyncIcon.textContent = '☁️';
+        if (desktopSyncText) desktopSyncText.textContent = '云端已同步';
+        if (mUserSyncStatus) mUserSyncStatus.textContent = `云端已同步 (${timeStr})`;
+        if (menuSyncTime) menuSyncTime.textContent = `上次同步: ${timeStr}`;
+      }
+    },
+
+    toggleUserMenu(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('userDropdownMenu');
+      if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+      }
+    },
+
+    closeUserMenu() {
+      const menu = document.getElementById('userDropdownMenu');
+      if (menu) menu.style.display = 'none';
+    },
+
+    openAuthModal(tab = 'login') {
+      this.closeUserMenu();
+      const modal = document.getElementById('authModal');
+      if (modal) {
+        modal.style.display = 'flex';
+        this.switchTab(tab);
+      }
+    },
+
+    closeAuthModal(e) {
+      if (e && e.target && e.target !== e.currentTarget) return;
+      const modal = document.getElementById('authModal');
+      if (modal) modal.style.display = 'none';
+      this.showNotice('', 'none');
+    },
+
+    switchTab(tab) {
+      this.showNotice('', 'none');
+      const tabs = ['login', 'register', 'reset'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`authTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        const form = document.getElementById(`form${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (btn) btn.classList.toggle('active', t === tab);
+        if (form) form.style.display = t === tab ? 'block' : 'none';
+      });
+
+      const titleEl = document.getElementById('authModalTitle');
+      if (titleEl) {
+        if (tab === 'login') titleEl.textContent = '考研政治 · 用户登录';
+        else if (tab === 'register') titleEl.textContent = '考研政治 · 新用户注册';
+        else if (tab === 'reset') titleEl.textContent = '考研政治 · 重置密码';
+      }
+    },
+
+    showNotice(msg, type = 'error') {
+      const notice = document.getElementById('authNotice');
+      if (!notice) return;
+      if (!msg) {
+        notice.style.display = 'none';
+        return;
+      }
+      notice.textContent = msg;
+      notice.className = `auth-notice ${type}`;
+      notice.style.display = 'block';
+    },
+
+    // 1. 用户登录
+    async handleLogin(e) {
+      e.preventDefault();
+      const username = (document.getElementById('loginUsername').value || '').trim();
+      const password = document.getElementById('loginPassword').value || '';
+      const submitBtn = document.getElementById('btnLoginSubmit');
+
+      if (!username || !password) {
+        this.showNotice('请输入账号与密码', 'error');
+        return;
+      }
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '登录中...';
+        this.showNotice('', 'none');
+
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || '登录失败，请检查账号密码');
+        }
+
+        this.setSession(data.token, data.user);
+        this.closeAuthModal();
+
+        // 登录成功瞬间自动触发双向智能合并同步
+        await this.syncProgress(true);
+        App.loadOverview();
+        alert(`欢迎回来，${data.user.nickname || data.user.username}！已为您自动连接云端数据。`);
+      } catch (err) {
+        this.showNotice(err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '立即登录并同步';
+      }
+    },
+
+    // 2. 新用户注册
+    async handleRegister(e) {
+      e.preventDefault();
+      const username = (document.getElementById('regUsername').value || '').trim();
+      const nickname = (document.getElementById('regNickname').value || '').trim();
+      const password = document.getElementById('regPassword').value || '';
+      const submitBtn = document.getElementById('btnRegSubmit');
+
+      if (!username || !password) {
+        this.showNotice('请填写完整的账号与密码', 'error');
+        return;
+      }
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '注册中...';
+        this.showNotice('', 'none');
+
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, nickname, password })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || '注册失败');
+        }
+
+        this.setSession(data.token, data.user);
+        this.closeAuthModal();
+
+        // 注册成功上传本地已有做题记录
+        await this.syncProgress(true);
+        App.loadOverview();
+        alert(`注册成功！已为您自动登录，本地刷题进度已同步至云端。`);
+      } catch (err) {
+        this.showNotice(err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '立即注册';
+      }
+    },
+
+    // 3. 学员重置密码
+    async handleResetPassword(e) {
+      e.preventDefault();
+      const username = (document.getElementById('resetUsername').value || '').trim();
+      const code = (document.getElementById('resetCode').value || '').trim();
+      const newPassword = document.getElementById('resetNewPassword').value || '';
+      const submitBtn = document.getElementById('btnResetSubmit');
+
+      if (!username || !code || !newPassword) {
+        this.showNotice('请填写账号、6位重置码与新密码', 'error');
+        return;
+      }
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '重置中...';
+        this.showNotice('', 'none');
+
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, code, newPassword })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || '重置密码失败');
+        }
+
+        this.setSession(data.token, data.user);
+        this.closeAuthModal();
+
+        await this.syncProgress(true);
+        App.loadOverview();
+        alert('密码重置成功！已自动为您登录并同步学习记录。');
+      } catch (err) {
+        this.showNotice(err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '确认重置并自动登录';
+      }
+    },
+
+    // 管理员面板
+    openAdminModal() {
+      this.closeAuthModal();
+      const modal = document.getElementById('adminModal');
+      const resultBox = document.getElementById('adminResultBox');
+      const notice = document.getElementById('adminNotice');
+      if (modal) modal.style.display = 'flex';
+      if (resultBox) resultBox.style.display = 'none';
+      if (notice) notice.style.display = 'none';
+    },
+
+    closeAdminModal(e) {
+      if (e && e.target && e.target !== e.currentTarget) return;
+      const modal = document.getElementById('adminModal');
+      if (modal) modal.style.display = 'none';
+    },
+
+    async handleAdminGenerateCode(e) {
+      e.preventDefault();
+      const adminSecret = (document.getElementById('adminSecretKey').value || '').trim();
+      const username = (document.getElementById('adminTargetUsername').value || '').trim();
+      const notice = document.getElementById('adminNotice');
+      const resultBox = document.getElementById('adminResultBox');
+      const codeDisplay = document.getElementById('adminGeneratedCode');
+      const submitBtn = document.getElementById('btnAdminGenerate');
+
+      if (!adminSecret || !username) {
+        notice.textContent = '请输入管理员密钥与学员账号';
+        notice.className = 'auth-notice error';
+        notice.style.display = 'block';
+        return;
+      }
+
+      try {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '生成中...';
+        notice.style.display = 'none';
+
+        const res = await fetch('/api/admin/generate-reset-code', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-secret': adminSecret
+          },
+          body: JSON.stringify({ adminSecret, username })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || '生成重置码失败');
+        }
+
+        codeDisplay.textContent = data.code;
+        resultBox.style.display = 'block';
+        notice.textContent = `学员「${data.nickname || data.username}」的 6 位重置码已生成！`;
+        notice.className = 'auth-notice success';
+        notice.style.display = 'block';
+
+        this._lastAdminResult = {
+          username: data.username,
+          code: data.code,
+          expiresIn: 30
+        };
+      } catch (err) {
+        notice.textContent = err.message;
+        notice.className = 'auth-notice error';
+        notice.style.display = 'block';
+        resultBox.style.display = 'none';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '⚡ 生成 6 位重置验证码';
+      }
+    },
+
+    copyAdminGeneratedCode() {
+      if (!this._lastAdminResult) return;
+      const text = `【考研政治 1000 题】学员 ${this._lastAdminResult.username}，您的密码重置码为：${this._lastAdminResult.code}，请在 30 分钟内点击登录界面的「忘记密码」输入该验证码重置新密码。`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          alert('重置码及使用说明已复制到剪贴板，可直接粘贴发送给学员！');
+        }).catch(() => {
+          prompt('请复制以下重置文本发给学员：', text);
+        });
+      } else {
+        prompt('请复制以下重置文本发给学员：', text);
+      }
+    },
+
+    setSession(token, user) {
+      this.token = token;
+      this.currentUser = user;
+      localStorage.setItem('kaoyan_jwt_token_2027', token);
+      if (user) {
+        localStorage.setItem('kaoyan_user_info_2027', JSON.stringify(user));
+      }
+      this.renderAuthUI();
+    },
+
+    async checkSession() {
+      if (!this.token) return;
+      try {
+        const cachedUser = localStorage.getItem('kaoyan_user_info_2027');
+        if (cachedUser) {
+          this.currentUser = JSON.parse(cachedUser);
+          this.renderAuthUI();
+        }
+
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.user) {
+            this.currentUser = data.user;
+            localStorage.setItem('kaoyan_user_info_2027', JSON.stringify(data.user));
+            this.renderAuthUI();
+          }
+        } else if (res.status === 401) {
+          this.logout(false);
+        }
+      } catch (e) {
+        // 离线或本地测试时忽略网络报错
+      }
+    },
+
+    logout(promptUser = true) {
+      if (promptUser && !confirm('确定要退出当前账号登录吗？本地答题记录仍会保留。')) {
+        return;
+      }
+      this.token = null;
+      this.currentUser = null;
+      this.isDirty = false;
+      localStorage.removeItem('kaoyan_jwt_token_2027');
+      localStorage.removeItem('kaoyan_user_info_2027');
+      this.renderAuthUI();
+      if (promptUser) {
+        alert('已成功退出登录。');
+      }
+    },
+
+    // 核心：点击「立即同步」将本地紧凑数据与云端双向智能合并
+    async syncProgress(isSilent = false) {
+      if (!this.token) {
+        if (!isSilent) {
+          this.openAuthModal('login');
+        }
+        return;
+      }
+
+      if (this.isSyncing) return;
+
+      try {
+        this.isSyncing = true;
+        this.updateSyncUI();
+
+        // 转换本地紧凑数据
+        const compactData = DB.toCompact();
+
+        const res = await fetch('/api/progress/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.token}`
+          },
+          body: JSON.stringify(compactData)
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || '云端同步失败');
+        }
+
+        // 智能合并云端最新回传结果至本地 localStorage
+        DB.mergeFromCompact(data);
+
+        this.lastSyncTime = data.updatedAt || Date.now();
+        localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
+        this.isDirty = false;
+        this.updateSyncUI();
+        App.loadOverview();
+
+        if (!isSilent) {
+          alert('☁️ 云端同步成功！做题进度与错题本已安全保存至 Cloudflare D1 数据库。');
+        }
+      } catch (err) {
+        console.error('Sync failed:', err);
+        if (!isSilent) {
+          alert(`同步失败: ${err.message || err}`);
+        }
+      } finally {
+        this.isSyncing = false;
+        this.updateSyncUI();
+      }
+    }
   },
 
   // ================== TIMERS ==================
@@ -1322,6 +1894,10 @@ const App = {
     });
   }
 };
+
+// Global window attachment for HTML event handlers & devtools
+window.DB = DB;
+window.App = App;
 
 // Bootstrap on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
