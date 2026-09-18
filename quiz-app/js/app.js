@@ -927,26 +927,21 @@ const App = {
       this.isDirty = false;
       this.lastSyncTime = null;
 
-      // 重新渲染导航栏与用户信息
-      this.renderAuthUI();
-
-      // 重新加载大厅目录，所有进度百分比归零
-      App.loadOverview();
-
-      // 如果当前在做题界面，重置当前做题状态并切回大厅
+      // 清空全局内存中的题目与做题状态
       if (App.state) {
+        App.state.questions = [];
+        App.state.mistakesList = [];
+        App.state.overview = null;
         App.state.currentIndex = 0;
         App.state.selectedOptions = [];
         App.state.isEvaluated = false;
         App.state.isFlagged = false;
       }
-      if (App.state && App.state.currentView !== 'hub') {
-        App.navigateTo('hub');
-      }
 
       if (reason) {
         alert(reason);
       }
+      location.reload();
     },
 
     setSession(token, user) {
@@ -1002,9 +997,26 @@ const App = {
     },
 
     resetLocalData() {
-      if (confirm('⚠️ 确定要清空本机所有的刷题记录与错题本吗？此操作不可撤销！')) {
-        this.purgeAllUserData('本地所有刷题记录与错题本已成功清空。');
+      if (!confirm('⚠️ 确定要清空本机所有的刷题记录与错题本吗？\n清空后所有答题进度与错题归零，此操作不可撤销！')) {
+        return;
       }
+      localStorage.removeItem('quiz_user_data_2027');
+      localStorage.removeItem('kaoyan_last_sync_time_2027');
+      this.isDirty = false;
+      this.lastSyncTime = null;
+
+      if (App.state) {
+        App.state.questions = [];
+        App.state.mistakesList = [];
+        App.state.overview = null;
+        App.state.currentIndex = 0;
+        App.state.selectedOptions = [];
+        App.state.isEvaluated = false;
+        App.state.isFlagged = false;
+      }
+
+      alert('本地所有刷题记录与错题本已成功清空！');
+      location.reload();
     },
 
     // 纯粹拉取云端数据并覆盖本地（只读 GET，彻底防本地脏数据污染云端）
@@ -1817,6 +1829,10 @@ const App = {
       reader.readAsText(file);
     };
     input.click();
+  },
+
+  resetLocalData() {
+    this.auth.resetLocalData();
   },
 
   // ================== PWA & SERVICE WORKER ==================
