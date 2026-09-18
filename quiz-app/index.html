@@ -80,9 +80,13 @@
           👤 登录 / 同步
         </button>
         <div id="userLoggedInBlock" class="user-logged-in-block" style="display:none;">
-          <button id="btnSyncCloud" class="btn-sync-pill" onclick="App.auth.syncProgress()" title="同步做题进度至 Cloudflare D1">
+          <button id="btnUploadCloud" class="btn-sync-pill" onclick="App.auth.uploadToCloud()" title="保存当前做题数据到 Cloudflare D1 云端">
             <span class="sync-icon" id="desktopSyncIcon">☁️</span>
-            <span id="desktopSyncText">立即同步</span>
+            <span id="desktopSyncText">上传云端</span>
+          </button>
+          <button id="btnDownloadCloud" class="btn-sync-pill btn-download-pill" onclick="App.auth.downloadFromCloud()" title="从 Cloudflare D1 云端下载恢复做题记录">
+            <span class="sync-icon">📥</span>
+            <span>下载云端</span>
           </button>
           <div class="user-badge" onclick="App.auth.toggleUserMenu(event)">
             <span class="user-avatar-dot"></span>
@@ -95,9 +99,13 @@
               <span class="menu-sync-time" id="menuSyncTime">云端已同步</span>
             </div>
             <div class="user-menu-divider"></div>
-            <button class="user-menu-item" onclick="App.auth.syncProgress(); App.auth.closeUserMenu();">
-              <span>☁️ 立即同步至 D1</span>
+            <button class="user-menu-item" onclick="App.auth.uploadToCloud(); App.auth.closeUserMenu();">
+              <span>☁️ 上传当前数据到云端</span>
             </button>
+            <button class="user-menu-item" onclick="App.auth.downloadFromCloud(); App.auth.closeUserMenu();">
+              <span>📥 从云端下载覆盖本机</span>
+            </button>
+            <div class="user-menu-divider"></div>
             <button class="user-menu-item color-coral" onclick="App.auth.resetLocalData(); App.auth.closeUserMenu();">
               <span>🧹 清空本机答题记录</span>
             </button>
@@ -110,8 +118,11 @@
 
       <!-- Mobile Quick Actions -->
       <div class="mobile-only mobile-header-actions">
-        <button class="m-icon-btn" id="mBtnSync" onclick="App.auth.syncProgress()" title="同步进度" style="display:none;">
+        <button class="m-icon-btn" id="mBtnUpload" onclick="App.auth.uploadToCloud()" title="保存当前数据到云端" style="display:none;">
           ☁️
+        </button>
+        <button class="m-icon-btn" id="mBtnDownload" onclick="App.auth.downloadFromCloud()" title="从云端下载恢复" style="display:none;">
+          📥
         </button>
         <button class="m-icon-btn" onclick="App.openDrawer()" title="打开答题卡">
           📋 <span id="mHeaderProgress">1/10</span>
@@ -719,6 +730,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270918_v3"></script>
+  <script src="js/app.js?v=20270918_v4"></script>
 </body>
 </html>

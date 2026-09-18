@@ -564,7 +564,12 @@ const App = {
         if (menuUsername) menuUsername.textContent = `@${this.currentUser.username}`;
         
         // Mobile
-        if (mBtnSync) mBtnSync.style.display = 'inline-block';
+        const mBtnUpload = document.getElementById('mBtnUpload');
+        const mBtnDownload = document.getElementById('mBtnDownload');
+        const mBtnSync = document.getElementById('mBtnSync');
+        if (mBtnUpload) mBtnUpload.style.display = 'inline-block';
+        if (mBtnDownload) mBtnDownload.style.display = 'inline-block';
+        if (mBtnSync) mBtnSync.style.display = 'none';
         if (mUserNotLoggedIn) mUserNotLoggedIn.style.display = 'none';
         if (mUserLoggedIn) mUserLoggedIn.style.display = 'flex';
         if (mUserNickname) mUserNickname.textContent = this.currentUser.nickname || this.currentUser.username;
@@ -574,6 +579,11 @@ const App = {
         if (userLoggedInBlock) userLoggedInBlock.style.display = 'none';
         
         // Mobile
+        const mBtnUpload = document.getElementById('mBtnUpload');
+        const mBtnDownload = document.getElementById('mBtnDownload');
+        const mBtnSync = document.getElementById('mBtnSync');
+        if (mBtnUpload) mBtnUpload.style.display = 'none';
+        if (mBtnDownload) mBtnDownload.style.display = 'none';
         if (mBtnSync) mBtnSync.style.display = 'none';
         if (mUserNotLoggedIn) mUserNotLoggedIn.style.display = 'flex';
         if (mUserLoggedIn) mUserLoggedIn.style.display = 'none';
@@ -586,11 +596,11 @@ const App = {
     updateSyncUI() {
       const desktopSyncIcon = document.getElementById('desktopSyncIcon');
       const desktopSyncText = document.getElementById('desktopSyncText');
-      const btnSyncCloud = document.getElementById('btnSyncCloud');
+      const btnUploadCloud = document.getElementById('btnUploadCloud') || document.getElementById('btnSyncCloud');
       const menuSyncTime = document.getElementById('menuSyncTime');
       const mUserSyncStatus = document.getElementById('mUserSyncStatus');
 
-      let timeStr = '未同步';
+      let timeStr = '未保存';
       if (this.lastSyncTime) {
         const d = new Date(this.lastSyncTime);
         const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -601,30 +611,30 @@ const App = {
       }
 
       if (this.isSyncing) {
-        if (btnSyncCloud) {
-          btnSyncCloud.classList.add('syncing');
-          btnSyncCloud.classList.remove('dirty');
+        if (btnUploadCloud) {
+          btnUploadCloud.classList.add('syncing');
+          btnUploadCloud.classList.remove('dirty');
         }
         if (desktopSyncIcon) desktopSyncIcon.textContent = '🔄';
-        if (desktopSyncText) desktopSyncText.textContent = '同步中...';
-        if (mUserSyncStatus) mUserSyncStatus.textContent = '正在同步至云端...';
+        if (desktopSyncText) desktopSyncText.textContent = '保存中...';
+        if (mUserSyncStatus) mUserSyncStatus.textContent = '正在保存至云端...';
       } else if (this.isDirty) {
-        if (btnSyncCloud) {
-          btnSyncCloud.classList.remove('syncing');
-          btnSyncCloud.classList.add('dirty');
+        if (btnUploadCloud) {
+          btnUploadCloud.classList.remove('syncing');
+          btnUploadCloud.classList.add('dirty');
         }
         if (desktopSyncIcon) desktopSyncIcon.textContent = '🟡';
-        if (desktopSyncText) desktopSyncText.textContent = '有新答题';
-        if (mUserSyncStatus) mUserSyncStatus.textContent = '本地有新作答，点击同步';
-        if (menuSyncTime) menuSyncTime.textContent = `上次同步: ${timeStr} (有未上传)`;
+        if (desktopSyncText) desktopSyncText.textContent = '保存云端';
+        if (mUserSyncStatus) mUserSyncStatus.textContent = '本地有新作答，点击保存云端';
+        if (menuSyncTime) menuSyncTime.textContent = `上次保存: ${timeStr} (有未上传)`;
       } else {
-        if (btnSyncCloud) {
-          btnSyncCloud.classList.remove('syncing', 'dirty');
+        if (btnUploadCloud) {
+          btnUploadCloud.classList.remove('syncing', 'dirty');
         }
         if (desktopSyncIcon) desktopSyncIcon.textContent = '☁️';
-        if (desktopSyncText) desktopSyncText.textContent = '云端已同步';
-        if (mUserSyncStatus) mUserSyncStatus.textContent = `云端已同步 (${timeStr})`;
-        if (menuSyncTime) menuSyncTime.textContent = `上次同步: ${timeStr}`;
+        if (desktopSyncText) desktopSyncText.textContent = '已存云端';
+        if (mUserSyncStatus) mUserSyncStatus.textContent = `云端已保存 (${timeStr})`;
+        if (menuSyncTime) menuSyncTime.textContent = `上次保存: ${timeStr}`;
       }
     },
 
@@ -721,8 +731,8 @@ const App = {
         // 关键防污染：先彻底清空本地临时/游客做题数据
         localStorage.removeItem('quiz_user_data_2027');
 
-        // 仅通过 GET 请求拉取该账号在云端的真实进度覆盖本地，杜绝污染
-        await this.fetchCloudProgress();
+        // 登录成功瞬间自动拉取该账号在云端的真实进度覆盖本地
+        await this.downloadFromCloud(true);
         App.loadOverview();
         alert(`欢迎回来，${data.user.nickname || data.user.username}！已为您清除本地临时数据，并成功载入您的专属云端进度。`);
       } catch (err) {
@@ -816,7 +826,7 @@ const App = {
 
         // 关键防污染：先清除本地临时数据，再拉取真实云端记录覆盖
         localStorage.removeItem('quiz_user_data_2027');
-        await this.fetchCloudProgress();
+        await this.downloadFromCloud(true);
         App.loadOverview();
         alert('密码重置成功！已自动为您登录，并载入您的云端学习记录。');
       } catch (err) {
@@ -1019,10 +1029,78 @@ const App = {
       location.reload();
     },
 
-    // 纯粹拉取云端数据并覆盖本地（只读 GET，彻底防本地脏数据污染云端）
-    async fetchCloudProgress() {
-      if (!this.token) return;
+    // 功能 1：☁️ 上传到云端（保存当前本地全部做题数据权威快照至 D1 数据库）
+    async uploadToCloud(isSilent = false) {
+      if (!this.token) {
+        if (!isSilent) this.openAuthModal('login');
+        return;
+      }
+
+      if (this.isSyncing) return;
+
       try {
+        this.isSyncing = true;
+        this.updateSyncUI();
+
+        // 采集本地当前全部真实做题数据快照
+        const compactData = DB.toCompact();
+
+        const res = await fetch('/api/progress/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.token}`
+          },
+          body: JSON.stringify(compactData)
+        });
+
+        if (res.status === 404 || res.status === 401) {
+          this.purgeAllUserData('您的账号已被管理员注销或下线，本地数据已自动清空。');
+          return;
+        }
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || '上传保存失败');
+        }
+
+        this.lastSyncTime = data.updatedAt || Date.now();
+        localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
+        this.isDirty = false;
+        this.updateSyncUI();
+
+        if (!isSilent) {
+          alert('☁️ 当前最新做题记录与错题本已成功保存至云端数据库！');
+        }
+      } catch (err) {
+        console.error('Upload failed:', err);
+        if (!isSilent) {
+          alert(`上传保存失败: ${err.message || err}`);
+        }
+      } finally {
+        this.isSyncing = false;
+        this.updateSyncUI();
+      }
+    },
+
+    // 功能 2：📥 从云端下载（拉取云端已保存的数据覆盖本机）
+    async downloadFromCloud(isSilent = false) {
+      if (!this.token) {
+        if (!isSilent) this.openAuthModal('login');
+        return;
+      }
+
+      if (!isSilent) {
+        const ok = confirm('⚠️ 确定要从云端下载数据吗？\n下载后将用云端保存的进度覆盖本机当前数据。');
+        if (!ok) return;
+      }
+
+      if (this.isSyncing) return;
+
+      try {
+        this.isSyncing = true;
+        this.updateSyncUI();
+
         const res = await fetch('/api/progress/sync', {
           method: 'GET',
           headers: {
@@ -1037,79 +1115,37 @@ const App = {
 
         const data = await res.json();
         if (!res.ok || !data.success) {
-          throw new Error(data.error || '获取云端数据失败');
+          throw new Error(data.error || '从云端下载失败');
         }
 
-        // 以云端权威数据全量覆盖本地
+        // 以云端真实保存的数据全量覆盖本地
         DB.setFromCloud(data);
         this.lastSyncTime = data.updatedAt || Date.now();
         localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
         this.isDirty = false;
         this.updateSyncUI();
-      } catch (err) {
-        console.warn('Fetch cloud progress failed:', err);
-      }
-    },
-
-    // 核心：点击「立即同步」将本地紧凑数据与云端双向智能合并
-    async syncProgress(isSilent = false) {
-      if (!this.token) {
-        if (!isSilent) {
-          this.openAuthModal('login');
-        }
-        return;
-      }
-
-      if (this.isSyncing) return;
-
-      try {
-        this.isSyncing = true;
-        this.updateSyncUI();
-
-        // 转换本地紧凑数据
-        const compactData = DB.toCompact();
-
-        const res = await fetch('/api/progress/sync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.token}`
-          },
-          body: JSON.stringify(compactData)
-        });
-
-        // 如果云端返回 404，说明账号在云端已被删除
-        if (res.status === 404 || res.status === 401) {
-          this.purgeAllUserData('您的账号已被管理员注销或下线，本地数据已自动清空。');
-          return;
-        }
-
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || '云端同步失败');
-        }
-
-        // 智能合并云端最新回传结果至本地 localStorage
-        DB.mergeFromCompact(data);
-
-        this.lastSyncTime = data.updatedAt || Date.now();
-        localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
-        this.isDirty = false;
-        this.updateSyncUI();
-        App.loadOverview();
 
         if (!isSilent) {
-          alert('☁️ 云端同步成功！做题进度与错题本已安全保存至 Cloudflare D1 数据库。');
+          alert('📥 云端数据下载成功！即将刷新页面呈现最新进度。');
+          location.reload();
         }
       } catch (err) {
-        console.error('Sync failed:', err);
+        console.error('Download failed:', err);
         if (!isSilent) {
-          alert(`同步失败: ${err.message || err}`);
+          alert(`下载失败: ${err.message || err}`);
         }
       } finally {
         this.isSyncing = false;
         this.updateSyncUI();
       }
+    },
+
+    // 兼容旧调用别名
+    async syncProgress(isSilent = false) {
+      return this.uploadToCloud(isSilent);
+    },
+    async fetchCloudProgress() {
+      return this.downloadFromCloud(true);
     }
   },
 

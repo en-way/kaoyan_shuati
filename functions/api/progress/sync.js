@@ -171,32 +171,25 @@ export async function onRequestPost(context) {
       }, 404);
     }
 
-    // 1. 读取云端现有进度
-    const existingRow = await env.DB.prepare(
-      'SELECT answers_data, mistakes_data, stats_data FROM user_progress WHERE user_id = ?'
-    ).bind(authUser.id).first();
-
-    let cloudAnswers = {};
-    let cloudMistakes = {};
-    let cloudStats = {};
-
-    if (existingRow) {
-      try { cloudAnswers = JSON.parse(existingRow.answers_data || '{}'); } catch(e) {}
-      try { cloudMistakes = JSON.parse(existingRow.mistakes_data || '{}'); } catch(e) {}
-      try { cloudStats = JSON.parse(existingRow.stats_data || '{}'); } catch(e) {}
+    // 权威保存（全量快照覆盖）：直接将客户端传来的当前做题状态作为云端权威最新数据
+    const cleanAnswers = {};
+    for (const [qid, item] of Object.entries(localAnswers || {})) {
+      const compact = toCompactAnswer(item);
+      if (compact) cleanAnswers[qid] = compact;
     }
 
-    // 2. 智能基于时间戳合并
-    const finalAnswers = mergeCompactAnswers(cloudAnswers, localAnswers);
-    const finalMistakes = mergeCompactMistakes(cloudMistakes, localMistakes);
-    const finalStats = { ...cloudStats, ...(localStats || {}) };
+    const cleanMistakes = {};
+    for (const [qid, item] of Object.entries(localMistakes || {})) {
+      const compact = toCompactMistake(item);
+      if (compact) cleanMistakes[qid] = compact;
+    }
 
     const now = Date.now();
-    const answersJson = JSON.stringify(finalAnswers);
-    const mistakesJson = JSON.stringify(finalMistakes);
-    const statsJson = JSON.stringify(finalStats);
+    const answersJson = JSON.stringify(cleanAnswers);
+    const mistakesJson = JSON.stringify(cleanMistakes);
+    const statsJson = JSON.stringify(localStats || {});
 
-    // 3. 写入 D1 (INSERT or REPLACE)
+    // 写入 D1 (INSERT or REPLACE 快照)
     await env.DB.prepare(
       `INSERT INTO user_progress (user_id, answers_data, mistakes_data, stats_data, version, updated_at)
        VALUES (?, ?, ?, ?, 1, ?)
@@ -209,11 +202,11 @@ export async function onRequestPost(context) {
 
     return jsonResponse({
       success: true,
-      answers: finalAnswers,
-      mistakes: finalMistakes,
-      stats: finalStats,
+      answers: cleanAnswers,
+      mistakes: cleanMistakes,
+      stats: localStats || {},
       updatedAt: now,
-      message: '云端同步成功'
+      message: '云端做题数据保存成功'
     });
   } catch (err) {
     return errorResponse(`同步做题数据失败: ${err.message || err}`, 500);

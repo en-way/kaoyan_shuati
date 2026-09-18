@@ -1955,6 +1955,17 @@ kbd {
   border-color: var(--accent-green);
 }
 
+.btn-download-pill {
+  background: rgba(0, 240, 255, 0.08);
+  border-color: rgba(0, 240, 255, 0.35);
+  color: var(--accent-cyan);
+}
+
+.btn-download-pill:hover {
+  background: rgba(0, 240, 255, 0.16);
+  border-color: var(--accent-cyan);
+}
+
 .btn-sync-pill.dirty {
   background: rgba(255, 204, 0, 0.12);
   border-color: rgba(255, 204, 0, 0.5);
