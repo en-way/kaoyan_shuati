@@ -637,9 +637,9 @@ const App = {
     const modeTag = document.getElementById('pModeTag');
     if (modeTag) modeTag.style.display = mode === 'mistakes_only' ? 'inline-block' : 'none';
 
-    const btnExam = document.getElementById('btnExamSubmit');
+    const btnExamSubmit = document.getElementById('btnExamSubmit');
     const drawerExam = document.getElementById('drawerExamSubmitBtn');
-    if (btnExam) btnExam.style.display = (mode === 'exam') ? 'inline-flex' : 'none';
+    if (btnExamSubmit) btnExamSubmit.style.display = (mode === 'exam') ? 'inline-flex' : 'none';
     if (drawerExam) drawerExam.style.display = (mode === 'exam') ? 'block' : 'none';
   },
 
