@@ -15,17 +15,17 @@
     <div class="header-left">
       <div class="brand" onclick="App.navigateTo('hub')">
         <span class="brand-badge">2027</span>
-        <span class="brand-title">考研政治 1000 题</span>
-        <span class="brand-sub">官方全解析版</span>
+        <span class="brand-title"><span class="desktop-only-inline">考研政治 </span>1000 题</span>
+        <span class="brand-sub desktop-only">官方全解析版</span>
       </div>
-      <div id="breadcrumb" class="breadcrumb">
+      <div id="breadcrumb" class="breadcrumb desktop-only">
         <span class="crumb-item" onclick="App.navigateTo('hub')">题库大厅</span>
         <span class="crumb-sep">/</span>
         <span id="crumbSubject" class="crumb-active">马原</span>
       </div>
     </div>
 
-    <div class="header-center">
+    <div class="header-center desktop-only">
       <!-- Question Stopwatch Timer -->
       <div class="timer-badge" title="当前题目用时">
         <span class="timer-icon">⏱️</span>
@@ -132,19 +132,28 @@
         <!-- Top Toolbar -->
         <div class="practice-toolbar">
           <div class="p-toolbar-top-row">
-            <div class="p-meta-tags">
-              <span id="pSubjectTag" class="p-subject-tag">马原</span>
-              <span id="pChapterTag" class="p-chapter-tag">导论</span>
-              <span id="pTypeTag" class="p-type-tag type-single">单选</span>
-              <span id="pModeTag" class="p-mode-tag" style="display:none;">错题专训</span>
+            <div class="p-left-group">
+              <!-- Mobile Mode Selector Pill Button -->
+              <button id="mModePillBtn" class="m-mode-pill mobile-only" onclick="App.openModeSelect()" title="点击切换做题模式">
+                <span id="mModePillIcon">⚡</span>
+                <span id="mModePillText">即做即判</span>
+                <span class="m-mode-chevron">▾</span>
+              </button>
+
+              <div class="p-meta-tags">
+                <span id="pSubjectTag" class="p-subject-tag">马原</span>
+                <span id="pChapterTag" class="p-chapter-tag desktop-only-inline">导论</span>
+                <span id="pTypeTag" class="p-type-tag type-single">单选</span>
+                <span id="pModeTag" class="p-mode-tag" style="display:none;">错题专训</span>
+              </div>
             </div>
 
             <div class="p-actions-group">
               <button id="pFlagBtn" class="btn-flag" onclick="App.toggleFlagCurrent()">
-                <span id="flagIcon">☆</span> 标记
+                <span id="flagIcon">☆</span> <span class="btn-label-text">标记</span>
               </button>
               <button id="pToggleExplBtn" class="btn-flag" onclick="App.toggleExplanationFold()">
-                💡 解析
+                💡 <span class="btn-label-text">解析</span>
               </button>
               <button class="btn-drawer desktop-only" onclick="App.openDrawer()">
                 📋 答题卡 (M)
@@ -152,8 +161,8 @@
             </div>
           </div>
 
-          <!-- Mode Switcher Pill Group -->
-          <div class="p-toolbar-bottom-row">
+          <!-- Mode Switcher Pill Group (Desktop Only) -->
+          <div class="p-toolbar-bottom-row desktop-only">
             <div class="mode-switch-group">
               <button id="modeBtnInstant" class="btn-mode-pill active" onclick="App.switchMode('instant')">
                 ⚡ 即做即判
@@ -330,11 +339,23 @@
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">⚙️</span>
-          <h3>功能与数据备份</h3>
+          <h3>功能与数据管理</h3>
         </div>
         <button class="modal-close" onclick="App.closeMoreMenu()">&times;</button>
       </div>
       <div class="modal-body sheet-body">
+        <!-- Live Timers Stats Card for Mobile -->
+        <div class="sheet-timers-grid">
+          <div class="sheet-timer-item">
+            <span class="sheet-timer-label">⏱️ 当前单题用时</span>
+            <span class="sheet-timer-val color-cyan" id="mSheetQuestionTimer">00:00</span>
+          </div>
+          <div class="sheet-timer-item">
+            <span class="sheet-timer-label">⏳ 今日累计刷题</span>
+            <span class="sheet-timer-val color-green" id="mSheetSessionTimer">00:00:00</span>
+          </div>
+        </div>
+
         <div class="sheet-action-list">
           <button class="sheet-btn" onclick="App.exportProgress(); App.closeMoreMenu();">
             <span class="sheet-btn-icon">💾</span>
@@ -355,6 +376,44 @@
         <div class="mobile-app-tip-box">
           <span class="tip-title">📱 手机全屏使用小技巧：</span>
           <p>在 Safari 浏览器中点击底部的 <b>“分享”</b> 图标，选择 <b>“添加到主屏幕”</b>，即可像原生 App 一样全屏沉浸刷题，无浏览器地址栏干扰！</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MOBILE MODE SELECTOR (移动端做题模式切换面板) -->
+  <div id="modeSelectModal" class="modal-backdrop" style="display:none;" onclick="App.closeModeSelect(event)">
+    <div class="modal-card modal-bottom-sheet" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">⚡</span>
+          <h3>选择刷题模式</h3>
+        </div>
+        <button class="modal-close" onclick="App.closeModeSelect()">&times;</button>
+      </div>
+      <div class="modal-body sheet-body">
+        <div class="sheet-action-list">
+          <button class="sheet-btn" id="mModeOptionInstant" onclick="App.selectModeFromSheet('instant')">
+            <span class="sheet-btn-icon">⚡</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title">即做即判模式 (推荐)</span>
+              <span class="sheet-btn-sub">做题即时给出对错与官方解析，做错题目自动归入错题本</span>
+            </div>
+          </button>
+          <button class="sheet-btn" id="mModeOptionExam" onclick="App.selectModeFromSheet('exam')">
+            <span class="sheet-btn-icon">📝</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title">模考自测模式</span>
+              <span class="sheet-btn-sub">全真模拟闭卷考场，答题时不显答案解析，交卷后统一复盘评分</span>
+            </div>
+          </button>
+          <button class="sheet-btn" id="mModeOptionRecite" onclick="App.selectModeFromSheet('recite')">
+            <span class="sheet-btn-icon">📖</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title">直接背题模式</span>
+              <span class="sheet-btn-sub">无需作答，直接高亮标准答案并展开名师点拨与考点详析</span>
+            </div>
+          </button>
         </div>
       </div>
     </div>

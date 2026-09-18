@@ -410,10 +410,11 @@ const App = {
       const h = Math.floor(this.state.sessionSeconds / 3600);
       const m = Math.floor((this.state.sessionSeconds % 3600) / 60);
       const s = this.state.sessionSeconds % 60;
+      const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
       const el = document.getElementById('sessionTimer');
-      if (el) {
-        el.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-      }
+      if (el) el.textContent = formatted;
+      const mEl = document.getElementById('mSheetSessionTimer');
+      if (mEl) mEl.textContent = formatted;
     }, 1000);
   },
 
@@ -432,11 +433,13 @@ const App = {
   },
 
   updateQuestionTimerDisplay() {
-    const el = document.getElementById('questionTimer');
-    if (!el) return;
     const m = Math.floor(this.state.questionSeconds / 60);
     const s = this.state.questionSeconds % 60;
-    el.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    const formatted = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    const el = document.getElementById('questionTimer');
+    if (el) el.textContent = formatted;
+    const mEl = document.getElementById('mSheetQuestionTimer');
+    if (mEl) mEl.textContent = formatted;
   },
 
   // ================== NAVIGATION ==================
@@ -605,12 +608,34 @@ const App = {
 
   updateModePillsUI() {
     const mode = this.state.practiceMode;
-    document.getElementById('modeBtnInstant').classList.toggle('active', mode === 'instant');
-    document.getElementById('modeBtnExam').classList.toggle('active', mode === 'exam');
-    document.getElementById('modeBtnRecite').classList.toggle('active', mode === 'recite');
+    const btnInstant = document.getElementById('modeBtnInstant');
+    const btnExam = document.getElementById('modeBtnExam');
+    const btnRecite = document.getElementById('modeBtnRecite');
+    if (btnInstant) btnInstant.classList.toggle('active', mode === 'instant');
+    if (btnExam) btnExam.classList.toggle('active', mode === 'exam');
+    if (btnRecite) btnRecite.classList.toggle('active', mode === 'recite');
+
+    // Update Mobile Mode Selector Pill
+    const mIcon = document.getElementById('mModePillIcon');
+    const mText = document.getElementById('mModePillText');
+    const modeMap = {
+      'instant': { icon: '⚡', text: '即做即判' },
+      'exam': { icon: '📝', text: '模考自测' },
+      'recite': { icon: '📖', text: '直接背题' },
+      'mistakes_only': { icon: '❌', text: '错题专训' }
+    };
+    const info = modeMap[mode] || { icon: '⚡', text: '做题模式' };
+    if (mIcon) mIcon.textContent = info.icon;
+    if (mText) mText.textContent = info.text;
+
+    // Update Mobile ActionSheet items active state
+    ['Instant', 'Exam', 'Recite'].forEach(k => {
+      const opt = document.getElementById(`mModeOption${k}`);
+      if (opt) opt.classList.toggle('active', mode === k.toLowerCase());
+    });
 
     const modeTag = document.getElementById('pModeTag');
-    modeTag.style.display = mode === 'mistakes_only' ? 'inline-block' : 'none';
+    if (modeTag) modeTag.style.display = mode === 'mistakes_only' ? 'inline-block' : 'none';
 
     const btnExam = document.getElementById('btnExamSubmit');
     const drawerExam = document.getElementById('drawerExamSubmitBtn');
@@ -1135,6 +1160,25 @@ const App = {
     if (modal) modal.style.display = 'none';
   },
 
+  // ================== MOBILE MODE SELECTOR ==================
+  openModeSelect() {
+    const modal = document.getElementById('modeSelectModal');
+    if (modal) modal.style.display = 'flex';
+  },
+
+  closeModeSelect(event) {
+    if (event && event.target && event.target.id !== 'modeSelectModal' && !event.target.classList.contains('modal-close')) {
+      return;
+    }
+    const modal = document.getElementById('modeSelectModal');
+    if (modal) modal.style.display = 'none';
+  },
+
+  selectModeFromSheet(mode) {
+    this.closeModeSelect();
+    this.switchMode(mode);
+  },
+
   // ================== TOUCH GESTURES (MOBILE SWIPE) ==================
   bindTouchGestures() {
     const card = document.getElementById('questionCard');
@@ -1180,6 +1224,7 @@ const App = {
           this.closeDrawer();
           this.closeLanModal();
           this.closeMoreMenu();
+          this.closeModeSelect();
           this.closeExamReportModal();
         }
         return;
@@ -1189,6 +1234,7 @@ const App = {
         this.closeDrawer();
         this.closeLanModal();
         this.closeMoreMenu();
+        this.closeModeSelect();
         this.closeExamReportModal();
         return;
       }
