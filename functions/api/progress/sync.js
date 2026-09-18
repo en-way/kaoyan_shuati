@@ -94,6 +94,16 @@ export async function onRequestGet(context) {
   }
 
   try {
+    // 检查用户是否仍在 users 表中
+    const userExists = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(authUser.id).first();
+    if (!userExists) {
+      return jsonResponse({
+        success: false,
+        code: 'USER_DELETED',
+        error: '账号在云端已被删除，本地数据将自动清空'
+      }, 404);
+    }
+
     const progressRow = await env.DB.prepare(
       'SELECT answers_data, mistakes_data, stats_data, updated_at FROM user_progress WHERE user_id = ?'
     ).bind(authUser.id).first();
@@ -151,6 +161,16 @@ export async function onRequestPost(context) {
   const { answers: localAnswers, mistakes: localMistakes, stats: localStats } = body || {};
 
   try {
+    // 检查用户是否仍在 users 表中
+    const userExists = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(authUser.id).first();
+    if (!userExists) {
+      return jsonResponse({
+        success: false,
+        code: 'USER_DELETED',
+        error: '账号在云端已被删除，本地数据将自动清空'
+      }, 404);
+    }
+
     // 1. 读取云端现有进度
     const existingRow = await env.DB.prepare(
       'SELECT answers_data, mistakes_data, stats_data FROM user_progress WHERE user_id = ?'

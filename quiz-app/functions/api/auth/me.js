@@ -13,7 +13,11 @@ export async function onRequestGet(context) {
 
   const authUser = await getAuthUser(request, env);
   if (!authUser) {
-    return errorResponse('未登录或登录已过期', 401);
+    return jsonResponse({
+      success: false,
+      code: 'UNAUTHORIZED',
+      error: '未登录或登录已过期'
+    }, 401);
   }
 
   if (!env.DB) {
@@ -29,7 +33,12 @@ export async function onRequestGet(context) {
     ).bind(authUser.id).first();
 
     if (!user) {
-      return errorResponse('用户不存在', 404);
+      // 云端数据库中未找到该用户（已被管理员删除或数据库已清空）
+      return jsonResponse({
+        success: false,
+        code: 'USER_DELETED',
+        error: '账号在云端已被删除，本地数据将自动清空'
+      }, 404);
     }
 
     return jsonResponse({

@@ -868,6 +868,40 @@ const App = {
       }
     },
 
+    // 核心安全清理：当云端数据库被清空或用户被删除时，自动彻底清空本地所有答题记录与缓存
+    purgeAllUserData(reason) {
+      localStorage.removeItem('quiz_user_data_2027');
+      localStorage.removeItem('kaoyan_jwt_token_2027');
+      localStorage.removeItem('kaoyan_user_info_2027');
+      localStorage.removeItem('kaoyan_last_sync_time_2027');
+
+      this.token = null;
+      this.currentUser = null;
+      this.isDirty = false;
+      this.lastSyncTime = null;
+
+      // 重新渲染导航栏与用户信息
+      this.renderAuthUI();
+
+      // 重新加载大厅目录，所有进度百分比归零
+      App.loadOverview();
+
+      // 如果当前在做题界面，重置当前做题状态并切回大厅
+      if (App.state) {
+        App.state.currentIndex = 0;
+        App.state.selectedOptions = [];
+        App.state.isEvaluated = false;
+        App.state.isFlagged = false;
+      }
+      if (App.state && App.state.currentView !== 'hub') {
+        App.navigateTo('hub');
+      }
+
+      if (reason) {
+        alert(reason);
+      }
+    },
+
     setSession(token, user) {
       this.token = token;
       this.currentUser = user;
@@ -890,6 +924,13 @@ const App = {
         const res = await fetch('/api/auth/me', {
           headers: { 'Authorization': `Bearer ${this.token}` }
         });
+
+        // 关键逻辑：如果云端返回 404（用户已不存在或数据库被清空）或 401（未授权）
+        if (res.status === 404 || res.status === 401) {
+          this.purgeAllUserData('检测到云端数据库中该用户已不存在或已被删除。本地所有答题记录与登录信息已自动清空重置！');
+          return;
+        }
+
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.user) {
@@ -897,8 +938,6 @@ const App = {
             localStorage.setItem('kaoyan_user_info_2027', JSON.stringify(data.user));
             this.renderAuthUI();
           }
-        } else if (res.status === 401) {
-          this.logout(false);
         }
       } catch (e) {
         // 离线或本地测试时忽略网络报错
@@ -906,17 +945,18 @@ const App = {
     },
 
     logout(promptUser = true) {
-      if (promptUser && !confirm('确定要退出当前账号登录吗？本地答题记录仍会保留。')) {
+      if (promptUser) {
+        const confirmLogout = confirm('确定要退出当前账号登录吗？\n点击【确定】退出登录并清空本机答题记录；点击【取消】取消操作。');
+        if (!confirmLogout) return;
+        this.purgeAllUserData('已成功退出登录，本地答题记录已全部清空。');
         return;
       }
-      this.token = null;
-      this.currentUser = null;
-      this.isDirty = false;
-      localStorage.removeItem('kaoyan_jwt_token_2027');
-      localStorage.removeItem('kaoyan_user_info_2027');
-      this.renderAuthUI();
-      if (promptUser) {
-        alert('已成功退出登录。');
+      this.purgeAllUserData();
+    },
+
+    resetLocalData() {
+      if (confirm('⚠️ 确定要清空本机所有的刷题记录与错题本吗？此操作不可撤销！')) {
+        this.purgeAllUserData('本地所有刷题记录与错题本已成功清空。');
       }
     },
 
@@ -946,6 +986,12 @@ const App = {
           },
           body: JSON.stringify(compactData)
         });
+
+        // 如果云端返回 404，说明账号在云端已被删除
+        if (res.status === 404 || res.status === 401) {
+          this.purgeAllUserData('检测到云端数据库中该账号已被删除。本地所有答题记录已自动彻底清空！');
+          return;
+        }
 
         const data = await res.json();
         if (!res.ok || !data.success) {
