@@ -1,0 +1,8 @@
+name = "kaoyan-shuati"
+pages_build_output_dir = "./quiz-app"
+compatibility_date = "2024-09-18"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kaoyan-quiz-db"
+database_id = "6af9521c-e4ce-4e8f-97fd-077776e11b97"
