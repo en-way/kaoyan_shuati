@@ -927,7 +927,7 @@ const App = {
 
         // 关键逻辑：如果云端返回 404（用户已不存在或数据库被清空）或 401（未授权）
         if (res.status === 404 || res.status === 401) {
-          this.purgeAllUserData('检测到云端数据库中该用户已不存在或已被删除。本地所有答题记录与登录信息已自动清空重置！');
+          this.purgeAllUserData('您的账号已被管理员注销或下线，本地数据已自动清空。');
           return;
         }
 
@@ -946,9 +946,9 @@ const App = {
 
     logout(promptUser = true) {
       if (promptUser) {
-        const confirmLogout = confirm('确定要退出当前账号登录吗？\n点击【确定】退出登录并清空本机答题记录；点击【取消】取消操作。');
+        const confirmLogout = confirm('确定要退出当前账号登录吗？退出后将清空本机答题记录。');
         if (!confirmLogout) return;
-        this.purgeAllUserData('已成功退出登录，本地答题记录已全部清空。');
+        this.purgeAllUserData('已成功退出登录，本地所有答题记录已全部清空。');
         return;
       }
       this.purgeAllUserData();
@@ -989,7 +989,7 @@ const App = {
 
         // 如果云端返回 404，说明账号在云端已被删除
         if (res.status === 404 || res.status === 401) {
-          this.purgeAllUserData('检测到云端数据库中该账号已被删除。本地所有答题记录已自动彻底清空！');
+          this.purgeAllUserData('您的账号已被管理员注销或下线，本地数据已自动清空。');
           return;
         }
 
