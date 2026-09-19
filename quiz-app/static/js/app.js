@@ -1398,6 +1398,15 @@ const App = {
       if (opt) opt.classList.toggle('active', mode === k.toLowerCase());
     });
 
+    // Update Question More Modal mode buttons
+    ['Instant', 'Exam', 'Recite', 'Mistakes'].forEach(k => {
+      const btn = document.getElementById(`qMoreMode${k}`);
+      if (btn) {
+        const isAct = k.toLowerCase() === mode || (k === 'Mistakes' && mode === 'mistakes_only');
+        btn.classList.toggle('active', isAct);
+      }
+    });
+
     const modeTag = document.getElementById('pModeTag');
     if (modeTag) modeTag.style.display = mode === 'mistakes_only' ? 'inline-block' : 'none';
 
@@ -1447,12 +1456,40 @@ const App = {
     const flagBtn = document.getElementById('pFlagBtn');
     const flagIcon = document.getElementById('flagIcon');
     if (this.state.isFlagged) {
-      flagBtn.classList.add('active');
-      flagIcon.textContent = '★';
+      if (flagBtn) flagBtn.classList.add('active');
+      if (flagIcon) flagIcon.textContent = '★';
     } else {
-      flagBtn.classList.remove('active');
-      flagIcon.textContent = '☆';
+      if (flagBtn) flagBtn.classList.remove('active');
+      if (flagIcon) flagIcon.textContent = '☆';
     }
+
+    // Update Mobile Card Top Row & Question More Menu status
+    const mProgress = document.getElementById('mCardProgress');
+    if (mProgress) {
+      mProgress.textContent = `${this.state.currentIndex + 1}/${this.state.questions.length}`;
+    }
+    const mType = document.getElementById('mCardTypeTag');
+    if (mType) {
+      mType.textContent = q.type === '多项选择题' ? '多选' : '单选';
+      mType.className = `p-type-tag ${q.type === '单项选择题' ? 'type-single' : 'type-multi'}`;
+    }
+    const mSub = document.getElementById('mCardSubjectTag');
+    if (mSub) {
+      mSub.textContent = shortSub;
+    }
+    const mSpecTag = document.getElementById('mCardSpecialTag');
+    if (mSpecTag) {
+      if (q.tag) {
+        mSpecTag.textContent = q.tag;
+        mSpecTag.style.display = 'inline-block';
+      } else {
+        mSpecTag.style.display = 'none';
+      }
+    }
+    const qMoreIcon = document.getElementById('qMoreFlagIcon');
+    const qMoreTitle = document.getElementById('qMoreFlagTitle');
+    if (qMoreIcon) qMoreIcon.textContent = this.state.isFlagged ? '★' : '☆';
+    if (qMoreTitle) qMoreTitle.textContent = this.state.isFlagged ? '已标记本题 (点击取消)' : '标记本题';
 
     document.getElementById('qStem').textContent = q.stem;
 
@@ -1673,12 +1710,17 @@ const App = {
     const flagBtn = document.getElementById('pFlagBtn');
     const flagIcon = document.getElementById('flagIcon');
     if (this.state.isFlagged) {
-      flagBtn.classList.add('active');
-      flagIcon.textContent = '★';
+      if (flagBtn) flagBtn.classList.add('active');
+      if (flagIcon) flagIcon.textContent = '★';
     } else {
-      flagBtn.classList.remove('active');
-      flagIcon.textContent = '☆';
+      if (flagBtn) flagBtn.classList.remove('active');
+      if (flagIcon) flagIcon.textContent = '☆';
     }
+
+    const qMoreIcon = document.getElementById('qMoreFlagIcon');
+    const qMoreTitle = document.getElementById('qMoreFlagTitle');
+    if (qMoreIcon) qMoreIcon.textContent = this.state.isFlagged ? '★' : '☆';
+    if (qMoreTitle) qMoreTitle.textContent = this.state.isFlagged ? '已标记本题 (点击取消)' : '标记本题';
   },
 
   // ================== EXAM SUBMISSION ==================
@@ -1982,6 +2024,44 @@ const App = {
   selectModeFromSheet(mode) {
     this.closeModeSelect();
     this.switchMode(mode);
+  },
+
+  // ================== MOBILE QUESTION MORE MENU ==================
+  openQuestionMoreMenu() {
+    const modal = document.getElementById('questionMoreModal');
+    if (!modal) return;
+
+    // Sync active mode button in question more sheet
+    const mode = this.state.practiceMode;
+    ['Instant', 'Exam', 'Recite', 'Mistakes'].forEach(k => {
+      const btn = document.getElementById(`qMoreMode${k}`);
+      if (btn) {
+        const isAct = k.toLowerCase() === mode || (k === 'Mistakes' && mode === 'mistakes_only');
+        btn.classList.toggle('active', isAct);
+      }
+    });
+
+    // Sync flag status
+    const qMoreIcon = document.getElementById('qMoreFlagIcon');
+    const qMoreTitle = document.getElementById('qMoreFlagTitle');
+    if (qMoreIcon) qMoreIcon.textContent = this.state.isFlagged ? '★' : '☆';
+    if (qMoreTitle) qMoreTitle.textContent = this.state.isFlagged ? '已标记本题 (点击取消)' : '标记本题';
+
+    // Sync exam submit button visibility
+    const submitBtn = document.getElementById('qMoreSubmitExamBtn');
+    if (submitBtn) {
+      submitBtn.style.display = (mode === 'exam') ? 'flex' : 'none';
+    }
+
+    modal.style.display = 'flex';
+  },
+
+  closeQuestionMoreMenu(event) {
+    if (event && event.target && event.target.id !== 'questionMoreModal' && !event.target.classList.contains('modal-close')) {
+      return;
+    }
+    const modal = document.getElementById('questionMoreModal');
+    if (modal) modal.style.display = 'none';
   },
 
   // ================== TOUCH GESTURES (MOBILE SWIPE) ==================

@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270919_v6">
+  <link rel="stylesheet" href="css/style.css?v=20270919_v7">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -182,17 +182,10 @@
     <!-- VIEW 2: PRACTICE STREAM (沉浸式卡片流) -->
     <section id="viewPractice" class="view-section">
       <div class="practice-container">
-        <!-- Top Toolbar -->
-        <div class="practice-toolbar">
+        <!-- Top Toolbar (Desktop Only) -->
+        <div class="practice-toolbar desktop-only">
           <div class="p-toolbar-top-row">
             <div class="p-left-group">
-              <!-- Mobile Mode Selector Pill Button -->
-              <button id="mModePillBtn" class="m-mode-pill mobile-only" onclick="App.openModeSelect()" title="点击切换做题模式">
-                <span id="mModePillIcon">⚡</span>
-                <span id="mModePillText">即做即判</span>
-                <span class="m-mode-chevron">▾</span>
-              </button>
-
               <div class="p-meta-tags">
                 <span id="pSubjectTag" class="p-subject-tag">马原</span>
                 <span id="pChapterTag" class="p-chapter-tag desktop-only-inline">导论</span>
@@ -239,12 +232,28 @@
         <!-- Question Card Box -->
         <div class="question-card" id="questionCard">
           <div class="q-header">
-            <div class="q-badges-wrap">
+            <!-- Desktop Badges -->
+            <div class="q-badges-wrap desktop-only">
               <span class="q-badge" id="qNumberBadge">第 1 题</span>
               <span class="q-tag-badge" id="qSpecialTag" style="display:none;">时政储备题</span>
             </div>
-            <div class="q-swipe-hint mobile-only">
-              <span>左右滑动切题</span>
+
+            <!-- Mobile Integrated Ultra-clean Top Bar -->
+            <div class="m-q-header-row mobile-only">
+              <div class="m-q-header-left">
+                <span class="m-q-progress-badge" id="mCardProgress">1/10</span>
+                <span class="p-type-tag type-single" id="mCardTypeTag">单选</span>
+                <span class="p-subject-tag m-subject-pill" id="mCardSubjectTag">马原</span>
+                <span class="q-tag-badge" id="mCardSpecialTag" style="display:none;">时政储备题</span>
+              </div>
+              <div class="m-q-header-right">
+                <button id="mCardToggleExplBtn" class="m-card-btn-action" onclick="App.toggleExplanationFold()" title="查看解析">
+                  💡 <span class="m-btn-label">解析</span>
+                </button>
+                <button id="mCardMoreBtn" class="m-card-btn-action m-card-btn-more" onclick="App.openQuestionMoreMenu()" title="更多做题操作">
+                  ···
+                </button>
+              </div>
             </div>
           </div>
 
@@ -517,6 +526,65 @@
     </div>
   </div>
 
+  <!-- MODAL: MOBILE QUESTION MORE MENU (移动端做题快捷操作面板) -->
+  <div id="questionMoreModal" class="modal-backdrop" style="display:none;" onclick="App.closeQuestionMoreMenu(event)">
+    <div class="modal-card modal-bottom-sheet" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span class="modal-icon">⚙️</span>
+          <h3>做题操作与模式</h3>
+        </div>
+        <button class="modal-close" onclick="App.closeQuestionMoreMenu()">&times;</button>
+      </div>
+      <div class="modal-body sheet-body">
+        <div class="q-more-section-title">切换做题模式</div>
+        <div class="q-more-modes-grid">
+          <button id="qMoreModeInstant" class="q-more-mode-btn active" onclick="App.switchMode('instant'); App.closeQuestionMoreMenu();">
+            <span class="q-mode-icon">⚡</span>
+            <span class="q-mode-name">即做即判</span>
+          </button>
+          <button id="qMoreModeExam" class="q-more-mode-btn" onclick="App.switchMode('exam'); App.closeQuestionMoreMenu();">
+            <span class="q-mode-icon">📝</span>
+            <span class="q-mode-name">模考自测</span>
+          </button>
+          <button id="qMoreModeRecite" class="q-more-mode-btn" onclick="App.switchMode('recite'); App.closeQuestionMoreMenu();">
+            <span class="q-mode-icon">📖</span>
+            <span class="q-mode-name">直接背题</span>
+          </button>
+          <button id="qMoreModeMistakes" class="q-more-mode-btn" onclick="App.startMistakesTraining(); App.closeQuestionMoreMenu();">
+            <span class="q-mode-icon">❌</span>
+            <span class="q-mode-name">错题专训</span>
+          </button>
+        </div>
+
+        <div class="q-more-section-title" style="margin-top: 14px;">题目快捷动作</div>
+        <div class="sheet-action-list">
+          <button class="sheet-btn" onclick="App.openDrawer(); App.closeQuestionMoreMenu();">
+            <span class="sheet-btn-icon">📋</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title">答题卡全览 / 快速跳题</span>
+              <span class="sheet-btn-sub">查看所有题目完成度，点击可直接跳至任意题</span>
+            </div>
+          </button>
+          <button id="qMoreFlagBtn" class="sheet-btn" onclick="App.toggleFlagCurrent()">
+            <span class="sheet-btn-icon" id="qMoreFlagIcon">☆</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title" id="qMoreFlagTitle">标记本题</span>
+              <span class="sheet-btn-sub">标为重点题目，方便稍后在答题卡筛选攻克</span>
+            </div>
+          </button>
+          <button id="qMoreSubmitExamBtn" class="sheet-btn sheet-btn-danger" style="display:none;" onclick="App.submitExam(); App.closeQuestionMoreMenu();">
+            <span class="sheet-btn-icon">📝</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title color-coral">交卷并生成成绩单</span>
+              <span class="sheet-btn-sub">提前结束本次模考自测并查看考情分析</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: EXAM SCORE REPORT (模考成绩单) -->
   <div id="examReportModal" class="modal-backdrop" style="display:none;">
     <div class="modal-card">
@@ -738,6 +806,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270919_v6"></script>
+  <script src="js/app.js?v=20270919_v7"></script>
 </body>
 </html>
