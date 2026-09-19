@@ -72,7 +72,7 @@ git push -u origin main
 - **生产分支 (Production branch)**：`main`；
 - **框架预设 (Framework preset)**：选择 **`None`**；
 - **构建命令 (Build command)**：**留空**（不需要填写任何内容）；
-- **构建输出目录 (Build output directory)**：填写 **`quiz-app`** ⚠️（非常关键：这代表直接发布 `quiz-app` 目录内的网页文件）。
+- **构建输出目录 (Build output directory)**：填写 **`/`** 或留空（代表直接发布根目录下的网页文件）。
 
 ### 步骤 4：保存并部署
 点击底部的 **保存并部署**（Save and Deploy）按钮。
