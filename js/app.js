@@ -1352,8 +1352,10 @@ const App = {
     this.state.currentIndex = 0;
     this.state.explanationVisible = true;
 
-    const shortSub = part.replace(/^第[一二三四五]部分\s*/, '');
-    document.getElementById('crumbSubject').textContent = `${shortSub} · ${chapter}`;
+    const shortSub = part ? part.replace(/^第[一二三四五]部分\s*/, '') : '全科错题';
+    const chTitle = chapter || (mode === 'mistakes_only' ? '专项特训' : '全部章节');
+    const crumbEl = document.getElementById('crumbSubject');
+    if (crumbEl) crumbEl.textContent = `${shortSub} · ${chTitle}`;
 
     const data = DB.getQuestions(part, chapter, type, mode);
     this.state.questions = data.questions || [];
@@ -1835,17 +1837,120 @@ const App = {
   },
 
   populateMistakeFilters() {
-    if (!this.state.overview) return;
+    // 提取所有未攻克的完整错题用于构建筛选器各级选项统计
+    const allMistakesData = DB.getMistakes('', '');
+    const allList = allMistakesData.mistakes || [];
+    const totalAllCount = allList.length;
+
+    // 按科目和章节聚合错题数量
+    const statsByPart = {};
+    allList.forEach(m => {
+      const p = m.part || '其他';
+      const ch = m.chapter || '未分类';
+      if (!statsByPart[p]) {
+        statsByPart[p] = { count: 0, chapters: {} };
+      }
+      statsByPart[p].count++;
+      statsByPart[p].chapters[ch] = (statsByPart[p].chapters[ch] || 0) + 1;
+    });
+
+    // 填充科目下拉框
     const pSelect = document.getElementById('mPartFilter');
-    if (pSelect.children.length <= 1) {
-      pSelect.innerHTML = '<option value="">全部科目</option>' +
-        this.state.overview.subjects.map(s => `<option value="${s.name}">${s.name}</option>`).join('');
+    if (pSelect) {
+      const currentPart = this.state.filterPart || '';
+      let partHtml = `<option value="">全部科目 (${totalAllCount}题)</option>`;
+      
+      if (this.state.overview && this.state.overview.subjects) {
+        this.state.overview.subjects.forEach(s => {
+          const count = statsByPart[s.name] ? statsByPart[s.name].count : 0;
+          const shortName = s.name.replace(/^第[一二三四五]部分\s*/, '');
+          const sel = s.name === currentPart ? 'selected' : '';
+          partHtml += `<option value="${s.name}" ${sel}>${shortName} (${count}题)</option>`;
+        });
+      } else {
+        Object.entries(statsByPart).forEach(([pName, pStat]) => {
+          const shortName = pName.replace(/^第[一二三四五]部分\s*/, '');
+          const sel = pName === currentPart ? 'selected' : '';
+          partHtml += `<option value="${pName}" ${sel}>${shortName} (${pStat.count}题)</option>`;
+        });
+      }
+      pSelect.innerHTML = partHtml;
     }
+
+    // 联动填充章节下拉框
+    this.populateMistakeChapterOptions(statsByPart, totalAllCount);
+
+    // 动态刷新顶部专项特训按钮
+    this.updateMistakesTrainingBtn(this.state.mistakesList.length);
+  },
+
+  populateMistakeChapterOptions(statsByPart, totalAllCount) {
+    const chSelect = document.getElementById('mChapterFilter');
+    if (!chSelect) return;
+
+    const currentPart = this.state.filterPart || '';
+    const currentChapter = this.state.filterChapter || '';
+
+    let chHtml = '';
+    if (currentPart && statsByPart && statsByPart[currentPart]) {
+      const pStat = statsByPart[currentPart];
+      chHtml += `<option value="">全部章节 (${pStat.count}题)</option>`;
+      Object.entries(pStat.chapters).forEach(([chName, count]) => {
+        const sel = chName === currentChapter ? 'selected' : '';
+        chHtml += `<option value="${chName}" ${sel}>${chName} (${count}题)</option>`;
+      });
+    } else {
+      chHtml += `<option value="">全部章节 (${totalAllCount}题)</option>`;
+      if (statsByPart) {
+        Object.entries(statsByPart).forEach(([pName, pStat]) => {
+          const shortPart = pName.replace(/^第[一二三四五]部分\s*/, '');
+          Object.entries(pStat.chapters).forEach(([chName, count]) => {
+            const sel = chName === currentChapter ? 'selected' : '';
+            chHtml += `<option value="${chName}" ${sel}>${shortPart} · ${chName} (${count}题)</option>`;
+          });
+        });
+      }
+    }
+    chSelect.innerHTML = chHtml;
+  },
+
+  onPartFilterChange() {
+    const pSelect = document.getElementById('mPartFilter');
+    this.state.filterPart = pSelect ? pSelect.value : '';
+    this.state.filterChapter = '';
+    this.loadMistakes();
+  },
+
+  onChapterFilterChange() {
+    const chSelect = document.getElementById('mChapterFilter');
+    this.state.filterChapter = chSelect ? chSelect.value : '';
+    this.loadMistakes();
   },
 
   filterMistakes() {
-    this.state.filterPart = document.getElementById('mPartFilter').value;
-    this.loadMistakes();
+    this.onPartFilterChange();
+  },
+
+  updateMistakesTrainingBtn(count) {
+    const btn = document.getElementById('btnStartMistakesTraining');
+    if (!btn) return;
+
+    const part = this.state.filterPart || '';
+    const chapter = this.state.filterChapter || '';
+
+    if (part && chapter) {
+      const shortPart = part.replace(/^第[一二三四五]部分\s*/, '');
+      btn.innerHTML = `⚡ 专项特训【${shortPart}·${chapter}】(${count}题)`;
+    } else if (part) {
+      const shortPart = part.replace(/^第[一二三四五]部分\s*/, '');
+      btn.innerHTML = `⚡ 专项特训【${shortPart}】(${count}题)`;
+    } else {
+      btn.innerHTML = `⚡ 立即全部错题特训 (${count}题)`;
+    }
+
+    btn.disabled = (count === 0);
+    btn.style.opacity = count === 0 ? '0.5' : '1';
+    btn.style.cursor = count === 0 ? 'not-allowed' : 'pointer';
   },
 
   renderMistakesList() {
@@ -1905,11 +2010,12 @@ const App = {
 
   startMistakesTraining() {
     if (!this.state.mistakesList.length) {
-      alert('当前没有错题可以特训！');
+      alert('当前筛选条件下暂无待攻克错题！');
       return;
     }
-    const firstM = this.state.mistakesList[0];
-    this.startPractice(firstM.part, firstM.chapter, '', 'mistakes_only');
+    const part = this.state.filterPart || '';
+    const chapter = this.state.filterChapter || '';
+    this.startPractice(part, chapter, '', 'mistakes_only');
   },
 
   // ================== PROGRESS BACKUP / RESTORE ==================

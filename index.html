@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270919_v8">
+  <link rel="stylesheet" href="css/style.css?v=20270919_v9">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -362,7 +362,7 @@
             <p>做题时做错的题目已自动收录在此，支持专项逐题攻坚复刷</p>
           </div>
           <div class="m-head-right">
-            <button class="btn-primary" onclick="App.startMistakesTraining()">
+            <button id="btnStartMistakesTraining" class="btn-primary" onclick="App.startMistakesTraining()">
               ⚡ 立即全部错题特训
             </button>
           </div>
@@ -370,10 +370,10 @@
 
         <!-- Filter bar -->
         <div class="mistakes-filters">
-          <select id="mPartFilter" onchange="App.filterMistakes()">
+          <select id="mPartFilter" onchange="App.onPartFilterChange()">
             <option value="">全部科目</option>
           </select>
-          <select id="mChapterFilter" onchange="App.filterMistakes()">
+          <select id="mChapterFilter" onchange="App.onChapterFilterChange()">
             <option value="">全部章节</option>
           </select>
           <div class="m-stats-summary" id="mMistakesCountText">
@@ -822,6 +822,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270919_v8"></script>
+  <script src="js/app.js?v=20270919_v9"></script>
 </body>
 </html>
