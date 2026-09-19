@@ -118,16 +118,10 @@
 
       <!-- Mobile Quick Actions -->
       <div class="mobile-only mobile-header-actions">
-        <button class="m-icon-btn" id="mBtnUpload" onclick="App.auth.uploadToCloud()" title="保存当前数据到云端" style="display:none;">
-          ☁️
-        </button>
-        <button class="m-icon-btn" id="mBtnDownload" onclick="App.auth.downloadFromCloud()" title="从云端下载恢复" style="display:none;">
-          📥
-        </button>
         <button class="m-icon-btn" onclick="App.openDrawer()" title="打开答题卡">
           📋 <span id="mHeaderProgress">1/10</span>
         </button>
-        <button class="m-icon-btn" onclick="App.openMoreMenu()" title="更多功能">
+        <button class="m-icon-btn" onclick="App.openMoreMenu()" title="设置与数据管理">
           ⚙️
         </button>
       </div>
@@ -419,27 +413,34 @@
         <div class="m-user-card" id="mUserCard">
           <div id="mUserNotLoggedIn" class="m-user-prompt">
             <div class="m-user-prompt-text">
-              <span class="m-user-title">👤 考研政治云端同步</span>
-              <span class="m-user-sub">登录后做题记录与错题持久化保存至 D1</span>
+              <span class="m-user-title">👤 考研政治云端账号</span>
+              <span class="m-user-sub">登录后可将做题进度与错题安全保存至云端</span>
             </div>
             <button class="btn-primary btn-sm" onclick="App.closeMoreMenu(); App.auth.openAuthModal('login');">
               登录 / 注册
             </button>
           </div>
-          <div id="mUserLoggedIn" class="m-user-status" style="display:none;">
-            <div class="m-user-prompt-text">
+          <div id="mUserLoggedIn" class="m-user-status-card" style="display:none;">
+            <div class="m-user-top-row">
               <div class="m-user-badge-row">
                 <span class="user-avatar-dot"></span>
                 <span class="m-user-title" id="mUserNickname">考研学子</span>
               </div>
-              <span class="m-user-sub" id="mUserSyncStatus">云端已同步</span>
-            </div>
-            <div class="m-user-btn-group">
-              <button class="btn-sync-pill" onclick="App.auth.syncProgress()">
-                ☁️ 立即同步
+              <button class="btn-logout-compact" onclick="App.auth.logout()" title="退出当前账号">
+                🚪 退出
               </button>
-              <button class="btn-secondary btn-sm" onclick="App.auth.logout()">
-                退出
+            </div>
+            <div class="m-user-sub-row">
+              <span class="m-user-sub" id="mUserSyncStatus">云端已保存</span>
+            </div>
+            <div class="m-cloud-grid">
+              <button id="mBtnUploadCloud" class="m-cloud-btn m-cloud-btn-upload" onclick="App.auth.uploadToCloud()">
+                <span class="m-cloud-icon" id="mCloudUploadIcon">☁️</span>
+                <span id="mCloudUploadText">上传云端</span>
+              </button>
+              <button id="mBtnDownloadCloud" class="m-cloud-btn m-cloud-btn-download" onclick="App.auth.downloadFromCloud()">
+                <span class="m-cloud-icon">📥</span>
+                <span>下载云端</span>
               </button>
             </div>
           </div>
@@ -458,6 +459,13 @@
             <div class="sheet-btn-info">
               <span class="sheet-btn-title">恢复/导入刷题进度</span>
               <span class="sheet-btn-sub">从其他设备或备份文件导入进度与错题</span>
+            </div>
+          </button>
+          <button class="sheet-btn sheet-btn-danger" onclick="App.closeMoreMenu(); App.auth.resetLocalData();">
+            <span class="sheet-btn-icon">🧹</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title color-coral">清空本机刷题记录</span>
+              <span class="sheet-btn-sub">清除本机所有的答题卡、得分与错题本（不可逆）</span>
             </div>
           </button>
         </div>
@@ -730,6 +738,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270918_v4"></script>
+  <script src="js/app.js?v=20270919_v5"></script>
 </body>
 </html>

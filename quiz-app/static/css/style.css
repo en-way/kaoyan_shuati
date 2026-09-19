@@ -2326,6 +2326,105 @@ kbd {
   gap: 10px;
 }
 
+.m-user-status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.m-user-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-logout-compact {
+  background: rgba(255, 71, 87, 0.12);
+  border: 1px solid rgba(255, 71, 87, 0.35);
+  color: #ff6b81;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-logout-compact:active {
+  background: rgba(255, 71, 87, 0.25);
+  transform: scale(0.96);
+}
+
+.m-user-sub-row {
+  margin-top: -4px;
+}
+
+/* 50% + 50% Mobile Cloud Dual Buttons */
+.m-cloud-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.m-cloud-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.m-cloud-btn:active {
+  transform: scale(0.97);
+}
+
+.m-cloud-btn-upload {
+  background: rgba(0, 255, 136, 0.12);
+  border-color: rgba(0, 255, 136, 0.35);
+  color: var(--accent-green);
+}
+
+.m-cloud-btn-upload.dirty {
+  background: rgba(255, 204, 0, 0.15);
+  border-color: rgba(255, 204, 0, 0.5);
+  color: var(--accent-gold);
+  animation: pulse-sync 2s infinite ease-in-out;
+}
+
+.m-cloud-btn-upload.syncing .m-cloud-icon {
+  display: inline-block;
+  animation: spin 1s infinite linear;
+}
+
+.m-cloud-btn-download {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: rgba(0, 240, 255, 0.35);
+  color: var(--accent-cyan);
+}
+
+/* Danger Item in Sheet Action List */
+.sheet-btn-danger {
+  border-color: rgba(255, 71, 87, 0.2) !important;
+}
+
+.sheet-btn-danger:active,
+.sheet-btn-danger:hover {
+  background: rgba(255, 71, 87, 0.08) !important;
+  border-color: rgba(255, 71, 87, 0.4) !important;
+}
+
+.color-coral {
+  color: #ff6b81 !important;
+}
+
 .m-user-badge-row {
   display: flex;
   align-items: center;

@@ -563,13 +563,7 @@ const App = {
         if (userNicknameDisplay) userNicknameDisplay.textContent = this.currentUser.nickname || this.currentUser.username;
         if (menuUsername) menuUsername.textContent = `@${this.currentUser.username}`;
         
-        // Mobile
-        const mBtnUpload = document.getElementById('mBtnUpload');
-        const mBtnDownload = document.getElementById('mBtnDownload');
-        const mBtnSync = document.getElementById('mBtnSync');
-        if (mBtnUpload) mBtnUpload.style.display = 'inline-block';
-        if (mBtnDownload) mBtnDownload.style.display = 'inline-block';
-        if (mBtnSync) mBtnSync.style.display = 'none';
+        // Mobile User Card
         if (mUserNotLoggedIn) mUserNotLoggedIn.style.display = 'none';
         if (mUserLoggedIn) mUserLoggedIn.style.display = 'flex';
         if (mUserNickname) mUserNickname.textContent = this.currentUser.nickname || this.currentUser.username;
@@ -578,13 +572,7 @@ const App = {
         if (btnOpenAuth) btnOpenAuth.style.display = 'inline-block';
         if (userLoggedInBlock) userLoggedInBlock.style.display = 'none';
         
-        // Mobile
-        const mBtnUpload = document.getElementById('mBtnUpload');
-        const mBtnDownload = document.getElementById('mBtnDownload');
-        const mBtnSync = document.getElementById('mBtnSync');
-        if (mBtnUpload) mBtnUpload.style.display = 'none';
-        if (mBtnDownload) mBtnDownload.style.display = 'none';
-        if (mBtnSync) mBtnSync.style.display = 'none';
+        // Mobile User Card
         if (mUserNotLoggedIn) mUserNotLoggedIn.style.display = 'flex';
         if (mUserLoggedIn) mUserLoggedIn.style.display = 'none';
       }
@@ -599,6 +587,11 @@ const App = {
       const btnUploadCloud = document.getElementById('btnUploadCloud') || document.getElementById('btnSyncCloud');
       const menuSyncTime = document.getElementById('menuSyncTime');
       const mUserSyncStatus = document.getElementById('mUserSyncStatus');
+
+      // Mobile dual button elements
+      const mBtnUploadCloud = document.getElementById('mBtnUploadCloud');
+      const mCloudUploadIcon = document.getElementById('mCloudUploadIcon');
+      const mCloudUploadText = document.getElementById('mCloudUploadText');
 
       let timeStr = '未保存';
       if (this.lastSyncTime) {
@@ -617,6 +610,13 @@ const App = {
         }
         if (desktopSyncIcon) desktopSyncIcon.textContent = '🔄';
         if (desktopSyncText) desktopSyncText.textContent = '保存中...';
+
+        if (mBtnUploadCloud) {
+          mBtnUploadCloud.classList.add('syncing');
+          mBtnUploadCloud.classList.remove('dirty');
+        }
+        if (mCloudUploadIcon) mCloudUploadIcon.textContent = '🔄';
+        if (mCloudUploadText) mCloudUploadText.textContent = '保存中...';
         if (mUserSyncStatus) mUserSyncStatus.textContent = '正在保存至云端...';
       } else if (this.isDirty) {
         if (btnUploadCloud) {
@@ -625,7 +625,14 @@ const App = {
         }
         if (desktopSyncIcon) desktopSyncIcon.textContent = '🟡';
         if (desktopSyncText) desktopSyncText.textContent = '保存云端';
-        if (mUserSyncStatus) mUserSyncStatus.textContent = '本地有新作答，点击保存云端';
+
+        if (mBtnUploadCloud) {
+          mBtnUploadCloud.classList.remove('syncing');
+          mBtnUploadCloud.classList.add('dirty');
+        }
+        if (mCloudUploadIcon) mCloudUploadIcon.textContent = '🟡';
+        if (mCloudUploadText) mCloudUploadText.textContent = '保存云端';
+        if (mUserSyncStatus) mUserSyncStatus.textContent = '本地有新答题，点击上传保存';
         if (menuSyncTime) menuSyncTime.textContent = `上次保存: ${timeStr} (有未上传)`;
       } else {
         if (btnUploadCloud) {
@@ -633,6 +640,12 @@ const App = {
         }
         if (desktopSyncIcon) desktopSyncIcon.textContent = '☁️';
         if (desktopSyncText) desktopSyncText.textContent = '已存云端';
+
+        if (mBtnUploadCloud) {
+          mBtnUploadCloud.classList.remove('syncing', 'dirty');
+        }
+        if (mCloudUploadIcon) mCloudUploadIcon.textContent = '☁️';
+        if (mCloudUploadText) mCloudUploadText.textContent = '上传云端';
         if (mUserSyncStatus) mUserSyncStatus.textContent = `云端已保存 (${timeStr})`;
         if (menuSyncTime) menuSyncTime.textContent = `上次保存: ${timeStr}`;
       }
