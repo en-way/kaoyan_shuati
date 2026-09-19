@@ -818,6 +818,7 @@ body {
 .option-item.is-correct-std {
   border-color: var(--accent-green) !important;
   background: rgba(16, 185, 129, 0.12) !important;
+  animation: correctPulse 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .option-item.is-correct-std .option-key-badge {
@@ -830,6 +831,7 @@ body {
 .option-item.is-wrong-selected {
   border-color: var(--accent-coral) !important;
   background: rgba(255, 71, 87, 0.12) !important;
+  animation: wrongShake 0.18s ease-in-out;
 }
 
 .option-item.is-wrong-selected .option-key-badge {
@@ -1580,6 +1582,8 @@ kbd {
     justify-content: space-between;
     width: 100%;
     gap: 6px;
+    flex-wrap: nowrap !important;
+    overflow: hidden;
   }
 
   .p-left-group {
@@ -1625,6 +1629,18 @@ kbd {
     gap: 4px;
     min-width: 0;
     overflow: hidden;
+  }
+
+  #pModeTag {
+    display: none !important;
+  }
+
+  .p-subject-tag {
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
   }
 
   .p-subject-tag, .p-chapter-tag, .p-type-tag {
@@ -2441,4 +2457,50 @@ kbd {
   padding: 5px 10px;
   font-size: 12px;
 }
+
+/* ==========================================================================
+   Micro-Animations (极速灵动动效 180ms ~ 220ms GPU 加速)
+   ========================================================================== */
+@keyframes cardSlideLeft {
+  0% {
+    opacity: 0.1;
+    transform: translate3d(24px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes cardSlideRight {
+  0% {
+    opacity: 0.1;
+    transform: translate3d(-24px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.anim-slide-left {
+  animation: cardSlideLeft 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.anim-slide-right {
+  animation: cardSlideRight 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes correctPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.015); box-shadow: 0 0 16px rgba(16, 185, 129, 0.35); }
+  100% { transform: scale(1); }
+}
+
+@keyframes wrongShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
 

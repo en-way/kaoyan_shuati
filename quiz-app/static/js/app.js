@@ -1049,6 +1049,11 @@ const App = {
         return;
       }
 
+      if (!isSilent) {
+        const ok = confirm('⚠️ 确定要上传当前数据覆盖云端吗？');
+        if (!ok) return;
+      }
+
       if (this.isSyncing) return;
 
       try {
@@ -1608,10 +1613,19 @@ const App = {
     this.renderQuestion();
   },
 
+  animateCard(direction = 'left') {
+    const card = document.getElementById('questionCard');
+    if (!card) return;
+    card.classList.remove('anim-slide-left', 'anim-slide-right');
+    void card.offsetWidth; // 触发 DOM 回流以重播 CSS 动效
+    card.classList.add(direction === 'left' ? 'anim-slide-left' : 'anim-slide-right');
+  },
+
   prevQuestion() {
     if (this.state.currentIndex > 0) {
       this.state.currentIndex--;
       this.renderQuestion();
+      this.animateCard('right');
     }
   },
 
@@ -1627,6 +1641,7 @@ const App = {
     if (this.state.currentIndex < this.state.questions.length - 1) {
       this.state.currentIndex++;
       this.renderQuestion();
+      this.animateCard('left');
     } else {
       if (mode === 'exam') {
         this.submitExam();
@@ -1639,8 +1654,10 @@ const App = {
 
   jumpToQuestion(index) {
     if (index >= 0 && index < this.state.questions.length) {
+      const dir = index >= this.state.currentIndex ? 'left' : 'right';
       this.state.currentIndex = index;
       this.renderQuestion();
+      this.animateCard(dir);
       this.closeDrawer();
     }
   },
