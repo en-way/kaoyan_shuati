@@ -4,7 +4,7 @@
  * 具备离线可用性，断网时自动启用本地题库与应用代码
  */
 
-const CACHE_NAME = 'ky-quiz-v7';
+const CACHE_NAME = 'ky-quiz-v8';
 const PRECACHE_ASSETS = [
   './',
   './index.html',

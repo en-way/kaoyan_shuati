@@ -1455,12 +1455,18 @@ const App = {
     this.state.isFlagged = !!q.is_flagged;
     const flagBtn = document.getElementById('pFlagBtn');
     const flagIcon = document.getElementById('flagIcon');
+    const mFlagBtn = document.getElementById('mFlagBtn');
+    const mFlagIcon = document.getElementById('mFlagIcon');
     if (this.state.isFlagged) {
       if (flagBtn) flagBtn.classList.add('active');
       if (flagIcon) flagIcon.textContent = '★';
+      if (mFlagBtn) mFlagBtn.classList.add('active');
+      if (mFlagIcon) mFlagIcon.textContent = '★';
     } else {
       if (flagBtn) flagBtn.classList.remove('active');
       if (flagIcon) flagIcon.textContent = '☆';
+      if (mFlagBtn) mFlagBtn.classList.remove('active');
+      if (mFlagIcon) mFlagIcon.textContent = '☆';
     }
 
     // Update Mobile Card Top Row & Question More Menu status
@@ -1709,12 +1715,18 @@ const App = {
 
     const flagBtn = document.getElementById('pFlagBtn');
     const flagIcon = document.getElementById('flagIcon');
+    const mFlagBtn = document.getElementById('mFlagBtn');
+    const mFlagIcon = document.getElementById('mFlagIcon');
     if (this.state.isFlagged) {
       if (flagBtn) flagBtn.classList.add('active');
       if (flagIcon) flagIcon.textContent = '★';
+      if (mFlagBtn) mFlagBtn.classList.add('active');
+      if (mFlagIcon) mFlagIcon.textContent = '★';
     } else {
       if (flagBtn) flagBtn.classList.remove('active');
       if (flagIcon) flagIcon.textContent = '☆';
+      if (mFlagBtn) mFlagBtn.classList.remove('active');
+      if (mFlagIcon) mFlagIcon.textContent = '☆';
     }
 
     const qMoreIcon = document.getElementById('qMoreFlagIcon');

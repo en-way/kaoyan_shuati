@@ -724,16 +724,101 @@ body {
   opacity: 0.8;
 }
 
-/* Mobile Question Card Integrated Top Row */
-.m-q-header-row {
+/* ==========================================================================
+   Mobile Two-Row Header Layout (移动端双行分层顶栏)
+   ========================================================================== */
+
+/* Row 1: Translucent Operation Bar Above Card */
+.m-practice-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 4px;
+  gap: 8px;
+  min-height: 32px;
+}
+
+/* Row 1 Left: Mode Pill Button */
+.m-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  color: var(--accent-cyan);
+  padding: 3.5px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.m-mode-pill:active {
+  transform: scale(0.95);
+  background: rgba(0, 240, 255, 0.25);
+}
+
+.m-mode-chevron {
+  font-size: 9px;
+  opacity: 0.8;
+}
+
+/* Row 1 Right: Top Action Pills (Flag, Expl, Drawer) */
+.m-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.m-action-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
+  padding: 3.5px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.m-action-pill:active {
+  transform: scale(0.94);
+  background: rgba(0, 240, 255, 0.15);
+  border-color: rgba(0, 240, 255, 0.4);
+  color: var(--accent-cyan);
+}
+
+/* Flag Active State (Golden Star) */
+.m-action-pill.active {
+  background: rgba(251, 191, 36, 0.15) !important;
+  border-color: rgba(251, 191, 36, 0.5) !important;
+  color: #fbbf24 !important;
+}
+
+/* Row 2: Question Info Row Inside Card Top */
+.m-q-info-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
   gap: 8px;
+  padding-bottom: 2px;
 }
 
-.m-q-header-left {
+.m-q-info-left {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -742,10 +827,9 @@ body {
   overflow: hidden;
 }
 
-.m-q-header-right {
+.m-q-info-right {
   display: flex;
   align-items: center;
-  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -753,7 +837,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2.5px 8px;
+  padding: 2px 7.5px;
   background: rgba(0, 240, 255, 0.12);
   border: 1px solid rgba(0, 240, 255, 0.35);
   border-radius: var(--radius-full);
@@ -773,36 +857,12 @@ body {
   flex-shrink: 1;
 }
 
-.m-card-btn-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  border-radius: var(--radius-full);
-  padding: 4px 10px;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-
-.m-card-btn-action:active {
-  transform: scale(0.94);
-  background: rgba(0, 240, 255, 0.15);
-  border-color: rgba(0, 240, 255, 0.4);
-  color: var(--accent-cyan);
-}
-
-.m-card-btn-more {
-  padding: 2px 9px;
-  font-size: 16px;
-  font-weight: 900;
-  letter-spacing: 1px;
-  line-height: 1.2;
+.m-swipe-tip {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  opacity: 0.7;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 /* Question More Menu Sheet */

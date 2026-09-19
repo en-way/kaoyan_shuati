@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270919_v7">
+  <link rel="stylesheet" href="css/style.css?v=20270919_v8">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -229,6 +229,27 @@
           </div>
         </div>
 
+        <!-- Mobile Row 1: Translucent Operation Bar (Above Card) -->
+        <div class="m-practice-top-bar mobile-only">
+          <button id="mModePillBtn" class="m-mode-pill" onclick="App.openModeSelect()" title="点击切换做题模式">
+            <span id="mModePillIcon">⚡</span>
+            <span id="mModePillText">即做即判</span>
+            <span class="m-mode-chevron">▾</span>
+          </button>
+
+          <div class="m-top-actions">
+            <button id="mFlagBtn" class="m-action-pill" onclick="App.toggleFlagCurrent()" title="标记重点题">
+              <span id="mFlagIcon">☆</span> <span class="m-btn-label">标记</span>
+            </button>
+            <button id="mToggleExplBtn" class="m-action-pill" onclick="App.toggleExplanationFold()" title="查看/折叠解析">
+              💡 <span class="m-btn-label">解析</span>
+            </button>
+            <button id="mDrawerBtn" class="m-action-pill" onclick="App.openDrawer()" title="打开答题卡">
+              📋 <span class="m-btn-label">题卡</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Question Card Box -->
         <div class="question-card" id="questionCard">
           <div class="q-header">
@@ -238,21 +259,16 @@
               <span class="q-tag-badge" id="qSpecialTag" style="display:none;">时政储备题</span>
             </div>
 
-            <!-- Mobile Integrated Ultra-clean Top Bar -->
-            <div class="m-q-header-row mobile-only">
-              <div class="m-q-header-left">
+            <!-- Mobile Row 2: Question Info Row (Inside Card Top) -->
+            <div class="m-q-info-row mobile-only">
+              <div class="m-q-info-left">
                 <span class="m-q-progress-badge" id="mCardProgress">1/10</span>
                 <span class="p-type-tag type-single" id="mCardTypeTag">单选</span>
                 <span class="p-subject-tag m-subject-pill" id="mCardSubjectTag">马原</span>
                 <span class="q-tag-badge" id="mCardSpecialTag" style="display:none;">时政储备题</span>
               </div>
-              <div class="m-q-header-right">
-                <button id="mCardToggleExplBtn" class="m-card-btn-action" onclick="App.toggleExplanationFold()" title="查看解析">
-                  💡 <span class="m-btn-label">解析</span>
-                </button>
-                <button id="mCardMoreBtn" class="m-card-btn-action m-card-btn-more" onclick="App.openQuestionMoreMenu()" title="更多做题操作">
-                  ···
-                </button>
+              <div class="m-q-info-right">
+                <span class="m-swipe-tip">滑动切题 ⇄</span>
               </div>
             </div>
           </div>
@@ -806,6 +822,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270919_v7"></script>
+  <script src="js/app.js?v=20270919_v8"></script>
 </body>
 </html>
