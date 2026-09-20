@@ -744,6 +744,7 @@ const App = {
         // 关键防污染：先彻底清空本地临时/游客做题数据
         localStorage.removeItem('quiz_user_data_2027');
 
+        localStorage.setItem('kaoyan_last_session_check_2027', String(Date.now()));
         // 登录成功瞬间自动拉取该账号在云端的真实进度覆盖本地
         await this.downloadFromCloud(true);
         App.loadOverview();
@@ -793,6 +794,8 @@ const App = {
         DB.setFromCloud({ answers: {}, mistakes: {}, updatedAt: Date.now() });
         this.lastSyncTime = Date.now();
         localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
+        localStorage.setItem('kaoyan_last_session_check_2027', String(this.lastSyncTime));
+        localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(DB.toCompact()));
         this.isDirty = false;
         this.updateSyncUI();
         App.loadOverview();
@@ -839,6 +842,7 @@ const App = {
 
         // 关键防污染：先清除本地临时数据，再拉取真实云端记录覆盖
         localStorage.removeItem('quiz_user_data_2027');
+        localStorage.setItem('kaoyan_last_session_check_2027', String(Date.now()));
         await this.downloadFromCloud(true);
         App.loadOverview();
         alert('密码重置成功！已自动为您登录，并载入您的云端学习记录。');
@@ -944,6 +948,8 @@ const App = {
       localStorage.removeItem('kaoyan_jwt_token_2027');
       localStorage.removeItem('kaoyan_user_info_2027');
       localStorage.removeItem('kaoyan_last_sync_time_2027');
+      localStorage.removeItem('kaoyan_last_session_check_2027');
+      localStorage.removeItem('kaoyan_last_upload_hash_2027');
 
       this.token = null;
       this.currentUser = null;
@@ -977,13 +983,38 @@ const App = {
       this.renderAuthUI();
     },
 
+    // 计算做题数据轻量级指纹（仅针对实际答题与错题状态，过滤动态时间戳，防误判）
+    computeDataFingerprint(compactData) {
+      if (!compactData) return '0';
+      const answers = compactData.answers || {};
+      const mistakes = compactData.mistakes || {};
+      const contentStr = JSON.stringify({ a: answers, m: mistakes });
+      let hash = 5381;
+      for (let i = 0; i < contentStr.length; i++) {
+        hash = ((hash << 5) + hash) + contentStr.charCodeAt(i);
+        hash |= 0;
+      }
+      const ansCount = Object.keys(answers).length;
+      const misCount = Object.keys(mistakes).length;
+      return `${ansCount}_${misCount}_${hash}`;
+    },
+
     async checkSession() {
       if (!this.token) return;
       try {
         const cachedUser = localStorage.getItem('kaoyan_user_info_2027');
         if (cachedUser) {
-          this.currentUser = JSON.parse(cachedUser);
-          this.renderAuthUI();
+          try {
+            this.currentUser = JSON.parse(cachedUser);
+            this.renderAuthUI();
+          } catch (e) {}
+        }
+
+        const now = Date.now();
+        const lastCheck = parseInt(localStorage.getItem('kaoyan_last_session_check_2027') || '0', 10);
+        // 30分钟节流：30分钟内若已成功联网校验过，直接复用本地有效会话，避免无意义消耗 Worker 与 D1 读配额
+        if (lastCheck && (now - lastCheck < 30 * 60 * 1000) && this.currentUser) {
+          return;
         }
 
         const res = await fetch('/api/auth/me', {
@@ -1001,6 +1032,7 @@ const App = {
           if (data.success && data.user) {
             this.currentUser = data.user;
             localStorage.setItem('kaoyan_user_info_2027', JSON.stringify(data.user));
+            localStorage.setItem('kaoyan_last_session_check_2027', String(now));
             this.renderAuthUI();
           }
         }
@@ -1025,6 +1057,7 @@ const App = {
       }
       localStorage.removeItem('quiz_user_data_2027');
       localStorage.removeItem('kaoyan_last_sync_time_2027');
+      localStorage.removeItem('kaoyan_last_upload_hash_2027');
       this.isDirty = false;
       this.lastSyncTime = null;
 
@@ -1042,10 +1075,24 @@ const App = {
       location.reload();
     },
 
-    // 功能 1：☁️ 上传到云端（保存当前本地全部做题数据权威快照至 D1 数据库）
+    // 功能 1：☁️ 上传到云端（带客户端与服务端双重防重复拦截，0请求/0写入）
     async uploadToCloud(isSilent = false) {
       if (!this.token) {
         if (!isSilent) this.openAuthModal('login');
+        return;
+      }
+
+      // 采集本地当前全部真实做题数据快照与指纹
+      const compactData = DB.toCompact();
+      const currentHash = this.computeDataFingerprint(compactData);
+      const lastUploadHash = localStorage.getItem('kaoyan_last_upload_hash_2027');
+
+      // 客户端防重复拦截：数据未变化且无未保存操作，直接跳过请求，节省 100% Worker 请求与 D1 写入配额！
+      if (!this.isDirty && lastUploadHash && lastUploadHash === currentHash) {
+        if (!isSilent) {
+          alert('💡 当前做题进度已与云端一致，无需重复保存！');
+        }
+        this.updateSyncUI();
         return;
       }
 
@@ -1060,16 +1107,13 @@ const App = {
         this.isSyncing = true;
         this.updateSyncUI();
 
-        // 采集本地当前全部真实做题数据快照
-        const compactData = DB.toCompact();
-
         const res = await fetch('/api/progress/sync', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.token}`
           },
-          body: JSON.stringify(compactData)
+          body: JSON.stringify({ ...compactData, dataHash: currentHash })
         });
 
         if (res.status === 404 || res.status === 401) {
@@ -1084,11 +1128,16 @@ const App = {
 
         this.lastSyncTime = data.updatedAt || Date.now();
         localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
+        localStorage.setItem('kaoyan_last_upload_hash_2027', currentHash);
         this.isDirty = false;
         this.updateSyncUI();
 
         if (!isSilent) {
-          alert('☁️ 当前最新做题记录与错题本已成功保存至云端数据库！');
+          if (data.notModified) {
+            alert('💡 当前做题进度已与云端一致，无需重复保存！');
+          } else {
+            alert('☁️ 当前最新做题记录与错题本已成功保存至云端数据库！');
+          }
         }
       } catch (err) {
         console.error('Upload failed:', err);
@@ -1101,7 +1150,7 @@ const App = {
       }
     },
 
-    // 功能 2：📥 从云端下载（拉取云端已保存的数据覆盖本机）
+    // 功能 2：📥 从云端下载（带增量时间戳比对，防全量无用传输与覆盖）
     async downloadFromCloud(isSilent = false) {
       if (!this.token) {
         if (!isSilent) this.openAuthModal('login');
@@ -1119,7 +1168,8 @@ const App = {
         this.isSyncing = true;
         this.updateSyncUI();
 
-        const res = await fetch('/api/progress/sync', {
+        const clientTime = this.lastSyncTime || 0;
+        const res = await fetch(`/api/progress/sync?clientTime=${clientTime}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${this.token}`
@@ -1136,10 +1186,22 @@ const App = {
           throw new Error(data.error || '从云端下载失败');
         }
 
+        // 云端未变动防重复覆盖（节省宽带与无意义 DOM 重载）
+        if (data.notModified) {
+          this.isDirty = false;
+          this.updateSyncUI();
+          if (!isSilent) {
+            alert('💡 云端数据与本机一致（无更新），无需重复覆盖！');
+          }
+          return;
+        }
+
         // 以云端真实保存的数据全量覆盖本地
         DB.setFromCloud(data);
         this.lastSyncTime = data.updatedAt || Date.now();
         localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
+        const newCompact = DB.toCompact();
+        localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(newCompact));
         this.isDirty = false;
         this.updateSyncUI();
 

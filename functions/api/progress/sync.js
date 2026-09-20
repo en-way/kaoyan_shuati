@@ -94,9 +94,19 @@ export async function onRequestGet(context) {
   }
 
   try {
-    // 检查用户是否仍在 users 表中
-    const userExists = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(authUser.id).first();
-    if (!userExists) {
+    const url = new URL(request.url);
+    const clientTimeParam = url.searchParams.get('clientTime');
+    const clientTime = clientTimeParam ? parseInt(clientTimeParam, 10) : 0;
+
+    // 单次 LEFT JOIN 合并查询：同时检查用户存在性与获取进度，节省 50% D1 读取操作
+    const row = await env.DB.prepare(`
+      SELECT u.id AS uid, p.answers_data, p.mistakes_data, p.stats_data, p.updated_at
+      FROM users u
+      LEFT JOIN user_progress p ON u.id = p.user_id
+      WHERE u.id = ?
+    `).bind(authUser.id).first();
+
+    if (!row || !row.uid) {
       return jsonResponse({
         success: false,
         code: 'USER_DELETED',
@@ -104,11 +114,19 @@ export async function onRequestGet(context) {
       }, 404);
     }
 
-    const progressRow = await env.DB.prepare(
-      'SELECT answers_data, mistakes_data, stats_data, updated_at FROM user_progress WHERE user_id = ?'
-    ).bind(authUser.id).first();
+    const updatedAt = row.updated_at || 0;
 
-    if (!progressRow) {
+    // 防无用下载：如果客户端带有本地版本时间戳，且云端更新时间未变动，返回轻量 notModified 响应
+    if (clientTime > 0 && updatedAt > 0 && clientTime >= updatedAt) {
+      return jsonResponse({
+        success: true,
+        notModified: true,
+        updatedAt: updatedAt,
+        message: '云端数据未发生变化'
+      });
+    }
+
+    if (!row.updated_at) {
       return jsonResponse({
         success: true,
         answers: {},
@@ -122,23 +140,23 @@ export async function onRequestGet(context) {
     let mistakes = {};
     let stats = {};
 
-    try { answers = JSON.parse(progressRow.answers_data || '{}'); } catch(e) {}
-    try { mistakes = JSON.parse(progressRow.mistakes_data || '{}'); } catch(e) {}
-    try { stats = JSON.parse(progressRow.stats_data || '{}'); } catch(e) {}
+    try { answers = JSON.parse(row.answers_data || '{}'); } catch(e) {}
+    try { mistakes = JSON.parse(row.mistakes_data || '{}'); } catch(e) {}
+    try { stats = JSON.parse(row.stats_data || '{}'); } catch(e) {}
 
     return jsonResponse({
       success: true,
       answers,
       mistakes,
       stats,
-      updatedAt: progressRow.updated_at
+      updatedAt: row.updated_at
     });
   } catch (err) {
     return errorResponse(`拉取云端进度失败: ${err.message || err}`, 500);
   }
 }
 
-// POST: 双向智能合并本地与云端做题数据并保存至 D1
+// POST: 双向智能合并本地与云端做题数据并保存至 D1（带防重复写入校验）
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -161,9 +179,15 @@ export async function onRequestPost(context) {
   const { answers: localAnswers, mistakes: localMistakes, stats: localStats } = body || {};
 
   try {
-    // 检查用户是否仍在 users 表中
-    const userExists = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(authUser.id).first();
-    if (!userExists) {
+    // 单次 LEFT JOIN 查询：确认用户存活并获取现有进度
+    const existing = await env.DB.prepare(`
+      SELECT u.id AS uid, p.updated_at, p.answers_data, p.mistakes_data
+      FROM users u
+      LEFT JOIN user_progress p ON u.id = p.user_id
+      WHERE u.id = ?
+    `).bind(authUser.id).first();
+
+    if (!existing || !existing.uid) {
       return jsonResponse({
         success: false,
         code: 'USER_DELETED',
@@ -184,10 +208,24 @@ export async function onRequestPost(context) {
       if (compact) cleanMistakes[qid] = compact;
     }
 
-    const now = Date.now();
     const answersJson = JSON.stringify(cleanAnswers);
     const mistakesJson = JSON.stringify(cleanMistakes);
     const statsJson = JSON.stringify(localStats || {});
+
+    // 服务端二次拦截：如果数据库中已有记录，且内容完全一致，跳过 D1 写入！
+    if (existing.answers_data === answersJson && existing.mistakes_data === mistakesJson) {
+      return jsonResponse({
+        success: true,
+        notModified: true,
+        answers: cleanAnswers,
+        mistakes: cleanMistakes,
+        stats: localStats || {},
+        updatedAt: existing.updated_at || Date.now(),
+        message: '数据与云端一致，无需重复写入'
+      });
+    }
+
+    const now = Date.now();
 
     // 写入 D1 (INSERT or REPLACE 快照)
     await env.DB.prepare(
