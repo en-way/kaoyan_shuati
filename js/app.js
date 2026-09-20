@@ -741,12 +741,15 @@ const App = {
         this.setSession(data.token, data.user);
         this.closeAuthModal();
 
-        // 关键防污染：先彻底清空本地临时/游客做题数据
+        // 关键防竞态：清除旧同步时间戳，强制向云端全量拉取，避免被 304 拦截导致本地空数据
+        this.lastSyncTime = null;
+        localStorage.removeItem('kaoyan_last_sync_time_2027');
         localStorage.removeItem('quiz_user_data_2027');
 
         localStorage.setItem('kaoyan_last_session_check_2027', String(Date.now()));
         // 登录成功瞬间自动拉取该账号在云端的真实进度覆盖本地
         await this.downloadFromCloud(true);
+        this.renderAuthUI();
         App.loadOverview();
         alert(`欢迎回来，${data.user.nickname || data.user.username}！已为您清除本地临时数据，并成功载入您的专属云端进度。`);
       } catch (err) {
@@ -840,10 +843,13 @@ const App = {
         this.setSession(data.token, data.user);
         this.closeAuthModal();
 
-        // 关键防污染：先清除本地临时数据，再拉取真实云端记录覆盖
+        // 关键防污染与防竞态：清除旧时间戳后全量拉取
+        this.lastSyncTime = null;
+        localStorage.removeItem('kaoyan_last_sync_time_2027');
         localStorage.removeItem('quiz_user_data_2027');
         localStorage.setItem('kaoyan_last_session_check_2027', String(Date.now()));
         await this.downloadFromCloud(true);
+        this.renderAuthUI();
         App.loadOverview();
         alert('密码重置成功！已自动为您登录，并载入您的云端学习记录。');
       } catch (err) {
@@ -2066,13 +2072,36 @@ const App = {
 
           <div class="m-item-footer">
             <button class="btn-sm-action" onclick="App.markMistakeMastered('${m.id}')">✓ 标为已攻克</button>
-            <button class="btn-primary" style="font-size:12px; padding: 6px 14px;" onclick="App.startPractice('${m.part}', '${m.chapter}', '', 'instant')">
+            <button class="btn-primary" style="font-size:12px; padding: 6px 14px;" onclick="App.retrySingleMistake('${m.id}')">
               ⚡ 重刷这道题
             </button>
           </div>
         </div>
       `;
     }).join('');
+  },
+
+  retrySingleMistake(qid) {
+    const q = DB.questionsMap[qid];
+    if (!q) return;
+    this.state.currentPart = q.part;
+    this.state.currentChapter = q.chapter;
+    this.state.currentType = '';
+    this.state.practiceMode = 'instant';
+    this.state.currentIndex = 0;
+    this.state.explanationVisible = true;
+
+    const shortSub = this.getSubjectShortName(q.part);
+    const crumbEl = document.getElementById('crumbSubject');
+    if (crumbEl) crumbEl.textContent = `${shortSub} · 错题精练`;
+
+    // 单题独立重做练习模式：初始重置作答状态，保留错题标识
+    const qCopy = { ...q, user_selected: [], user_time: 0, is_flagged: false, is_correct: null, in_mistakes: true };
+    this.state.questions = [qCopy];
+
+    this.navigateTo('practice');
+    this.updateModePillsUI();
+    this.renderQuestion();
   },
 
   markMistakeMastered(qid) {

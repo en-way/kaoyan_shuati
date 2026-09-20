@@ -27,57 +27,23 @@ function toCompactAnswer(item) {
   ];
 }
 
-// 辅助：标准化为紧凑错题格式 [count, lastChoice, time]
+// 辅助：标准化为紧凑错题格式 [count, lastChoice, time, mastered (1|0)]
 function toCompactMistake(item) {
   if (!item) return null;
-  if (Array.isArray(item)) return item;
+  if (Array.isArray(item)) {
+    return [
+      item[0] || 1,
+      item[1] || '',
+      item[2] || 0,
+      item[3] ? 1 : 0
+    ];
+  }
   return [
-    item.count || 1,
-    item.lastChoice || '',
-    item.time || Date.now()
+    item.count || item.wrong_count || 1,
+    item.lastChoice || (Array.isArray(item.last_selected) ? item.last_selected.join('') : (item.last_selected || '')),
+    item.time || (item.last_wrong_time ? (Date.parse(item.last_wrong_time) || 0) : Date.now()),
+    item.mastered ? 1 : 0
   ];
-}
-
-// 智能按时间戳合并作答记录
-function mergeCompactAnswers(cloudMap, localMap) {
-  const merged = { ...(cloudMap || {}) };
-  for (const [qid, localItem] of Object.entries(localMap || {})) {
-    const compactLocal = toCompactAnswer(localItem);
-    if (!compactLocal) continue;
-
-    const cloudItem = merged[qid];
-    if (!cloudItem) {
-      merged[qid] = compactLocal;
-    } else {
-      const localTime = getItemTime(compactLocal);
-      const cloudTime = getItemTime(cloudItem);
-      if (localTime >= cloudTime) {
-        merged[qid] = compactLocal;
-      }
-    }
-  }
-  return merged;
-}
-
-// 智能按时间戳合并错题记录
-function mergeCompactMistakes(cloudMap, localMap) {
-  const merged = { ...(cloudMap || {}) };
-  for (const [qid, localItem] of Object.entries(localMap || {})) {
-    const compactLocal = toCompactMistake(localItem);
-    if (!compactLocal) continue;
-
-    const cloudItem = merged[qid];
-    if (!cloudItem) {
-      merged[qid] = compactLocal;
-    } else {
-      const localTime = getItemTime(compactLocal);
-      const cloudTime = getItemTime(cloudItem);
-      if (localTime >= cloudTime) {
-        merged[qid] = compactLocal;
-      }
-    }
-  }
-  return merged;
 }
 
 // GET: 拉取云端最新刷题进度
@@ -100,7 +66,7 @@ export async function onRequestGet(context) {
 
     // 单次 LEFT JOIN 合并查询：同时检查用户存在性与获取进度，节省 50% D1 读取操作
     const row = await env.DB.prepare(`
-      SELECT u.id AS uid, p.answers_data, p.mistakes_data, p.stats_data, p.updated_at
+      SELECT u.id AS uid, p.answers_data, p.mistakes_data, p.updated_at
       FROM users u
       LEFT JOIN user_progress p ON u.id = p.user_id
       WHERE u.id = ?
@@ -131,24 +97,20 @@ export async function onRequestGet(context) {
         success: true,
         answers: {},
         mistakes: {},
-        stats: {},
         updatedAt: 0
       });
     }
 
     let answers = {};
     let mistakes = {};
-    let stats = {};
 
     try { answers = JSON.parse(row.answers_data || '{}'); } catch(e) {}
     try { mistakes = JSON.parse(row.mistakes_data || '{}'); } catch(e) {}
-    try { stats = JSON.parse(row.stats_data || '{}'); } catch(e) {}
 
     return jsonResponse({
       success: true,
       answers,
       mistakes,
-      stats,
       updatedAt: row.updated_at
     });
   } catch (err) {
@@ -176,7 +138,7 @@ export async function onRequestPost(context) {
     return errorResponse('请求参数格式错误 (需为 JSON)', 400);
   }
 
-  const { answers: localAnswers, mistakes: localMistakes, stats: localStats } = body || {};
+  const { answers: localAnswers, mistakes: localMistakes } = body || {};
 
   try {
     // 单次 LEFT JOIN 查询：确认用户存活并获取现有进度
@@ -210,7 +172,6 @@ export async function onRequestPost(context) {
 
     const answersJson = JSON.stringify(cleanAnswers);
     const mistakesJson = JSON.stringify(cleanMistakes);
-    const statsJson = JSON.stringify(localStats || {});
 
     // 服务端二次拦截：如果数据库中已有记录，且内容完全一致，跳过 D1 写入！
     if (existing.answers_data === answersJson && existing.mistakes_data === mistakesJson) {
@@ -219,7 +180,6 @@ export async function onRequestPost(context) {
         notModified: true,
         answers: cleanAnswers,
         mistakes: cleanMistakes,
-        stats: localStats || {},
         updatedAt: existing.updated_at || Date.now(),
         message: '数据与云端一致，无需重复写入'
       });
@@ -230,19 +190,17 @@ export async function onRequestPost(context) {
     // 写入 D1 (INSERT or REPLACE 快照)
     await env.DB.prepare(
       `INSERT INTO user_progress (user_id, answers_data, mistakes_data, stats_data, version, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?)
+       VALUES (?, ?, ?, '{}', 1, ?)
        ON CONFLICT(user_id) DO UPDATE SET
          answers_data = excluded.answers_data,
          mistakes_data = excluded.mistakes_data,
-         stats_data = excluded.stats_data,
          updated_at = excluded.updated_at`
-    ).bind(authUser.id, answersJson, mistakesJson, statsJson, now).run();
+    ).bind(authUser.id, answersJson, mistakesJson, now).run();
 
     return jsonResponse({
       success: true,
       answers: cleanAnswers,
       mistakes: cleanMistakes,
-      stats: localStats || {},
       updatedAt: now,
       message: '云端做题数据保存成功'
     });
