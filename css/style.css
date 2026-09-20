@@ -1284,10 +1284,28 @@ kbd {
   border: 1px solid var(--border-color);
   color: var(--text-primary);
   font-size: 13px;
-  padding: 8px 14px;
+  padding: 8px 30px 8px 12px;
   border-radius: var(--radius-md);
   outline: none;
   cursor: pointer;
+  width: 210px;
+  max-width: 250px;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.mistakes-filters select:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.15);
 }
 
 .m-stats-summary {
@@ -2014,6 +2032,126 @@ kbd {
     color: var(--accent-cyan);
     display: block;
     margin-bottom: 4px;
+  }
+
+  /* ================== VIEW 3: MISTAKES VAULT (MOBILE) ================== */
+  #viewMistakes {
+    padding: 14px 12px 75px;
+  }
+
+  .mistakes-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .m-head-left h2 {
+    font-size: 20px;
+  }
+
+  .m-head-left p {
+    font-size: 12px;
+  }
+
+  #btnStartMistakesTraining {
+    width: 100%;
+    padding: 11px 16px;
+    font-size: 13px;
+    border-radius: var(--radius-md);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mistakes-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .mistakes-filters select {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 38px;
+    padding: 0 24px 0 10px;
+    font-size: 12px;
+    background-position: right 7px center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    box-sizing: border-box;
+    border-radius: var(--radius-md);
+  }
+
+  .m-stats-summary {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-left: 0;
+    font-size: 12px;
+    text-align: right;
+    padding: 2px 2px 0;
+    box-sizing: border-box;
+  }
+
+  .mistake-card-item {
+    padding: 14px 12px;
+    gap: 10px;
+    border-radius: 12px;
+  }
+
+  .m-item-meta {
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .m-item-meta .p-subject-tag,
+  .m-item-meta .p-chapter-tag,
+  .m-item-meta .q-badge,
+  .m-item-meta .p-type-tag {
+    font-size: 10.5px;
+    padding: 2px 6px;
+  }
+
+  .m-item-stem {
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .m-item-answers {
+    font-size: 13px;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+  }
+
+  .m-item-expl-snippet {
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 6px 8px;
+  }
+
+  .m-item-footer {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .m-item-footer button {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 12px;
+    white-space: nowrap;
   }
 }
 

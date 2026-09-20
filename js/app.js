@@ -1352,7 +1352,7 @@ const App = {
     this.state.currentIndex = 0;
     this.state.explanationVisible = true;
 
-    const shortSub = part ? part.replace(/^第[一二三四五]部分\s*/, '') : '全科错题';
+    const shortSub = part ? this.getSubjectShortName(part) : '全科错题';
     const chTitle = chapter || (mode === 'mistakes_only' ? '专项特训' : '全部章节');
     const crumbEl = document.getElementById('crumbSubject');
     if (crumbEl) crumbEl.textContent = `${shortSub} · ${chTitle}`;
@@ -1430,7 +1430,7 @@ const App = {
       return;
     }
 
-    const shortSub = q.part.replace(/^第[一二三四五]部分\s*/, '');
+    const shortSub = this.getSubjectShortName(q.part);
     document.getElementById('pSubjectTag').textContent = shortSub;
     document.getElementById('pChapterTag').textContent = q.chapter;
 
@@ -1836,6 +1836,16 @@ const App = {
     this.renderMistakesList();
   },
 
+  getSubjectShortName(part) {
+    if (!part) return '';
+    if (part.includes('马克思主义基本原理')) return '马原';
+    if (part.includes('毛泽东思想')) return '毛中特';
+    if (part.includes('习近平新时代')) return '习思想';
+    if (part.includes('近现代史纲要')) return '史纲';
+    if (part.includes('思想道德与法治')) return '思修';
+    return part.replace(/^第[一二三四五]部分\s*/, '');
+  },
+
   populateMistakeFilters() {
     // 提取所有未攻克的完整错题用于构建筛选器各级选项统计
     const allMistakesData = DB.getMistakes('', '');
@@ -1863,13 +1873,13 @@ const App = {
       if (this.state.overview && this.state.overview.subjects) {
         this.state.overview.subjects.forEach(s => {
           const count = statsByPart[s.name] ? statsByPart[s.name].count : 0;
-          const shortName = s.name.replace(/^第[一二三四五]部分\s*/, '');
+          const shortName = this.getSubjectShortName(s.name);
           const sel = s.name === currentPart ? 'selected' : '';
           partHtml += `<option value="${s.name}" ${sel}>${shortName} (${count}题)</option>`;
         });
       } else {
         Object.entries(statsByPart).forEach(([pName, pStat]) => {
-          const shortName = pName.replace(/^第[一二三四五]部分\s*/, '');
+          const shortName = this.getSubjectShortName(pName);
           const sel = pName === currentPart ? 'selected' : '';
           partHtml += `<option value="${pName}" ${sel}>${shortName} (${pStat.count}题)</option>`;
         });
@@ -1903,7 +1913,7 @@ const App = {
       chHtml += `<option value="">全部章节 (${totalAllCount}题)</option>`;
       if (statsByPart) {
         Object.entries(statsByPart).forEach(([pName, pStat]) => {
-          const shortPart = pName.replace(/^第[一二三四五]部分\s*/, '');
+          const shortPart = this.getSubjectShortName(pName);
           Object.entries(pStat.chapters).forEach(([chName, count]) => {
             const sel = chName === currentChapter ? 'selected' : '';
             chHtml += `<option value="${chName}" ${sel}>${shortPart} · ${chName} (${count}题)</option>`;
@@ -1939,10 +1949,11 @@ const App = {
     const chapter = this.state.filterChapter || '';
 
     if (part && chapter) {
-      const shortPart = part.replace(/^第[一二三四五]部分\s*/, '');
-      btn.innerHTML = `⚡ 专项特训【${shortPart}·${chapter}】(${count}题)`;
+      const shortPart = this.getSubjectShortName(part);
+      const shortCh = chapter.length > 10 ? chapter.slice(0, 9) + '…' : chapter;
+      btn.innerHTML = `⚡ 专项特训【${shortPart}·${shortCh}】(${count}题)`;
     } else if (part) {
-      const shortPart = part.replace(/^第[一二三四五]部分\s*/, '');
+      const shortPart = this.getSubjectShortName(part);
       btn.innerHTML = `⚡ 专项特训【${shortPart}】(${count}题)`;
     } else {
       btn.innerHTML = `⚡ 立即全部错题特训 (${count}题)`;
@@ -1975,7 +1986,7 @@ const App = {
       return `
         <div class="mistake-card-item">
           <div class="m-item-meta">
-            <span class="p-subject-tag">${m.part.replace(/^第[一二三四五]部分\s*/, '')}</span>
+            <span class="p-subject-tag">${this.getSubjectShortName(m.part)}</span>
             <span class="p-chapter-tag">${m.chapter}</span>
             <span class="q-badge">第 ${m.num} 题</span>
             <span class="p-type-tag ${m.type === '单项选择题' ? 'type-single' : 'type-multi'}">${m.type}</span>
