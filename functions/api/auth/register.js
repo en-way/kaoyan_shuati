@@ -59,15 +59,15 @@ export async function onRequestPost(context) {
     const userId = crypto.randomUUID();
     const now = Date.now();
 
-    // 写入 users 表
-    await env.DB.prepare(
-      'INSERT INTO users (id, username, nickname, password_hash, salt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(userId, username, nickname, passwordHash, salt, now, now).run();
-
-    // 初始化 user_progress 进度行
-    await env.DB.prepare(
-      'INSERT INTO user_progress (user_id, answers_data, mistakes_data, stats_data, version, updated_at) VALUES (?, ?, ?, ?, 1, ?)'
-    ).bind(userId, '{}', '{}', '{}', now).run();
+    // 原子事务写入 users 表与 user_progress 初始行 (减少 1 次网络往返，单次原子批处理提交)
+    await env.DB.batch([
+      env.DB.prepare(
+        'INSERT INTO users (id, username, nickname, password_hash, salt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).bind(userId, username, nickname, passwordHash, salt, now, now),
+      env.DB.prepare(
+        'INSERT INTO user_progress (user_id, answers_data, mistakes_data, stats_data, version, updated_at) VALUES (?, ?, ?, ?, 1, ?)'
+      ).bind(userId, '{}', '{}', '{}', now)
+    ]);
 
     // 签发 JWT
     const token = await signJwt({ id: userId, username, nickname }, env.JWT_SECRET);

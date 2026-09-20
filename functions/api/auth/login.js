@@ -44,13 +44,7 @@ export async function onRequestPost(context) {
       return errorResponse('账号不存在或密码错误', 401);
     }
 
-    // 更新最后活跃时间
-    const now = Date.now();
-    await env.DB.prepare('UPDATE users SET updated_at = ? WHERE id = ?')
-      .bind(now, user.id)
-      .run();
-
-    // 签发 JWT
+    // 签发 JWT (免写 D1 数据库，节约每日 10 万行写入配额)
     const token = await signJwt(
       { id: user.id, username: user.username, nickname: user.nickname },
       env.JWT_SECRET

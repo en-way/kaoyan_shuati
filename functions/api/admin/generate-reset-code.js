@@ -59,10 +59,15 @@ export async function onRequestPost(context) {
     const now = Date.now();
     const expiresAt = now + (30 * 60 * 1000); // 30分钟有效
 
-    // 插入重置码记录
-    await env.DB.prepare(
-      'INSERT INTO password_resets (id, username, code, created_at, expires_at, used) VALUES (?, ?, ?, ?, ?, 0)'
-    ).bind(id, username, code, now, expiresAt).run();
+    // 插入新重置码记录，并顺便原子清理已过期或已使用的旧记录，防止数据表长期膨胀
+    await env.DB.batch([
+      env.DB.prepare(
+        'INSERT INTO password_resets (id, username, code, created_at, expires_at, used) VALUES (?, ?, ?, ?, ?, 0)'
+      ).bind(id, username, code, now, expiresAt),
+      env.DB.prepare(
+        'DELETE FROM password_resets WHERE expires_at < ? OR used = 1'
+      ).bind(now)
+    ]);
 
     return jsonResponse({
       success: true,

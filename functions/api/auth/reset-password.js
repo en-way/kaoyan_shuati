@@ -72,14 +72,17 @@ export async function onRequestPost(context) {
     const newSalt = generateSalt();
     const newPasswordHash = await hashPassword(newPassword, newSalt);
 
-    // 4. 更新密码并使当前重置码作废 (单次使用)
+    // 4. 更新密码并使当前重置码作废 (单次使用)，顺便清理历史过期记录
     await env.DB.batch([
       env.DB.prepare(
         'UPDATE users SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ?'
       ).bind(newPasswordHash, newSalt, now, user.id),
       env.DB.prepare(
         'UPDATE password_resets SET used = 1 WHERE id = ?'
-      ).bind(resetRecord.id)
+      ).bind(resetRecord.id),
+      env.DB.prepare(
+        'DELETE FROM password_resets WHERE expires_at < ?'
+      ).bind(now)
     ]);
 
     // 5. 签发全新 JWT 凭证，实现重置后自动静默登录
