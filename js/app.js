@@ -2082,7 +2082,14 @@ const App = {
   },
 
   retrySingleMistake(qid) {
-    const q = DB.questionsMap[qid];
+    let q = DB.questionsMap[qid];
+    if (!q) {
+      const num = parseInt(String(qid).replace(/\D/g, ''), 10);
+      if (!isNaN(num)) {
+        const padId = `Q_${String(num).padStart(4, '0')}`;
+        q = DB.questionsMap[padId] || (DB.questionsData && DB.questionsData.questions.find(item => item.num === num));
+      }
+    }
     if (!q) return;
     this.state.currentPart = q.part;
     this.state.currentChapter = q.chapter;
