@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270920_v13">
+  <link rel="stylesheet" href="css/style.css?v=20270921_v14">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -792,17 +792,26 @@
 
       <div class="modal-body auth-body">
         <p class="admin-desc">
-          输入管理员密钥 (<code>ADMIN_SECRET</code>) 与学员账号，为学员生成专属 6 位重置码（有效期 30 分钟）。
+          输入管理员密钥 (<code>ADMIN_SECRET</code>) 与学员账号，为学员生成专属 6 位重置码（有效期 30 分钟）。可在 <strong>Cloudflare Pages 后台「设置 -> 环境变量」</strong>随时修改该密钥。
         </p>
 
         <div id="adminNotice" class="auth-notice" style="display:none;"></div>
 
         <form onsubmit="App.auth.handleAdminGenerateCode(event)">
           <div class="form-group">
-            <label>管理员密钥 (ADMIN_SECRET)</label>
-            <input type="password" id="adminSecretKey" class="form-control" placeholder="在 Cloudflare Pages 环境变量配置的密钥" required>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label style="margin-bottom:0;">管理员密钥 (ADMIN_SECRET)</label>
+              <div style="font-size:12px; display:flex; gap:8px;">
+                <a href="javascript:void(0)" onclick="App.auth.verifyAdminSecret()" style="color:var(--accent-blue); text-decoration:none;">🔍 测试密钥</a>
+                <a href="javascript:void(0)" onclick="App.auth.clearSavedAdminSecret()" id="adminClearSecretLink" style="color:var(--text-muted); text-decoration:none; display:none;">清除记忆</a>
+              </div>
+            </div>
+            <input type="password" id="adminSecretKey" class="form-control" placeholder="在 Cloudflare 后台设置的 ADMIN_SECRET" required>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:4px; line-height:1.4;">
+              💡 提示：密钥会自动记住在此浏览器中。若未在 Cloudflare 设置，可临时使用初始密钥 <code>KAOYAN_ADMIN_SECRET_2027</code>。
+            </div>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-top:12px;">
             <label>学员账号 / 用户名</label>
             <input type="text" id="adminTargetUsername" class="form-control" placeholder="需找回密码的学员账号" required>
           </div>
@@ -822,6 +831,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270920_v13"></script>
+  <script src="js/app.js?v=20270921_v14"></script>
 </body>
 </html>

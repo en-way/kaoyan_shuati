@@ -866,15 +866,98 @@ const App = {
       const modal = document.getElementById('adminModal');
       const resultBox = document.getElementById('adminResultBox');
       const notice = document.getElementById('adminNotice');
+      const secretInput = document.getElementById('adminSecretKey');
+      const clearLink = document.getElementById('adminClearSecretLink');
+
       if (modal) modal.style.display = 'flex';
       if (resultBox) resultBox.style.display = 'none';
       if (notice) notice.style.display = 'none';
+
+      // 自动恢复管理员本机记住的密钥
+      const savedSecret = localStorage.getItem('kaoyan_admin_secret_saved') || '';
+      if (secretInput && savedSecret) {
+        secretInput.value = savedSecret;
+        if (clearLink) clearLink.style.display = 'inline';
+      } else if (clearLink) {
+        clearLink.style.display = 'none';
+      }
     },
 
     closeAdminModal(e) {
       if (e && e.target && e.target !== e.currentTarget) return;
       const modal = document.getElementById('adminModal');
       if (modal) modal.style.display = 'none';
+    },
+
+    // 快捷测试密钥有效性
+    async verifyAdminSecret() {
+      const secretInput = document.getElementById('adminSecretKey');
+      const notice = document.getElementById('adminNotice');
+      const clearLink = document.getElementById('adminClearSecretLink');
+      const secret = (secretInput ? secretInput.value : '').trim();
+
+      if (!secret) {
+        if (notice) {
+          notice.textContent = '请先在上方输入需要测试的管理员密钥';
+          notice.className = 'auth-notice error';
+          notice.style.display = 'block';
+        }
+        if (secretInput) secretInput.focus();
+        return;
+      }
+
+      try {
+        if (notice) {
+          notice.textContent = '正在与 Cloudflare 边缘服务器比对密钥...';
+          notice.className = 'auth-notice';
+          notice.style.display = 'block';
+        }
+
+        const res = await fetch('/api/admin/verify-secret', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-secret': secret
+          },
+          body: JSON.stringify({ adminSecret: secret })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.isValid) {
+          throw new Error(data.error || '密钥校验失败');
+        }
+
+        // 验证通过，持久化保存在当前浏览器
+        localStorage.setItem('kaoyan_admin_secret_saved', secret);
+        if (clearLink) clearLink.style.display = 'inline';
+
+        if (notice) {
+          notice.textContent = data.message || '✅ 密钥有效！';
+          notice.className = data.isCustomConfigured ? 'auth-notice success' : 'auth-notice warning';
+          notice.style.display = 'block';
+        }
+      } catch (err) {
+        if (notice) {
+          notice.textContent = `❌ ${err.message}`;
+          notice.className = 'auth-notice error';
+          notice.style.display = 'block';
+        }
+      }
+    },
+
+    // 清除本地已保存的密钥
+    clearSavedAdminSecret() {
+      localStorage.removeItem('kaoyan_admin_secret_saved');
+      const secretInput = document.getElementById('adminSecretKey');
+      const clearLink = document.getElementById('adminClearSecretLink');
+      const notice = document.getElementById('adminNotice');
+      if (secretInput) secretInput.value = '';
+      if (clearLink) clearLink.style.display = 'none';
+      if (notice) {
+        notice.textContent = '已清除本浏览器记住的管理员密钥';
+        notice.className = 'auth-notice';
+        notice.style.display = 'block';
+      }
     },
 
     async handleAdminGenerateCode(e) {
@@ -885,6 +968,7 @@ const App = {
       const resultBox = document.getElementById('adminResultBox');
       const codeDisplay = document.getElementById('adminGeneratedCode');
       const submitBtn = document.getElementById('btnAdminGenerate');
+      const clearLink = document.getElementById('adminClearSecretLink');
 
       if (!adminSecret || !username) {
         notice.textContent = '请输入管理员密钥与学员账号';
@@ -911,6 +995,10 @@ const App = {
         if (!res.ok || !data.success) {
           throw new Error(data.error || '生成重置码失败');
         }
+
+        // 成功生成时，顺便在管理员本机持久记住该密钥
+        localStorage.setItem('kaoyan_admin_secret_saved', adminSecret);
+        if (clearLink) clearLink.style.display = 'inline';
 
         codeDisplay.textContent = data.code;
         resultBox.style.display = 'block';

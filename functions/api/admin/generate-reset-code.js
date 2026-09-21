@@ -25,16 +25,17 @@ export async function onRequestPost(context) {
   const headerSecret = request.headers.get('x-admin-secret');
   const providedSecret = (headerSecret || body.adminSecret || '').trim();
 
+  // 优先读取 Cloudflare Pages 后台配置的环境变量 ADMIN_SECRET，未配置时使用初始兜底密钥
+  const DEFAULT_ADMIN_SECRET = 'KAOYAN_ADMIN_SECRET_2027';
   const configuredSecret = env.ADMIN_SECRET ? env.ADMIN_SECRET.trim() : null;
+  const isCustomConfigured = Boolean(configuredSecret);
+  const activeSecret = configuredSecret || DEFAULT_ADMIN_SECRET;
 
-  if (!configuredSecret) {
-    return errorResponse(
-      'Cloudflare Pages 环境变量中尚未配置 ADMIN_SECRET。请前往 Pages 设置 -> 环境变量 中添加 ADMIN_SECRET 密钥后再试。',
-      500
-    );
+  if (!providedSecret) {
+    return errorResponse('请输入管理员密钥', 400);
   }
 
-  if (providedSecret !== configuredSecret) {
+  if (providedSecret !== activeSecret) {
     return errorResponse('管理员口令/密钥错误，无权生成重置码', 403);
   }
 

@@ -4,13 +4,13 @@
  * 具备离线可用性，断网时自动启用本地题库与应用代码
  */
 
-const VERSION = 'v13';
+const VERSION = 'v14';
 const CACHE_NAME = `ky-quiz-${VERSION}`;
 const PRECACHE_ASSETS = [
   './',
   './index.html',
-  `./css/style.css?v=20270920_${VERSION}`,
-  `./js/app.js?v=20270920_${VERSION}`,
+  `./css/style.css?v=20270921_${VERSION}`,
+  `./js/app.js?v=20270921_${VERSION}`,
   './manifest.json',
   './data/questions.json',
   './icons/icon-192.png',

@@ -101,12 +101,19 @@ Cloudflare 会在 15~30 秒内完成全球边缘节点部署！
    - **D1 数据库 (D1 database)**：选择刚才创建的 `kaoyan-quiz-db`；
 4. 点击 **保存**。
 
-### 步骤 3：配置安全环境变量（可选但推荐）
-在 Pages 项目的 **设置** -> **环境变量** 中添加：
-- `JWT_SECRET`：自定义长字符串密码（用于签名学员登录凭证）；
-- `ADMIN_SECRET`：自定义管理员密钥（用于管理员后台一键生成 6 位纯数字学员密码重置码）。
+### 步骤 3：配置与修改安全环境变量（核心）
+在 Pages 项目的 **设置**（Settings）-> **环境变量**（Environment variables）中：
+1. 点击 **添加变量**（Add variable）：
+   - `JWT_SECRET`：自定义长字符串密码（用于签名学员登录凭证，如 `ky_jwt_2027_mysecret`）；
+   - `ADMIN_SECRET`：自定义管理员密钥（用于管理员后台发放密码重置码，如 `my_super_admin_key_888`）。
+2. 点击 **保存**。
 
-保存后重新触发一次部署，刷新页面即可直接注册账号、登录并畅享多端自动秒级云同步！
+> 💡 **如何随时在 Cloudflare 后台修改管理员密钥？**
+> - 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)；
+> - 进入你的 Pages 项目 -> 点击 **设置 (Settings)** -> **环境变量 (Environment variables)**；
+> - 找到 `ADMIN_SECRET` -> 点击右侧 **编辑**（Edit）-> 输入全新密码 -> 点击 **保存**；
+> - 此时密钥已在后台即刻更新生效！在前端网页点击管理员弹窗中的 **「🔍 测试密钥」**，输入新密码即可秒级校验连通性！
+> - 若尚未配置该变量，系统会自动启用初始备用密钥 `KAOYAN_ADMIN_SECRET_2027` 兜底，绝不影响基础使用。
 
 ---
 
