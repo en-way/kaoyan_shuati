@@ -8,14 +8,15 @@
   
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-muted: #8da0b8;
 
   --accent-cyan: #00f0ff;
   --accent-blue: #38bdf8;
   --accent-green: #10b981;
   --accent-coral: #ff4757;
   --accent-amber: #fbbf24;
-  --accent-purple: #a855f7;
+  --accent-gold: #ffcc00;
+  --accent-purple: #c084fc;
 
   --glow-cyan: 0 0 20px rgba(0, 240, 255, 0.35);
   --glow-green: 0 0 20px rgba(16, 185, 129, 0.35);
@@ -23,6 +24,7 @@
   --glow-amber: 0 0 20px rgba(251, 191, 36, 0.35);
 
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: 'Consolas', 'Courier New', monospace;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
@@ -41,11 +43,20 @@ body {
   color: var(--text-primary);
   line-height: 1.6;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* 弹窗打开时的全局滚动穿透锁定 */
+body.modal-open {
+  overflow: hidden !important;
+  touch-action: none;
 }
 
 /* Visibility Utilities */
@@ -569,6 +580,12 @@ body {
   font-size: 13px;
   color: var(--text-primary);
   font-weight: 600;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .p-type-tag {
@@ -956,7 +973,7 @@ body {
   border-radius: var(--radius-md);
   padding: 13px 16px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -987,13 +1004,16 @@ body {
   color: var(--text-secondary);
   transition: all 0.2s;
   flex-shrink: 0;
+  margin-top: 1.5px;
 }
 
 .option-text {
   font-size: 15.5px;
   color: var(--text-primary);
-  line-height: 1.45;
+  line-height: 1.5;
   flex: 1;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Option Selected State */
@@ -1010,7 +1030,7 @@ body {
   box-shadow: var(--glow-cyan);
 }
 
-/* Correct / Wrong States */
+/* Correct / Wrong States (高对比度 AAA 级标准) */
 .option-item.is-correct-std {
   border-color: var(--accent-green) !important;
   background: rgba(16, 185, 129, 0.12) !important;
@@ -1019,7 +1039,7 @@ body {
 
 .option-item.is-correct-std .option-key-badge {
   background: var(--accent-green) !important;
-  color: #fff !important;
+  color: #050b14 !important;
   border-color: var(--accent-green) !important;
   box-shadow: var(--glow-green);
 }
@@ -1031,9 +1051,9 @@ body {
 }
 
 .option-item.is-wrong-selected .option-key-badge {
-  background: var(--accent-coral) !important;
-  color: #fff !important;
-  border-color: var(--accent-coral) !important;
+  background: #e02435 !important;
+  color: #ffffff !important;
+  border-color: #e02435 !important;
   box-shadow: var(--glow-coral);
 }
 
@@ -1285,7 +1305,7 @@ kbd {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   padding: 8px 30px 8px 12px;
   border-radius: var(--radius-md);
   outline: none;
@@ -1392,7 +1412,7 @@ kbd {
 }
 
 /* ================== MODALS & DRAWERS ================== */
-.modal-backdrop, .drawer-backdrop {
+.modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
@@ -1406,6 +1426,26 @@ kbd {
   align-items: center;
   justify-content: center;
   padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(5, 10, 18, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 !important;
+  overflow: hidden;
+  overscroll-behavior: contain;
 }
 
 .modal-card {
@@ -1415,9 +1455,13 @@ kbd {
   width: 100%;
   max-width: 620px;
   max-height: 90vh;
+  max-height: 90dvh;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overscroll-behavior: contain;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
   animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1453,12 +1497,26 @@ kbd {
   font-size: 24px;
   cursor: pointer;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
 }
-.modal-close:hover { color: var(--text-primary); }
+.modal-close:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.06); }
 
 .modal-body {
   padding: 20px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1594,7 +1652,24 @@ kbd {
 }
 
 .drawer-header h3 { font-size: 16px; font-weight: 700; }
-.drawer-close { background: none; border: none; font-size: 24px; color: var(--text-muted); cursor: pointer; }
+.drawer-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+.drawer-close:hover { color: var(--text-primary); background: rgba(255, 255, 255, 0.06); }
 
 .drawer-legend {
   padding: 10px 20px;
@@ -1650,7 +1725,7 @@ kbd {
 .grid-q-btn.is-flagged::after { content: '★'; position: absolute; top: 2px; right: 2px; font-size: 9px; color: var(--accent-amber); }
 
 .drawer-footer {
-  padding: 14px 16px;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border-color);
 }
 
@@ -1668,17 +1743,22 @@ kbd {
 /* ================== MOBILE-FIRST ADAPTATIONS ================== */
 @media (max-width: 768px) {
   .desktop-only { display: none !important; }
+  .desktop-only-inline { display: none !important; }
   .mobile-only { display: flex !important; }
 
   /* Adjust body padding for bottom navigation */
   body {
     padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
   }
 
   /* Compact Header with Safe Area for Notch/Dynamic Island */
   .app-header {
     height: calc(46px + env(safe-area-inset-top, 0px));
-    padding: env(safe-area-inset-top, 0px) 12px 0 12px;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: max(12px, env(safe-area-inset-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
   }
 
   /* Prevent iOS Safari auto-zoom on input focus */
@@ -1786,7 +1866,7 @@ kbd {
 
   /* Practice View on Mobile */
   #viewPractice {
-    padding: 6px 10px 20px;
+    padding: 6px 10px calc(114px + env(safe-area-inset-bottom, 0px));
   }
 
   .practice-toolbar {
@@ -1934,15 +2014,42 @@ kbd {
     padding: 12px;
   }
 
-  /* Bottom Sheet Modal */
+  /* Bottom Sheet Modal: 贴边满宽与消除悬空缝隙 */
+  .modal-backdrop:has(.modal-bottom-sheet) {
+    padding: 0 !important;
+    align-items: flex-end;
+  }
+
   .modal-bottom-sheet {
     max-width: 100% !important;
-    width: 100%;
+    width: 100% !important;
+    max-height: 85vh;
+    max-height: 85dvh;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     align-self: flex-end;
-    margin-bottom: 0;
-    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    margin: 0 !important;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
     animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* 多选确认提交条在小屏下垂直自适应 */
+  .multi-submit-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .btn-submit-multi {
+    width: 100%;
+    padding: 10px;
+    font-size: 13.5px;
+    text-align: center;
+  }
+
+  .multi-tip-text {
+    text-align: center;
+    font-size: 11.5px;
   }
 
   @keyframes slideUp {
@@ -2090,9 +2197,9 @@ kbd {
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
-    height: 38px;
+    height: 40px;
     padding: 0 24px 0 10px;
-    font-size: 12px;
+    font-size: 16px;
     background-position: right 7px center;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2162,6 +2269,113 @@ kbd {
     padding: 8px 10px;
     font-size: 12px;
     white-space: nowrap;
+  }
+
+  /* 移动端 thumb 拇指舒适热区扩展 (Apple HIG & WCAG) */
+  .m-mode-pill {
+    min-height: 38px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .m-action-pill {
+    min-height: 38px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .auth-tab-btn {
+    min-height: 44px;
+    padding: 10px 4px;
+    font-size: 13.5px;
+  }
+
+  .m-icon-btn {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .btn-logout-compact {
+    min-height: 32px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .link-admin-secret {
+    display: inline-block;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .q-more-mode-btn {
+    min-height: 44px;
+    padding: 12px 14px;
+  }
+
+  .q-tag-badge, .p-type-tag {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+/* ================== EXTRA SMALL MOBILE (<480px) ================== */
+@media (max-width: 480px) {
+  /* 模考成绩单弹窗移动端自适应垂直布局 */
+  .exam-summary-card {
+    flex-direction: column;
+    padding: 16px 14px;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .report-metrics {
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 14px;
+  }
+
+  .metric-item {
+    font-size: 13px;
+  }
+
+  .report-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .m-q-info-row {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+  }
+}
+
+/* ================== TABLET TRANSITION BREAKPOINT (769px ~ 1024px) ================== */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* 隐藏桌面次要工具与面包屑，确保关键的登录同步与导航留存 */
+  .breadcrumb,
+  .brand-sub,
+  .header-tools {
+    display: none !important;
+  }
+
+  .app-header {
+    padding: 0 16px;
+  }
+
+  .nav-btn {
+    padding: 6px 10px;
+    font-size: 12.5px;
+  }
+
+  .timer-badge {
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+
+  .chapters-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
   }
 }
 
@@ -2451,7 +2665,7 @@ kbd {
   border-radius: var(--radius-md);
   padding: 10px 14px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 16px;
   outline: none;
   box-sizing: border-box;
   transition: border-color 0.2s ease;

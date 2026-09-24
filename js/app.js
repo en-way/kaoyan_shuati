@@ -712,6 +712,9 @@ const App = {
       if (modal) {
         modal.style.display = 'flex';
         this.switchTab(tab);
+        if (typeof App !== 'undefined' && typeof App.updateBodyScrollLock === 'function') {
+          App.updateBodyScrollLock();
+        }
       }
     },
 
@@ -720,6 +723,9 @@ const App = {
       const modal = document.getElementById('authModal');
       if (modal) modal.style.display = 'none';
       this.showNotice('', 'none');
+      if (typeof App !== 'undefined' && typeof App.updateBodyScrollLock === 'function') {
+        App.updateBodyScrollLock();
+      }
     },
 
     switchTab(tab) {
@@ -914,6 +920,9 @@ const App = {
       if (modal) modal.style.display = 'flex';
       if (resultBox) resultBox.style.display = 'none';
       if (notice) notice.style.display = 'none';
+      if (typeof App !== 'undefined' && typeof App.updateBodyScrollLock === 'function') {
+        App.updateBodyScrollLock();
+      }
 
       // 自动恢复管理员本机记住的密钥
       const savedSecret = localStorage.getItem('kaoyan_admin_secret_saved') || '';
@@ -929,6 +938,9 @@ const App = {
       if (e && e.target && e.target !== e.currentTarget) return;
       const modal = document.getElementById('adminModal');
       if (modal) modal.style.display = 'none';
+      if (typeof App !== 'undefined' && typeof App.updateBodyScrollLock === 'function') {
+        App.updateBodyScrollLock();
+      }
     },
 
     // 快捷测试密钥有效性
@@ -2051,15 +2063,23 @@ const App = {
 
     document.getElementById('examReportModal').style.display = 'flex';
     this.closeDrawer();
+    this.updateBodyScrollLock();
   },
 
-  closeExamReportModal() {
-    document.getElementById('examReportModal').style.display = 'none';
+  closeExamReportModal(event) {
+    if (event && event.target && event.target.id !== 'examReportModal' && !event.target.classList.contains('modal-close') && !event.target.classList.contains('btn-secondary')) {
+      return;
+    }
+    const modal = document.getElementById('examReportModal');
+    if (modal) modal.style.display = 'none';
+    this.updateBodyScrollLock();
     this.navigateTo('hub');
   },
 
   reviewExamQuestions() {
-    document.getElementById('examReportModal').style.display = 'none';
+    const modal = document.getElementById('examReportModal');
+    if (modal) modal.style.display = 'none';
+    this.updateBodyScrollLock();
     this.startPractice(this.state.currentPart, this.state.currentChapter, '', 'instant');
   },
 
@@ -2099,6 +2119,7 @@ const App = {
     const drawer = document.getElementById('questionDrawer');
     if (drawer) {
       drawer.style.display = 'flex';
+      this.updateBodyScrollLock();
       // 自动平滑居中滚动定位到当前题目按钮，大幅提升 100+ 题章节做题体验
       requestAnimationFrame(() => {
         const curBtn = container.querySelector('.grid-q-btn.current');
@@ -2113,7 +2134,9 @@ const App = {
     if (event && event.target && event.target.id !== 'questionDrawer' && !event.target.classList.contains('drawer-close')) {
       return;
     }
-    document.getElementById('questionDrawer').style.display = 'none';
+    const drawer = document.getElementById('questionDrawer');
+    if (drawer) drawer.style.display = 'none';
+    this.updateBodyScrollLock();
   },
 
   // ================== VIEW 3: MISTAKES VAULT ==================
@@ -2433,11 +2456,13 @@ const App = {
   openLanModal() {
     const modal = document.getElementById('lanModal');
     if (modal) modal.style.display = 'flex';
+    this.updateBodyScrollLock();
   },
 
   closeLanModal() {
     const modal = document.getElementById('lanModal');
     if (modal) modal.style.display = 'none';
+    this.updateBodyScrollLock();
   },
 
   copyLanUrl() {
@@ -2453,6 +2478,7 @@ const App = {
   openMoreMenu() {
     const modal = document.getElementById('moreMenuModal');
     if (modal) modal.style.display = 'flex';
+    this.updateBodyScrollLock();
   },
 
   closeMoreMenu(event) {
@@ -2461,12 +2487,14 @@ const App = {
     }
     const modal = document.getElementById('moreMenuModal');
     if (modal) modal.style.display = 'none';
+    this.updateBodyScrollLock();
   },
 
   // ================== MOBILE MODE SELECTOR ==================
   openModeSelect() {
     const modal = document.getElementById('modeSelectModal');
     if (modal) modal.style.display = 'flex';
+    this.updateBodyScrollLock();
   },
 
   closeModeSelect(event) {
@@ -2475,6 +2503,7 @@ const App = {
     }
     const modal = document.getElementById('modeSelectModal');
     if (modal) modal.style.display = 'none';
+    this.updateBodyScrollLock();
   },
 
   selectModeFromSheet(mode) {
@@ -2510,6 +2539,7 @@ const App = {
     }
 
     modal.style.display = 'flex';
+    this.updateBodyScrollLock();
   },
 
   closeQuestionMoreMenu(event) {
@@ -2518,6 +2548,27 @@ const App = {
     }
     const modal = document.getElementById('questionMoreModal');
     if (modal) modal.style.display = 'none';
+    this.updateBodyScrollLock();
+  },
+
+  updateBodyScrollLock() {
+    const modalIds = [
+      'authModal',
+      'adminModal',
+      'lanModal',
+      'moreMenuModal',
+      'modeSelectModal',
+      'questionMoreModal',
+      'questionDrawer',
+      'examReportModal'
+    ];
+    const isAnyOpen = modalIds.some(id => {
+      const el = document.getElementById(id);
+      return el && el.style.display && el.style.display !== 'none';
+    });
+    if (document.body) {
+      document.body.classList.toggle('modal-open', isAnyOpen);
+    }
   },
 
   // ================== TOUCH GESTURES (MOBILE SWIPE) ==================
@@ -2566,6 +2617,7 @@ const App = {
           this.closeLanModal();
           this.closeMoreMenu();
           this.closeModeSelect();
+          this.closeQuestionMoreMenu();
           this.closeExamReportModal();
         }
         return;
@@ -2576,14 +2628,15 @@ const App = {
         this.closeLanModal();
         this.closeMoreMenu();
         this.closeModeSelect();
+        this.closeQuestionMoreMenu();
         this.closeExamReportModal();
         if (this.auth && typeof this.auth.closeAuthModal === 'function') this.auth.closeAuthModal();
         if (this.auth && typeof this.auth.closeAdminModal === 'function') this.auth.closeAdminModal();
         return;
       }
 
-      // 如果当前页面有任何弹窗遮罩层正在展示（如登录、管理员、局域网等），禁止按键穿透修改题目
-      const anyBackdrop = Array.from(document.querySelectorAll('.modal-backdrop')).find(el => {
+      // 如果当前页面有任何弹窗遮罩层正在展示（如登录、管理员、答题卡抽屉等），禁止按键穿透修改题目
+      const anyBackdrop = Array.from(document.querySelectorAll('.modal-backdrop, .drawer-backdrop')).find(el => {
         return el.style.display && el.style.display !== 'none';
       });
       if (anyBackdrop) {

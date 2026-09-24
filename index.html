@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270924_v16">
+  <link rel="stylesheet" href="css/style.css?v=20270924_v18">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -602,8 +602,8 @@
   </div>
 
   <!-- MODAL: EXAM SCORE REPORT (模考成绩单) -->
-  <div id="examReportModal" class="modal-backdrop" style="display:none;">
-    <div class="modal-card">
+  <div id="examReportModal" class="modal-backdrop" style="display:none;" onclick="App.closeExamReportModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">🏆</span>
@@ -835,6 +835,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270924_v16"></script>
+  <script src="js/app.js?v=20270924_v18"></script>
 </body>
 </html>
