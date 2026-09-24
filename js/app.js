@@ -71,9 +71,10 @@ const DB = {
     for (const [qid, rec] of Object.entries(userData.answers || {})) {
       if (!rec) continue;
       const selStr = Array.isArray(rec.selected) ? rec.selected.join('') : (rec.selected || '');
-      const isCorr = rec.is_correct ? 1 : 0;
+      const isCorr = rec.is_correct === true ? 1 : (rec.is_correct === false ? 0 : -1);
       const t = rec.updated_at ? (Date.parse(rec.updated_at) || Date.now()) : Date.now();
-      compactAnswers[qid] = [selStr, isCorr, t];
+      const isFlagged = rec.is_flagged ? 1 : 0;
+      compactAnswers[qid] = [selStr, isCorr, t, isFlagged];
     }
 
     for (const [qid, rec] of Object.entries(userData.mistakes || {})) {
@@ -88,8 +89,8 @@ const DB = {
 
   mergeFromCompact(cloudData) {
     const userData = this.getUserData();
-    const cloudAnswers = cloudData.answers || {};
-    const cloudMistakes = cloudData.mistakes || {};
+    const cloudAnswers = (cloudData && cloudData.answers) || {};
+    const cloudMistakes = (cloudData && cloudData.mistakes) || {};
 
     // 智能合并 answers: 以最新时间戳为准
     for (const [qid, cloudArr] of Object.entries(cloudAnswers)) {
@@ -100,10 +101,13 @@ const DB = {
 
       if (!localRec || cloudTime > localTime) {
         const selStr = Array.isArray(cloudArr) ? cloudArr[0] : (cloudArr.choice || '');
-        const isCorr = Array.isArray(cloudArr) ? Boolean(cloudArr[1]) : Boolean(cloudArr.correct);
+        const isCorrRaw = Array.isArray(cloudArr) ? cloudArr[1] : (cloudArr.is_correct !== undefined ? cloudArr.is_correct : cloudArr.correct);
+        const isCorr = isCorrRaw === 1 ? true : (isCorrRaw === 0 ? false : null);
+        const isFlagged = Array.isArray(cloudArr) ? Boolean(cloudArr[3]) : Boolean(cloudArr.is_flagged || cloudArr.flagged);
         userData.answers[qid] = {
           selected: selStr ? selStr.split('') : [],
           is_correct: isCorr,
+          is_flagged: isFlagged,
           time_spent: localRec ? localRec.time_spent || 0 : 0,
           updated_at: new Date(cloudTime || Date.now()).toISOString()
         };
@@ -120,7 +124,7 @@ const DB = {
       if (!localRec || cloudTime > localTime) {
         const wrongCnt = Array.isArray(cloudArr) ? cloudArr[0] : (cloudArr.count || 1);
         const lastSelStr = Array.isArray(cloudArr) ? cloudArr[1] : (cloudArr.lastChoice || '');
-        const mastered = Array.isArray(cloudArr) ? Boolean(cloudArr[3]) : false;
+        const mastered = Array.isArray(cloudArr) ? Boolean(cloudArr[3]) : Boolean(cloudArr.mastered);
         userData.mistakes[qid] = {
           question_id: parseInt(qid, 10) || qid,
           wrong_count: wrongCnt,
@@ -143,11 +147,14 @@ const DB = {
     for (const [qid, cloudArr] of Object.entries(cloudAnswers)) {
       if (!cloudArr) continue;
       const selStr = Array.isArray(cloudArr) ? cloudArr[0] : (cloudArr.choice || '');
-      const isCorr = Array.isArray(cloudArr) ? Boolean(cloudArr[1]) : Boolean(cloudArr.correct);
+      const isCorrRaw = Array.isArray(cloudArr) ? cloudArr[1] : (cloudArr.is_correct !== undefined ? cloudArr.is_correct : cloudArr.correct);
+      const isCorr = isCorrRaw === 1 ? true : (isCorrRaw === 0 ? false : null);
       const cloudTime = Array.isArray(cloudArr) ? (cloudArr[2] || 0) : (cloudArr.time || 0);
+      const isFlagged = Array.isArray(cloudArr) ? Boolean(cloudArr[3]) : Boolean(cloudArr.is_flagged || cloudArr.flagged);
       newUserData.answers[qid] = {
         selected: selStr ? selStr.split('') : [],
         is_correct: isCorr,
+        is_flagged: isFlagged,
         time_spent: 0,
         updated_at: new Date(cloudTime || Date.now()).toISOString()
       };
@@ -158,7 +165,7 @@ const DB = {
       const wrongCnt = Array.isArray(cloudArr) ? cloudArr[0] : (cloudArr.count || 1);
       const lastSelStr = Array.isArray(cloudArr) ? cloudArr[1] : (cloudArr.lastChoice || '');
       const cloudTime = Array.isArray(cloudArr) ? (cloudArr[2] || 0) : (cloudArr.time || 0);
-      const mastered = Array.isArray(cloudArr) ? Boolean(cloudArr[3]) : false;
+      const mastered = Array.isArray(cloudArr) ? Boolean(cloudArr[3]) : Boolean(cloudArr.mastered);
       newUserData.mistakes[qid] = {
         question_id: parseInt(qid, 10) || qid,
         wrong_count: wrongCnt,
@@ -270,7 +277,7 @@ const DB = {
       qCopy.in_mistakes = (mistakes[q.id] && !mistakes[q.id].mastered);
 
       // In exam mode, hide standard answers until submitted
-      if (mode === 'exam' && qCopy.is_correct === null) {
+      if (mode === 'exam') {
         qCopy.answer = null;
         qCopy.source = null;
         qCopy.analysis = null;
@@ -435,6 +442,9 @@ const DB = {
       if (userData.answers[qid]) {
         delete userData.answers[qid];
       }
+      if (userData.mistakes && userData.mistakes[qid]) {
+        delete userData.mistakes[qid];
+      }
     }
     this.saveUserData(userData);
     return { success: true, cleared_count: chQIds.length };
@@ -466,10 +476,13 @@ const DB = {
   mistakeAction(qid, action) {
     const userData = this.getUserData();
     if (userData.mistakes && userData.mistakes[qid]) {
+      const nowIso = new Date().toISOString();
       if (action === 'remove' || action === 'master') {
         userData.mistakes[qid].mastered = true;
+        userData.mistakes[qid].last_wrong_time = nowIso;
       } else if (action === 'unmaster') {
         userData.mistakes[qid].mastered = false;
+        userData.mistakes[qid].last_wrong_time = nowIso;
       }
       this.saveUserData(userData);
       return { success: true };
@@ -1036,7 +1049,7 @@ const App = {
       }
     },
 
-    // 核心安全清理：当云端数据库被清空或用户被删除时，自动彻底清空本地所有答题记录与缓存
+    // 核心安全清理：当用户主动要求注销或清空时彻底清空本地所有答题记录与缓存
     purgeAllUserData(reason) {
       localStorage.removeItem('quiz_user_data_2027');
       localStorage.removeItem('kaoyan_jwt_token_2027');
@@ -1065,6 +1078,36 @@ const App = {
         alert(reason);
       }
       location.reload();
+    },
+
+    // 会话凭证过期处理：绝不删除本地做题记录，仅清理登录态凭证并友好提示
+    handleSessionExpired(isSilent = false) {
+      this.token = null;
+      this.currentUser = null;
+      localStorage.removeItem('kaoyan_jwt_token_2027');
+      localStorage.removeItem('kaoyan_user_info_2027');
+      localStorage.removeItem('kaoyan_last_session_check_2027');
+      this.renderAuthUI();
+      if (!isSilent) {
+        alert('🔑 您的登录凭证已过期或失效，本地做题记录已为您完整保留，请重新登录！');
+        this.openAuthModal('login');
+      }
+    },
+
+    // 账号在云端被注销或被删除时的处理（由用户自主选择是否保留本地答题数据）
+    handleUserDeleted() {
+      const keep = confirm('⚠️ 您的账号在云端已被注销或不存在。\n\n点击【确定】：完整保留本地做题记录并转为离线访客模式；\n点击【取消】：清空本地所有答题记录与缓存。');
+      if (keep) {
+        this.token = null;
+        this.currentUser = null;
+        localStorage.removeItem('kaoyan_jwt_token_2027');
+        localStorage.removeItem('kaoyan_user_info_2027');
+        localStorage.removeItem('kaoyan_last_session_check_2027');
+        this.renderAuthUI();
+        alert('已为您保留本地做题记录，当前已转为离线访客模式。');
+      } else {
+        this.purgeAllUserData('账号已在云端注销，本地数据已清空。');
+      }
     },
 
     setSession(token, user) {
@@ -1115,9 +1158,12 @@ const App = {
           headers: { 'Authorization': `Bearer ${this.token}` }
         });
 
-        // 关键逻辑：如果云端返回 404（用户已不存在或数据库被清空）或 401（未授权）
-        if (res.status === 404 || res.status === 401) {
-          this.purgeAllUserData('您的账号已被管理员注销或下线，本地数据已自动清空。');
+        if (res.status === 401) {
+          this.handleSessionExpired(true);
+          return;
+        }
+        if (res.status === 404) {
+          this.handleUserDeleted();
           return;
         }
 
@@ -1210,8 +1256,12 @@ const App = {
           body: JSON.stringify({ ...compactData, dataHash: currentHash })
         });
 
-        if (res.status === 404 || res.status === 401) {
-          this.purgeAllUserData('您的账号已被管理员注销或下线，本地数据已自动清空。');
+        if (res.status === 401) {
+          this.handleSessionExpired(isSilent);
+          return;
+        }
+        if (res.status === 404) {
+          this.handleUserDeleted();
           return;
         }
 
@@ -1220,9 +1270,14 @@ const App = {
           throw new Error(data.error || '上传保存失败');
         }
 
+        if (data.answers) {
+          DB.mergeFromCompact(data);
+        }
+
         this.lastSyncTime = data.updatedAt || Date.now();
         localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
-        localStorage.setItem('kaoyan_last_upload_hash_2027', currentHash);
+        const updatedCompact = DB.toCompact();
+        localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(updatedCompact));
         this.isDirty = false;
         this.updateSyncUI();
 
@@ -1252,7 +1307,7 @@ const App = {
       }
 
       if (!isSilent) {
-        const ok = confirm('⚠️ 确定要从云端下载数据吗？\n下载后将用云端保存的进度覆盖本机当前数据。');
+        const ok = confirm('⚠️ 确定要从云端下载数据吗？\n下载后将用云端保存的进度与本机当前数据智能合并。');
         if (!ok) return;
       }
 
@@ -1270,8 +1325,12 @@ const App = {
           }
         });
 
-        if (res.status === 404 || res.status === 401) {
-          this.purgeAllUserData('您的账号已被管理员注销或下线，本地数据已自动清空。');
+        if (res.status === 401) {
+          this.handleSessionExpired(isSilent);
+          return;
+        }
+        if (res.status === 404) {
+          this.handleUserDeleted();
           return;
         }
 
@@ -1282,7 +1341,7 @@ const App = {
 
         // 云端未变动防重复覆盖（节省宽带与无意义 DOM 重载）
         if (data.notModified) {
-          this.isDirty = false;
+          // 注意：切勿清空 this.isDirty，保留本地离线修改待保存状态
           this.updateSyncUI();
           if (!isSilent) {
             alert('💡 云端数据与本机一致（无更新），无需重复覆盖！');
@@ -1290,8 +1349,8 @@ const App = {
           return;
         }
 
-        // 以云端真实保存的数据全量覆盖本地
-        DB.setFromCloud(data);
+        // 智能双向时间戳合并云端数据至本地（杜绝粗暴覆盖丢题）
+        DB.mergeFromCompact(data);
         this.lastSyncTime = data.updatedAt || Date.now();
         localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
         const newCompact = DB.toCompact();
@@ -1300,7 +1359,7 @@ const App = {
         this.updateSyncUI();
 
         if (!isSilent) {
-          alert('📥 云端数据下载成功！即将刷新页面呈现最新进度。');
+          alert('📥 云端数据同步成功！即将刷新页面呈现最新进度。');
           location.reload();
         }
       } catch (err) {
@@ -1364,6 +1423,10 @@ const App = {
 
   // ================== NAVIGATION ==================
   navigateTo(viewName) {
+    if (viewName !== 'practice' && this.state.questionTimerTimer) {
+      clearInterval(this.state.questionTimerTimer);
+      this.state.questionTimerTimer = null;
+    }
     this.state.currentView = viewName;
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -1582,7 +1645,28 @@ const App = {
     const q = this.getCurrentQuestion();
     const card = document.getElementById('questionCard');
     if (!q) {
-      if (card) card.innerHTML = '<div class="q-stem">此分类下暂无题目。</div>';
+      if (card) {
+        const stem = document.getElementById('qStem');
+        if (stem) stem.textContent = '此分类下暂无题目。';
+        const opts = document.getElementById('qOptions');
+        if (opts) opts.innerHTML = '';
+        const subItems = document.getElementById('qSubItems');
+        if (subItems) subItems.style.display = 'none';
+        const multiBar = document.getElementById('multiSubmitBar');
+        if (multiBar) multiBar.style.display = 'none';
+        const panel = document.getElementById('explanationPanel');
+        if (panel) panel.style.display = 'none';
+        const qNumBadge = document.getElementById('qNumberBadge');
+        if (qNumBadge) qNumBadge.textContent = '—';
+        const tagEl = document.getElementById('qSpecialTag');
+        if (tagEl) tagEl.style.display = 'none';
+        const pCurrent = document.getElementById('pCurrentNum');
+        if (pCurrent) pCurrent.textContent = '0';
+        const pTotal = document.getElementById('pTotalNum');
+        if (pTotal) pTotal.textContent = '0';
+        const mProgress = document.getElementById('mCardProgress');
+        if (mProgress) mProgress.textContent = '0/0';
+      }
       return;
     }
 
@@ -1755,6 +1839,7 @@ const App = {
     const mode = this.state.practiceMode;
 
     if (mode === 'recite') return;
+    if ((mode === 'instant' || mode === 'mistakes_only') && this.state.isEvaluated) return;
 
     if (q.type === '单项选择题') {
       this.state.selectedOptions = [key];
@@ -2436,6 +2521,16 @@ const App = {
         this.closeMoreMenu();
         this.closeModeSelect();
         this.closeExamReportModal();
+        if (this.auth && typeof this.auth.closeAuthModal === 'function') this.auth.closeAuthModal();
+        if (this.auth && typeof this.auth.closeAdminModal === 'function') this.auth.closeAdminModal();
+        return;
+      }
+
+      // 如果当前页面有任何弹窗遮罩层正在展示（如登录、管理员、局域网等），禁止按键穿透修改题目
+      const anyBackdrop = Array.from(document.querySelectorAll('.modal-backdrop')).find(el => {
+        return el.style.display && el.style.display !== 'none';
+      });
+      if (anyBackdrop) {
         return;
       }
 

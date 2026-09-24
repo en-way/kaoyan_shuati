@@ -1671,10 +1671,15 @@ kbd {
     padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* Compact Header */
+  /* Compact Header with Safe Area for Notch/Dynamic Island */
   .app-header {
-    height: 46px;
-    padding: 0 12px;
+    height: calc(46px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 12px 0 12px;
+  }
+
+  /* Prevent iOS Safari auto-zoom on input focus */
+  .form-control {
+    font-size: 16px !important;
   }
 
   .header-left {
@@ -1932,6 +1937,7 @@ kbd {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     align-self: flex-end;
     margin-bottom: 0;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 

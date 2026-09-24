@@ -8,23 +8,34 @@ export async function onRequestOptions() {
   return jsonResponse({}, 200);
 }
 
-// 辅助：从作答条目中提取时间戳（兼容数组紧凑格式 [choice, isCorrect, time] 与对象格式）
+// 辅助：从作答条目中提取时间戳（兼容紧凑数组 [choice, isCorrect, time, isFlagged] 与对象格式）
 function getItemTime(item) {
   if (!item) return 0;
   if (Array.isArray(item)) return item[2] || 0;
-  if (typeof item === 'object') return item.time || 0;
+  if (typeof item === 'object') {
+    if (typeof item.time === 'number') return item.time;
+    if (item.time) return Date.parse(item.time) || 0;
+    if (item.updated_at) return Date.parse(item.updated_at) || 0;
+    if (item.last_wrong_time) return Date.parse(item.last_wrong_time) || 0;
+  }
   return 0;
 }
 
-// 辅助：标准化为紧凑数组格式 [choice, isCorrect ? 1 : 0, time]
+// 辅助：标准化为紧凑数组格式 [choice, isCorrect (-1|0|1), time, isFlagged (1|0)]
 function toCompactAnswer(item) {
   if (!item) return null;
-  if (Array.isArray(item)) return item;
-  return [
-    item.choice || '',
-    item.correct ? 1 : 0,
-    item.time || Date.now()
-  ];
+  if (Array.isArray(item)) {
+    const choice = item[0] || '';
+    const isCorr = item[1] === 1 ? 1 : (item[1] === 0 ? 0 : -1);
+    const time = item[2] || Date.now();
+    const isFlagged = item[3] ? 1 : 0;
+    return [choice, isCorr, time, isFlagged];
+  }
+  const choice = Array.isArray(item.choice) ? item.choice.join('') : (Array.isArray(item.selected) ? item.selected.join('') : (item.choice || item.selected || ''));
+  const isCorr = (item.is_correct === true || item.correct === true) ? 1 : ((item.is_correct === false || item.correct === false) ? 0 : -1);
+  const time = item.time ? (typeof item.time === 'number' ? item.time : (Date.parse(item.time) || Date.now())) : (item.updated_at ? (Date.parse(item.updated_at) || Date.now()) : Date.now());
+  const isFlagged = (item.is_flagged || item.flagged) ? 1 : 0;
+  return [choice, isCorr, time, isFlagged];
 }
 
 // 辅助：标准化为紧凑错题格式 [count, lastChoice, time, mastered (1|0)]
@@ -38,12 +49,11 @@ function toCompactMistake(item) {
       item[3] ? 1 : 0
     ];
   }
-  return [
-    item.count || item.wrong_count || 1,
-    item.lastChoice || (Array.isArray(item.last_selected) ? item.last_selected.join('') : (item.last_selected || '')),
-    item.time || (item.last_wrong_time ? (Date.parse(item.last_wrong_time) || 0) : Date.now()),
-    item.mastered ? 1 : 0
-  ];
+  const count = item.count || item.wrong_count || 1;
+  const lastChoice = item.lastChoice || (Array.isArray(item.last_selected) ? item.last_selected.join('') : (item.last_selected || ''));
+  const time = item.time ? (typeof item.time === 'number' ? item.time : (Date.parse(item.time) || Date.now())) : (item.last_wrong_time ? (Date.parse(item.last_wrong_time) || Date.now()) : Date.now());
+  const mastered = item.mastered ? 1 : 0;
+  return [count, lastChoice, time, mastered];
 }
 
 // GET: 拉取云端最新刷题进度
@@ -76,7 +86,7 @@ export async function onRequestGet(context) {
       return jsonResponse({
         success: false,
         code: 'USER_DELETED',
-        error: '账号在云端已被删除，本地数据将自动清空'
+        error: '账号在云端已被删除'
       }, 404);
     }
 
@@ -118,7 +128,7 @@ export async function onRequestGet(context) {
   }
 }
 
-// POST: 双向智能合并本地与云端做题数据并保存至 D1（带防重复写入校验）
+// POST: 双向智能时间戳合并本地与云端做题数据并保存至 D1（带防重复写入校验）
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -153,33 +163,77 @@ export async function onRequestPost(context) {
       return jsonResponse({
         success: false,
         code: 'USER_DELETED',
-        error: '账号在云端已被删除，本地数据将自动清空'
+        error: '账号在云端已被删除'
       }, 404);
     }
 
-    // 权威保存（全量快照覆盖）：直接将客户端传来的当前做题状态作为云端权威最新数据
-    const cleanAnswers = {};
-    for (const [qid, item] of Object.entries(localAnswers || {})) {
-      const compact = toCompactAnswer(item);
-      if (compact) cleanAnswers[qid] = compact;
+    let cloudAnswers = {};
+    let cloudMistakes = {};
+    try { cloudAnswers = JSON.parse(existing.answers_data || '{}'); } catch (e) {}
+    try { cloudMistakes = JSON.parse(existing.mistakes_data || '{}'); } catch (e) {}
+
+    // 双向智能合并 Answers（以单题最新时间戳为准，并集保留）
+    const finalAnswers = {};
+    const allAnswerQids = new Set([
+      ...Object.keys(cloudAnswers || {}),
+      ...Object.keys(localAnswers || {})
+    ]);
+
+    for (const qid of allAnswerQids) {
+      const localItem = localAnswers ? localAnswers[qid] : null;
+      const cloudItem = cloudAnswers ? cloudAnswers[qid] : null;
+
+      if (localItem && !cloudItem) {
+        const compact = toCompactAnswer(localItem);
+        if (compact) finalAnswers[qid] = compact;
+      } else if (!localItem && cloudItem) {
+        const compact = toCompactAnswer(cloudItem);
+        if (compact) finalAnswers[qid] = compact;
+      } else if (localItem && cloudItem) {
+        const tLocal = getItemTime(localItem);
+        const tCloud = getItemTime(cloudItem);
+        const chosen = tLocal >= tCloud ? localItem : cloudItem;
+        const compact = toCompactAnswer(chosen);
+        if (compact) finalAnswers[qid] = compact;
+      }
     }
 
-    const cleanMistakes = {};
-    for (const [qid, item] of Object.entries(localMistakes || {})) {
-      const compact = toCompactMistake(item);
-      if (compact) cleanMistakes[qid] = compact;
+    // 双向智能合并 Mistakes（以单题最新时间戳为准，并集保留）
+    const finalMistakes = {};
+    const allMistakeQids = new Set([
+      ...Object.keys(cloudMistakes || {}),
+      ...Object.keys(localMistakes || {})
+    ]);
+
+    for (const qid of allMistakeQids) {
+      const localItem = localMistakes ? localMistakes[qid] : null;
+      const cloudItem = cloudMistakes ? cloudMistakes[qid] : null;
+
+      if (localItem && !cloudItem) {
+        const compact = toCompactMistake(localItem);
+        if (compact) finalMistakes[qid] = compact;
+      } else if (!localItem && cloudItem) {
+        const compact = toCompactMistake(cloudItem);
+        if (compact) finalMistakes[qid] = compact;
+      } else if (localItem && cloudItem) {
+        const tLocal = getItemTime(localItem);
+        const tCloud = getItemTime(cloudItem);
+        const chosen = tLocal >= tCloud ? localItem : cloudItem;
+        const compact = toCompactMistake(chosen);
+        if (compact) finalMistakes[qid] = compact;
+      }
     }
 
-    const answersJson = JSON.stringify(cleanAnswers);
-    const mistakesJson = JSON.stringify(cleanMistakes);
+    const answersJson = JSON.stringify(finalAnswers);
+    const mistakesJson = JSON.stringify(finalMistakes);
 
     // 服务端二次拦截：如果数据库中已有记录，且内容完全一致，跳过 D1 写入！
     if (existing.answers_data === answersJson && existing.mistakes_data === mistakesJson) {
       return jsonResponse({
         success: true,
         notModified: true,
-        answers: cleanAnswers,
-        mistakes: cleanMistakes,
+        answers: finalAnswers,
+        mistakes: finalMistakes,
         updatedAt: existing.updated_at || Date.now(),
         message: '数据与云端一致，无需重复写入'
       });
@@ -199,8 +253,8 @@ export async function onRequestPost(context) {
 
     return jsonResponse({
       success: true,
-      answers: cleanAnswers,
-      mistakes: cleanMistakes,
+      answers: finalAnswers,
+      mistakes: finalMistakes,
       updatedAt: now,
       message: '云端做题数据保存成功'
     });
