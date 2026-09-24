@@ -52,8 +52,11 @@ export function generateSalt() {
   return bytesToHex(salt);
 }
 
-// 2. PBKDF2 安全密码哈希 (SHA-256, 100,000 次迭代)
-export async function hashPassword(password, saltHex) {
+// 2. PBKDF2 安全密码哈希配置 (Cloudflare Free 版 10ms CPU 最佳实践：20,000 次；同时向下兼容 100,000 次)
+export const PBKDF2_DEFAULT_ITERATIONS = 20000;
+export const PBKDF2_LEGACY_ITERATIONS = 100000;
+
+export async function hashPassword(password, saltHex, iterations = PBKDF2_DEFAULT_ITERATIONS) {
   const enc = new TextEncoder();
   const passKey = await crypto.subtle.importKey(
     'raw',
@@ -68,7 +71,7 @@ export async function hashPassword(password, saltHex) {
     {
       name: 'PBKDF2',
       salt: saltBytes,
-      iterations: 100000,
+      iterations: iterations,
       hash: 'SHA-256'
     },
     passKey,
@@ -78,10 +81,13 @@ export async function hashPassword(password, saltHex) {
   return bytesToHex(new Uint8Array(derivedBits));
 }
 
-// 3. 校验密码是否匹配
+// 3. 校验密码是否匹配（先使用 20k 次迭代快速比对，未匹配时向下兼容 100k 次旧账号）
 export async function verifyPassword(password, saltHex, targetHash) {
-  const hash = await hashPassword(password, saltHex);
-  return hash === targetHash;
+  const hash = await hashPassword(password, saltHex, PBKDF2_DEFAULT_ITERATIONS);
+  if (hash === targetHash) return true;
+  // 向下兼容历史 100k 迭代账号
+  const legacyHash = await hashPassword(password, saltHex, PBKDF2_LEGACY_ITERATIONS);
+  return legacyHash === targetHash;
 }
 
 // 4. 生成 6 位纯数字密码重置码 (100000 ~ 999999)

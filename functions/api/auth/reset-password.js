@@ -42,11 +42,6 @@ export async function onRequestPost(context) {
   }
 
   try {
-    // 兼容历史数据表：确保 password_resets 表具备 failed_attempts 字段
-    try {
-      await env.DB.prepare('ALTER TABLE password_resets ADD COLUMN failed_attempts INTEGER DEFAULT 0').run();
-    } catch (e) {}
-
     // 1. 查询该学员账号最新且未被使用的重置码记录
     const resetRecord = await env.DB.prepare(
       'SELECT id, code, expires_at, used, coalesce(failed_attempts, 0) as failed_attempts FROM password_resets WHERE username = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'

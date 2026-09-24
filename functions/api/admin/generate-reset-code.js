@@ -49,13 +49,6 @@ export async function onRequestPost(context) {
   }
 
   try {
-    // 兼容历史部署：确保 password_resets 表具备 failed_attempts 字段
-    try {
-      await env.DB.prepare('ALTER TABLE password_resets ADD COLUMN failed_attempts INTEGER DEFAULT 0').run();
-    } catch (e) {
-      // 字段已存在时忽略错误
-    }
-
     // 检查学员用户是否存在
     const user = await env.DB.prepare(
       'SELECT id, username, nickname FROM users WHERE username = ?'

@@ -36,3 +36,4 @@ CREATE TABLE IF NOT EXISTS password_resets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_resets_user_code ON password_resets(username, code);
+CREATE INDEX IF NOT EXISTS idx_resets_expires ON password_resets(expires_at);

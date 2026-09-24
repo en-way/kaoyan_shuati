@@ -562,6 +562,18 @@ const App = {
         this.closeUserMenu();
       });
 
+      // 初始化检查数据脏状态：若本地数据指纹与最后上传指纹不一致，则自动恢复未保存黄灯提示
+      try {
+        const compactData = DB.toCompact();
+        const currentHash = this.computeDataFingerprint(compactData);
+        const lastUploadHash = localStorage.getItem('kaoyan_last_upload_hash_2027');
+        if (lastUploadHash && currentHash !== lastUploadHash) {
+          this.isDirty = true;
+        }
+      } catch (e) {
+        console.warn('Failed to evaluate initial dirty status:', e);
+      }
+
       if (this.token) {
         this.checkSession();
       } else {
@@ -1172,7 +1184,8 @@ const App = {
         }
 
         const res = await fetch('/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${this.token}` }
+          headers: { 'Authorization': `Bearer ${this.token}` },
+          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined
         });
 
         if (res.status === 401) {
@@ -1270,7 +1283,8 @@ const App = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.token}`
           },
-          body: JSON.stringify({ ...compactData, dataHash: currentHash })
+          body: JSON.stringify({ ...compactData, dataHash: currentHash }),
+          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined
         });
 
         if (res.status === 401) {
@@ -1339,7 +1353,8 @@ const App = {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${this.token}`
-          }
+          },
+          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined
         });
 
         if (res.status === 401) {
