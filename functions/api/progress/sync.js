@@ -167,60 +167,25 @@ export async function onRequestPost(context) {
       }, 404);
     }
 
-    let cloudAnswers = {};
-    let cloudMistakes = {};
-    try { cloudAnswers = JSON.parse(existing.answers_data || '{}'); } catch (e) {}
-    try { cloudMistakes = JSON.parse(existing.mistakes_data || '{}'); } catch (e) {}
-
-    // 双向智能合并 Answers（以单题最新时间戳为准，并集保留）
+    // 客户端快照权威覆盖模式 (Client-Authoritative Snapshot Overwrite)
+    // 本地快照拥有绝对权威：客户端提交的数据即为真实全量状态。
+    // 本地清空（answers 为空）或重置某一章节（对应题目被移除）时，直接以客户端清洗后的数据为准覆写云端，杜绝死灰复燃。
     const finalAnswers = {};
     const validQid = qid => typeof qid === 'string' && qid.length > 0 && qid.length <= 64 && /^[a-zA-Z0-9_-]+$/.test(qid) && qid !== '__proto__' && qid !== 'constructor';
-    const allAnswerQids = new Set([
-      ...Object.keys(cloudAnswers || {}).filter(validQid),
-      ...Object.keys(localAnswers || {}).filter(validQid)
-    ]);
 
-    for (const qid of allAnswerQids) {
-      const localItem = localAnswers ? localAnswers[qid] : null;
-      const cloudItem = cloudAnswers ? cloudAnswers[qid] : null;
-
-      if (localItem && !cloudItem) {
-        const compact = toCompactAnswer(localItem);
-        if (compact) finalAnswers[qid] = compact;
-      } else if (!localItem && cloudItem) {
-        const compact = toCompactAnswer(cloudItem);
-        if (compact) finalAnswers[qid] = compact;
-      } else if (localItem && cloudItem) {
-        const tLocal = getItemTime(localItem);
-        const tCloud = getItemTime(cloudItem);
-        const chosen = tLocal >= tCloud ? localItem : cloudItem;
-        const compact = toCompactAnswer(chosen);
+    if (localAnswers && typeof localAnswers === 'object') {
+      for (const [qid, item] of Object.entries(localAnswers)) {
+        if (!validQid(qid)) continue;
+        const compact = toCompactAnswer(item);
         if (compact) finalAnswers[qid] = compact;
       }
     }
 
-    // 双向智能合并 Mistakes（以单题最新时间戳为准，并集保留）
     const finalMistakes = {};
-    const allMistakeQids = new Set([
-      ...Object.keys(cloudMistakes || {}).filter(validQid),
-      ...Object.keys(localMistakes || {}).filter(validQid)
-    ]);
-
-    for (const qid of allMistakeQids) {
-      const localItem = localMistakes ? localMistakes[qid] : null;
-      const cloudItem = cloudMistakes ? cloudMistakes[qid] : null;
-
-      if (localItem && !cloudItem) {
-        const compact = toCompactMistake(localItem);
-        if (compact) finalMistakes[qid] = compact;
-      } else if (!localItem && cloudItem) {
-        const compact = toCompactMistake(cloudItem);
-        if (compact) finalMistakes[qid] = compact;
-      } else if (localItem && cloudItem) {
-        const tLocal = getItemTime(localItem);
-        const tCloud = getItemTime(cloudItem);
-        const chosen = tLocal >= tCloud ? localItem : cloudItem;
-        const compact = toCompactMistake(chosen);
+    if (localMistakes && typeof localMistakes === 'object') {
+      for (const [qid, item] of Object.entries(localMistakes)) {
+        if (!validQid(qid)) continue;
+        const compact = toCompactMistake(item);
         if (compact) finalMistakes[qid] = compact;
       }
     }

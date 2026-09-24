@@ -562,12 +562,13 @@ const App = {
         this.closeUserMenu();
       });
 
-      // 初始化检查数据脏状态：若本地数据指纹与最后上传指纹不一致，则自动恢复未保存黄灯提示
+      // 初始化检查数据脏状态：若本地数据指纹与最后上传指纹不一致，或存在显式标脏标记，则自动恢复未保存黄灯提示
       try {
         const compactData = DB.toCompact();
         const currentHash = this.computeDataFingerprint(compactData);
         const lastUploadHash = localStorage.getItem('kaoyan_last_upload_hash_2027');
-        if (lastUploadHash && currentHash !== lastUploadHash) {
+        const isExplicitDirty = localStorage.getItem('kaoyan_is_dirty_2027') === '1';
+        if (isExplicitDirty || (lastUploadHash && currentHash !== lastUploadHash)) {
           this.isDirty = true;
         }
       } catch (e) {
@@ -584,6 +585,7 @@ const App = {
 
     markDirty() {
       this.isDirty = true;
+      localStorage.setItem('kaoyan_is_dirty_2027', '1');
       this.updateSyncUI();
     },
 
@@ -1234,13 +1236,15 @@ const App = {
     },
 
     resetLocalData() {
-      if (!confirm('⚠️ 确定要清空本机所有的刷题记录与错题本吗？\n清空后所有答题进度与错题归零，此操作不可撤销！')) {
+      if (!confirm('⚠️ 确定要清空本机所有的刷题记录与错题本吗？\n清空后本机进度归零。若需同步清空云端，可在刷新后点击「上传」按钮覆盖云端。')) {
         return;
       }
       localStorage.removeItem('quiz_user_data_2027');
+      DB.saveUserData({ answers: {}, mistakes: {} });
       localStorage.removeItem('kaoyan_last_sync_time_2027');
       localStorage.removeItem('kaoyan_last_upload_hash_2027');
-      this.isDirty = false;
+      localStorage.setItem('kaoyan_is_dirty_2027', '1');
+      this.isDirty = true;
       this.lastSyncTime = null;
 
       if (App.state) {
@@ -1253,7 +1257,7 @@ const App = {
         App.state.isFlagged = false;
       }
 
-      alert('本地所有刷题记录与错题本已成功清空！');
+      alert('本地所有刷题记录与错题本已成功清空！\n当前处于待上传状态。如需同步清空云端，请点击同步按钮上传覆盖。');
       location.reload();
     },
 
@@ -1313,14 +1317,11 @@ const App = {
           throw new Error(data.error || '上传保存失败');
         }
 
-        if (data.answers) {
-          DB.mergeFromCompact(data);
-        }
-
         this.lastSyncTime = data.updatedAt || Date.now();
         localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
         const updatedCompact = DB.toCompact();
         localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(updatedCompact));
+        localStorage.removeItem('kaoyan_is_dirty_2027');
         this.isDirty = false;
         this.updateSyncUI();
 
@@ -1350,7 +1351,7 @@ const App = {
       }
 
       if (!isSilent) {
-        const ok = confirm('⚠️ 确定要从云端下载数据吗？\n下载后将用云端保存的进度与本机当前数据智能合并。');
+        const ok = confirm('⚠️ 确定要从云端下载数据吗？\n下载后将用云端保存的进度直接覆盖本机当前进度。');
         if (!ok) return;
       }
 
@@ -1393,12 +1394,13 @@ const App = {
           return;
         }
 
-        // 智能双向时间戳合并云端数据至本地（杜绝粗暴覆盖丢题）
-        DB.mergeFromCompact(data);
+        // 客户端快照权威覆盖模式：以云端全量数据直接覆写本机进度
+        DB.setFromCloud(data);
         this.lastSyncTime = data.updatedAt || Date.now();
         localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
         const newCompact = DB.toCompact();
         localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(newCompact));
+        localStorage.removeItem('kaoyan_is_dirty_2027');
         this.isDirty = false;
         this.updateSyncUI();
 
