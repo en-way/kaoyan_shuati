@@ -11,12 +11,12 @@ export async function onRequestOptions() {
 // 辅助：从作答条目中提取时间戳（兼容紧凑数组 [choice, isCorrect, time, isFlagged] 与对象格式）
 function getItemTime(item) {
   if (!item) return 0;
-  if (Array.isArray(item)) return item[2] || 0;
+  if (Array.isArray(item)) return Number.isFinite(item[2]) ? item[2] : 0;
   if (typeof item === 'object') {
-    if (typeof item.time === 'number') return item.time;
-    if (item.time) return Date.parse(item.time) || 0;
-    if (item.updated_at) return Date.parse(item.updated_at) || 0;
-    if (item.last_wrong_time) return Date.parse(item.last_wrong_time) || 0;
+    if (Number.isFinite(item.time)) return item.time;
+    if (item.time && !isNaN(Date.parse(item.time))) return Date.parse(item.time);
+    if (item.updated_at && !isNaN(Date.parse(item.updated_at))) return Date.parse(item.updated_at);
+    if (item.last_wrong_time && !isNaN(Date.parse(item.last_wrong_time))) return Date.parse(item.last_wrong_time);
   }
   return 0;
 }
@@ -25,17 +25,17 @@ function getItemTime(item) {
 function toCompactAnswer(item) {
   if (!item) return null;
   if (Array.isArray(item)) {
-    const choice = item[0] || '';
+    const choice = typeof item[0] === 'string' ? item[0] : '';
     const isCorr = item[1] === 1 ? 1 : (item[1] === 0 ? 0 : -1);
-    const time = item[2] || Date.now();
+    const time = Number.isFinite(item[2]) ? item[2] : Date.now();
     const isFlagged = item[3] ? 1 : 0;
     return [choice, isCorr, time, isFlagged];
   }
   const choice = Array.isArray(item.choice) ? item.choice.join('') : (Array.isArray(item.selected) ? item.selected.join('') : (item.choice || item.selected || ''));
   const isCorr = (item.is_correct === true || item.correct === true) ? 1 : ((item.is_correct === false || item.correct === false) ? 0 : -1);
-  const time = item.time ? (typeof item.time === 'number' ? item.time : (Date.parse(item.time) || Date.now())) : (item.updated_at ? (Date.parse(item.updated_at) || Date.now()) : Date.now());
+  const time = Number.isFinite(item.time) ? item.time : (item.time && !isNaN(Date.parse(item.time)) ? Date.parse(item.time) : (item.updated_at && !isNaN(Date.parse(item.updated_at)) ? Date.parse(item.updated_at) : Date.now()));
   const isFlagged = (item.is_flagged || item.flagged) ? 1 : 0;
-  return [choice, isCorr, time, isFlagged];
+  return [typeof choice === 'string' ? choice : '', isCorr, time, isFlagged];
 }
 
 // 辅助：标准化为紧凑错题格式 [count, lastChoice, time, mastered (1|0)]
@@ -43,17 +43,17 @@ function toCompactMistake(item) {
   if (!item) return null;
   if (Array.isArray(item)) {
     return [
-      item[0] || 1,
-      item[1] || '',
-      item[2] || 0,
+      Number.isFinite(item[0]) ? item[0] : 1,
+      typeof item[1] === 'string' ? item[1] : '',
+      Number.isFinite(item[2]) ? item[2] : 0,
       item[3] ? 1 : 0
     ];
   }
-  const count = item.count || item.wrong_count || 1;
+  const count = Number.isFinite(item.count) ? item.count : (Number.isFinite(item.wrong_count) ? item.wrong_count : 1);
   const lastChoice = item.lastChoice || (Array.isArray(item.last_selected) ? item.last_selected.join('') : (item.last_selected || ''));
-  const time = item.time ? (typeof item.time === 'number' ? item.time : (Date.parse(item.time) || Date.now())) : (item.last_wrong_time ? (Date.parse(item.last_wrong_time) || Date.now()) : Date.now());
+  const time = Number.isFinite(item.time) ? item.time : (item.time && !isNaN(Date.parse(item.time)) ? Date.parse(item.time) : (item.last_wrong_time && !isNaN(Date.parse(item.last_wrong_time)) ? Date.parse(item.last_wrong_time) : Date.now()));
   const mastered = item.mastered ? 1 : 0;
-  return [count, lastChoice, time, mastered];
+  return [count, typeof lastChoice === 'string' ? lastChoice : '', time, mastered];
 }
 
 // GET: 拉取云端最新刷题进度
@@ -174,9 +174,10 @@ export async function onRequestPost(context) {
 
     // 双向智能合并 Answers（以单题最新时间戳为准，并集保留）
     const finalAnswers = {};
+    const validQid = qid => typeof qid === 'string' && qid.length > 0 && qid.length <= 64 && /^[a-zA-Z0-9_-]+$/.test(qid) && qid !== '__proto__' && qid !== 'constructor';
     const allAnswerQids = new Set([
-      ...Object.keys(cloudAnswers || {}),
-      ...Object.keys(localAnswers || {})
+      ...Object.keys(cloudAnswers || {}).filter(validQid),
+      ...Object.keys(localAnswers || {}).filter(validQid)
     ]);
 
     for (const qid of allAnswerQids) {
@@ -201,8 +202,8 @@ export async function onRequestPost(context) {
     // 双向智能合并 Mistakes（以单题最新时间戳为准，并集保留）
     const finalMistakes = {};
     const allMistakeQids = new Set([
-      ...Object.keys(cloudMistakes || {}),
-      ...Object.keys(localMistakes || {})
+      ...Object.keys(cloudMistakes || {}).filter(validQid),
+      ...Object.keys(localMistakes || {}).filter(validQid)
     ]);
 
     for (const qid of allMistakeQids) {

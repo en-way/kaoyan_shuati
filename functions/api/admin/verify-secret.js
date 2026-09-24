@@ -1,6 +1,7 @@
 import {
   jsonResponse,
-  errorResponse
+  errorResponse,
+  timingSafeEqualStr
 } from '../../utils/auth.js';
 
 export async function onRequestOptions() {
@@ -36,7 +37,8 @@ export async function onRequestPost(context) {
     }, 500);
   }
 
-  if (providedSecret !== configuredSecret) {
+  const isMatch = await timingSafeEqualStr(providedSecret, configuredSecret);
+  if (!isMatch) {
     return jsonResponse({
       success: false,
       isValid: false,

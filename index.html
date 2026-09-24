@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270924_v15">
+  <link rel="stylesheet" href="css/style.css?v=20270924_v16">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -623,6 +623,10 @@
               <span class="m-label">总题数</span>
               <span class="m-val" id="examTotalQ">0</span>
             </div>
+            <div class="metric-item" style="border: 1px solid rgba(0, 240, 255, 0.2); background: rgba(0, 240, 255, 0.05); border-radius: 6px; padding: 4px 8px;">
+              <span class="m-label" style="color: var(--accent-cyan); font-weight: 600;">考研得分</span>
+              <span class="m-val" id="examScorePoints" style="color: var(--accent-cyan); font-weight: 700;">0/0</span>
+            </div>
             <div class="metric-item color-green">
               <span class="m-label">做对</span>
               <span class="m-val" id="examCorrectQ">0</span>
@@ -821,7 +825,7 @@
         </form>
 
         <div id="adminResultBox" class="admin-result-box" style="display:none;">
-          <div class="result-title">重置码生成成功（30分钟内有效）：</div>
+          <div class="result-title">重置码生成成功（15分钟内有效，输错5次作废）：</div>
           <div class="result-code-display" id="adminGeneratedCode">------</div>
           <button type="button" class="btn-secondary btn-block" onclick="App.auth.copyAdminGeneratedCode()">
             📋 一键复制重置信息发给学员
@@ -831,6 +835,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270924_v15"></script>
+  <script src="js/app.js?v=20270924_v16"></script>
 </body>
 </html>

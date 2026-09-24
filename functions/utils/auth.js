@@ -92,8 +92,24 @@ export function generate6DigitCode() {
   return code.toString();
 }
 
+// 4.5. 恒定时间字符串比对（防御时序侧信道反推秘钥/重置码）
+export async function timingSafeEqualStr(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const enc = new TextEncoder();
+  const hashA = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(a)));
+  const hashB = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(b)));
+  let diff = 0;
+  for (let i = 0; i < 32; i++) {
+    diff |= (hashA[i] ^ hashB[i]);
+  }
+  return diff === 0;
+}
+
 // 5. JWT HMAC-SHA256 签发 (有效期默认 30 天)
-export async function signJwt(payload, secret = 'DEFAULT_KAOYAN_JWT_SECRET_2027') {
+export async function signJwt(payload, secret) {
+  if (!secret || typeof secret !== 'string') {
+    throw new Error('云端服务未配置 JWT_SECRET 环境变量，请在 Cloudflare Pages 后台添加');
+  }
   const header = { alg: 'HS256', typ: 'JWT' };
   const exp = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30天
   const fullPayload = { ...payload, exp };
@@ -126,8 +142,9 @@ export async function signJwt(payload, secret = 'DEFAULT_KAOYAN_JWT_SECRET_2027'
 }
 
 // 6. JWT HMAC-SHA256 校验与解析
-export async function verifyJwt(token, secret = 'DEFAULT_KAOYAN_JWT_SECRET_2027') {
+export async function verifyJwt(token, secret) {
   if (!token || typeof token !== 'string') return null;
+  if (!secret || typeof secret !== 'string') return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
 
@@ -176,7 +193,8 @@ export async function getAuthUser(request, env) {
   const authHeader = request.headers.get('Authorization') || '';
   if (!authHeader.startsWith('Bearer ')) return null;
   const token = authHeader.substring(7).trim();
-  const secret = env.JWT_SECRET || 'DEFAULT_KAOYAN_JWT_SECRET_2027';
+  const secret = env.JWT_SECRET;
+  if (!secret) return null;
   return await verifyJwt(token, secret);
 }
 

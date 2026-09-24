@@ -349,10 +349,12 @@ const DB = {
 
   toggleFlag(qid) {
     const userData = this.getUserData();
+    const now = new Date().toISOString();
     if (!userData.answers[qid]) {
-      userData.answers[qid] = { selected: [], time_spent: 0, is_flagged: true };
+      userData.answers[qid] = { selected: [], time_spent: 0, is_flagged: true, updated_at: now };
     } else {
       userData.answers[qid].is_flagged = !userData.answers[qid].is_flagged;
+      userData.answers[qid].updated_at = now;
     }
     this.saveUserData(userData);
     return userData.answers[qid].is_flagged;
@@ -365,6 +367,8 @@ const DB = {
     let correctCnt = 0;
     let wrongCnt = 0;
     let unansweredCnt = 0;
+    let totalPoints = 0;
+    let earnedPoints = 0;
     const results = [];
 
     for (const q of chQuestions) {
@@ -373,13 +377,19 @@ const DB = {
       const selected = rec.selected || [];
       const userStr = selected.slice().sort().join('');
       const stdAns = q.answer || '';
+      const isMulti = q.type === '多项选择题' || q.type === '多选题' || (stdAns && stdAns.length > 1);
+      const pointWeight = isMulti ? 2 : 1; // 考研政治官方赋分标准：单选 1 分，多选 2 分
+      totalPoints += pointWeight;
 
       let isCorr = false;
+      let scoreEarned = 0;
       if (!userStr) {
         unansweredCnt++;
       } else if (userStr === stdAns) {
         correctCnt++;
         isCorr = true;
+        scoreEarned = pointWeight;
+        earnedPoints += pointWeight;
         rec.is_correct = true;
         if (userData.mistakes[qid]) userData.mistakes[qid].mastered = true;
       } else {
@@ -397,16 +407,19 @@ const DB = {
       }
 
       rec.is_correct = isCorr;
+      rec.updated_at = new Date().toISOString();
       userData.answers[qid] = rec;
 
       results.push({
         id: qid,
         num: q.num,
-        type: q.type,
+        type: q.type || (isMulti ? '多项选择题' : '单项选择题'),
         stem: q.stem,
         user_ans: userStr || '未作答',
         standard_ans: stdAns,
         is_correct: isCorr,
+        max_score: pointWeight,
+        score_earned: scoreEarned,
         source: q.source || '',
         analysis: q.analysis || '',
         tips: q.tips || '',
@@ -417,7 +430,9 @@ const DB = {
     this.saveUserData(userData);
 
     const totalGraded = correctCnt + wrongCnt;
-    const scoreRate = chQuestions.length > 0 ? Math.round((correctCnt / chQuestions.length) * 1000) / 10 : 0;
+    // 官方考研政治赋分加权得分率 (实得分 / 满分)
+    const scoreRate = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 1000) / 10 : 0;
+    // 做完题目的准确率
     const accuracy = totalGraded > 0 ? Math.round((correctCnt / totalGraded) * 1000) / 10 : 0;
 
     return {
@@ -426,6 +441,8 @@ const DB = {
       correct_count: correctCnt,
       wrong_count: wrongCnt,
       unanswered_count: unansweredCnt,
+      total_points: totalPoints,
+      earned_points: earnedPoints,
       accuracy,
       score_rate: scoreRate,
       results
@@ -1986,24 +2003,36 @@ const App = {
 
     const data = DB.submitExam(this.state.currentPart, this.state.currentChapter);
 
-    document.getElementById('examReportAccuracy').textContent = `${data.score_rate}%`;
-    document.getElementById('examTotalQ').textContent = data.total;
-    document.getElementById('examCorrectQ').textContent = data.correct_count;
-    document.getElementById('examWrongQ').textContent = data.wrong_count;
-    document.getElementById('examUnansweredQ').textContent = data.unanswered_count;
+    const accEl = document.getElementById('examReportAccuracy');
+    if (accEl) accEl.textContent = `${data.score_rate}%`;
+    const scorePointsEl = document.getElementById('examScorePoints');
+    if (scorePointsEl) scorePointsEl.textContent = `${data.earned_points} / ${data.total_points} 分`;
+    const totEl = document.getElementById('examTotalQ');
+    if (totEl) totEl.textContent = data.total;
+    const corrEl = document.getElementById('examCorrectQ');
+    if (corrEl) corrEl.textContent = data.correct_count;
+    const wrgEl = document.getElementById('examWrongQ');
+    if (wrgEl) wrgEl.textContent = data.wrong_count;
+    const unEl = document.getElementById('examUnansweredQ');
+    if (unEl) unEl.textContent = data.unanswered_count;
 
     const listContainer = document.getElementById('examReportList');
-    listContainer.innerHTML = data.results.map(r => {
-      const rowClass = r.is_correct ? 'row-correct' : 'row-wrong';
-      const icon = r.is_correct ? '<span style="color:var(--accent-green)">✓</span>' : '<span style="color:var(--accent-coral)">✗</span>';
-      return `
-        <div class="report-row ${rowClass}">
-          <span>${icon} <strong>第 ${r.num} 题</strong> (${r.type})</span>
-          <span>你的选择: <code>${r.user_ans}</code></span>
-          <span>正确答案: <strong style="color:var(--accent-green)">${r.standard_ans}</strong></span>
-        </div>
-      `;
-    }).join('');
+    if (listContainer) {
+      listContainer.innerHTML = data.results.map(r => {
+        const rowClass = r.is_correct ? 'row-correct' : 'row-wrong';
+        const icon = r.is_correct ? '<span style="color:var(--accent-green)">✓</span>' : '<span style="color:var(--accent-coral)">✗</span>';
+        const scoreTag = r.is_correct
+          ? `<strong style="color:var(--accent-green);font-size:12px;margin-left:6px;">+${r.score_earned}分</strong>`
+          : `<span style="color:var(--accent-coral);font-size:12px;margin-left:6px;">+0分</span>`;
+        return `
+          <div class="report-row ${rowClass}">
+            <span>${icon} <strong>第 ${r.num} 题</strong> (${r.type} ${r.max_score}分) ${scoreTag}</span>
+            <span>你的选择: <code>${r.user_ans}</code></span>
+            <span>正确答案: <strong style="color:var(--accent-green)">${r.standard_ans}</strong></span>
+          </div>
+        `;
+      }).join('');
+    }
 
     document.getElementById('examReportModal').style.display = 'flex';
     this.closeDrawer();
@@ -2052,7 +2081,17 @@ const App = {
       `;
     }).join('');
 
-    document.getElementById('questionDrawer').style.display = 'flex';
+    const drawer = document.getElementById('questionDrawer');
+    if (drawer) {
+      drawer.style.display = 'flex';
+      // 自动平滑居中滚动定位到当前题目按钮，大幅提升 100+ 题章节做题体验
+      requestAnimationFrame(() => {
+        const curBtn = container.querySelector('.grid-q-btn.current');
+        if (curBtn && typeof curBtn.scrollIntoView === 'function') {
+          curBtn.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+        }
+      });
+    }
   },
 
   closeDrawer(event) {
@@ -2377,11 +2416,13 @@ const App = {
   },
 
   openLanModal() {
-    document.getElementById('lanModal').style.display = 'flex';
+    const modal = document.getElementById('lanModal');
+    if (modal) modal.style.display = 'flex';
   },
 
   closeLanModal() {
-    document.getElementById('lanModal').style.display = 'none';
+    const modal = document.getElementById('lanModal');
+    if (modal) modal.style.display = 'none';
   },
 
   copyLanUrl() {

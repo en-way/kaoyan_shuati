@@ -3,7 +3,8 @@ import {
   hashPassword,
   signJwt,
   jsonResponse,
-  errorResponse
+  errorResponse,
+  timingSafeEqualStr
 } from '../../utils/auth.js';
 
 export async function onRequestOptions() {
@@ -41,22 +42,45 @@ export async function onRequestPost(context) {
   }
 
   try {
-    // 1. 查询重置码记录
+    // 兼容历史数据表：确保 password_resets 表具备 failed_attempts 字段
+    try {
+      await env.DB.prepare('ALTER TABLE password_resets ADD COLUMN failed_attempts INTEGER DEFAULT 0').run();
+    } catch (e) {}
+
+    // 1. 查询该学员账号最新且未被使用的重置码记录
     const resetRecord = await env.DB.prepare(
-      'SELECT id, expires_at, used FROM password_resets WHERE username = ? AND code = ? ORDER BY created_at DESC LIMIT 1'
-    ).bind(username, code).first();
+      'SELECT id, code, expires_at, used, coalesce(failed_attempts, 0) as failed_attempts FROM password_resets WHERE username = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'
+    ).bind(username).first();
 
     if (!resetRecord) {
-      return errorResponse('重置码不存在或无效，请核对账号与重置码', 400);
-    }
-
-    if (resetRecord.used === 1) {
-      return errorResponse('该重置码已被使用，不能重复使用。请联系管理员重新获取', 400);
+      return errorResponse('该账号暂无有效的密码重置码，请联系管理员重新获取', 400);
     }
 
     const now = Date.now();
     if (now > resetRecord.expires_at) {
-      return errorResponse('重置码已过期（有效期为 30 分钟），请联系管理员重新生成', 400);
+      return errorResponse('重置码已过期（有效时长为 15 分钟），请联系管理员重新生成', 400);
+    }
+
+    // 检查防爆破限制：输错达到 5 次立即作废
+    if (resetRecord.failed_attempts >= 5) {
+      await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
+      return errorResponse('该重置码因连续输错超过 5 次已被系统安全作废，请联系管理员重新生成', 400);
+    }
+
+    // 恒定时间校验重置码
+    const isCodeMatch = await timingSafeEqualStr(code, resetRecord.code);
+    if (!isCodeMatch) {
+      const nextFailed = (resetRecord.failed_attempts || 0) + 1;
+      if (nextFailed >= 5) {
+        await env.DB.prepare('UPDATE password_resets SET failed_attempts = ?, used = 1 WHERE id = ?')
+          .bind(nextFailed, resetRecord.id).run();
+        return errorResponse('重置码错误！连续输错达到 5 次，该重置码已立即安全作废，请联系管理员重新生成', 400);
+      } else {
+        await env.DB.prepare('UPDATE password_resets SET failed_attempts = ? WHERE id = ?')
+          .bind(nextFailed, resetRecord.id).run();
+        const remain = 5 - nextFailed;
+        return errorResponse(`重置码错误，请重新核对输入（还剩 ${remain} 次尝试机会）`, 400);
+      }
     }
 
     // 2. 查询用户

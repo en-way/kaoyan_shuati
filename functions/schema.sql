@@ -24,14 +24,15 @@ CREATE TABLE IF NOT EXISTS user_progress (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 3. 密码重置码表 (管理员凭 ADMIN_SECRET 发放，30分钟有效，单次使用即作废)
+-- 3. 密码重置码表 (管理员凭 ADMIN_SECRET 发放，15分钟有效，单次使用即作废，连续输错5次锁定)
 CREATE TABLE IF NOT EXISTS password_resets (
     id TEXT PRIMARY KEY,               -- UUID
     username TEXT NOT NULL,            -- 关联用户名
     code TEXT NOT NULL,                -- 6位纯数字重置验证码
     created_at INTEGER NOT NULL,       -- 生成时间戳 (毫秒)
-    expires_at INTEGER NOT NULL,       -- 过期时间戳 (生成时间 + 30分钟)
-    used INTEGER DEFAULT 0             -- 0 未使用, 1 已使用
+    expires_at INTEGER NOT NULL,       -- 过期时间戳 (生成时间 + 15分钟)
+    used INTEGER DEFAULT 0,            -- 0 未使用, 1 已使用
+    failed_attempts INTEGER DEFAULT 0  -- 输错次数计数器 (上限 5 次防暴力破解)
 );
 
 CREATE INDEX IF NOT EXISTS idx_resets_user_code ON password_resets(username, code);
