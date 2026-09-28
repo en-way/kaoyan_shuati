@@ -540,6 +540,7 @@ const App = {
     this.startSessionTimer();
     this.bindGlobalKeys();
     this.bindTouchGestures();
+    this.initPwaInstall();
     this.registerServiceWorker();
     await DB.init();
     this.auth.init();
@@ -2381,14 +2382,24 @@ const App = {
 
   // ================== PROGRESS BACKUP / RESTORE ==================
   exportProgress() {
+    const ua = navigator.userAgent.toLowerCase();
+    const isWeChat = /micromessenger/.test(ua);
+    if (isWeChat) {
+      alert('⚠️ 微信内置浏览器受限制无法直接下载文件。\n\n请点击右上角「⋯」，选择「在浏览器打开」（如 Safari 或 Chrome），即可正常下载备份文件！');
+      return;
+    }
     const userData = DB.getUserData();
     const blob = new Blob([JSON.stringify(userData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `2027考研政治1000题_刷题进度备份_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      if (document.body.contains(a)) document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
   },
 
   importProgress() {
@@ -2423,6 +2434,64 @@ const App = {
   },
 
   // ================== PWA & SERVICE WORKER ==================
+  deferredInstallPrompt: null,
+
+  initPwaInstall() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // 阻止浏览器默认底部小条，由界面专属按钮友好唤起
+      e.preventDefault();
+      this.deferredInstallPrompt = e;
+      const btn = document.getElementById('btnPwaInstall');
+      if (btn) btn.style.display = 'flex';
+      console.log('[PWA] beforeinstallprompt captured, ready to install.');
+    });
+
+    window.addEventListener('appinstalled', () => {
+      this.deferredInstallPrompt = null;
+      console.log('[PWA] App successfully installed to desktop/home screen.');
+      alert('🎉 恭喜！应用已成功添加到手机桌面，后续可直接从桌面全屏启动刷题！');
+    });
+  },
+
+  async triggerPwaInstall() {
+    // 检查是否已经在独立 PWA 模式中运行
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) {
+      alert('💡 应用当前已经在手机桌面 App 独立全屏模式中运行！');
+      return;
+    }
+
+    // 检查是否在微信或 QQ 内置浏览器中打开
+    const ua = navigator.userAgent.toLowerCase();
+    const isWeChat = /micromessenger/.test(ua);
+    const isQQ = /qq\//.test(ua);
+    if (isWeChat || isQQ) {
+      alert('⚠️ 微信/QQ 内置浏览器受安全限制无法直接添加到桌面。\n\n请点击右上角「⋯」，选择「在浏览器打开」（如 Safari 或 Chrome），即可一键下载到手机桌面！');
+      return;
+    }
+
+    // 如果浏览器捕获到了安装 prompt（如 Android Chrome, Edge, 华为/小米浏览器等）
+    if (this.deferredInstallPrompt) {
+      this.deferredInstallPrompt.prompt();
+      const choiceResult = await this.deferredInstallPrompt.userChoice;
+      if (choiceResult && choiceResult.outcome === 'accepted') {
+        console.log('[PWA] User accepted the install prompt');
+        this.deferredInstallPrompt = null;
+      } else {
+        console.log('[PWA] User dismissed the install prompt');
+      }
+      return;
+    }
+
+    // iOS Safari 或不支持 beforeinstallprompt 的浏览器
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    if (isIOS) {
+      alert('🍎 iPhone / iPad 添加到桌面只需 2 步：\n\n1. 点击 Safari 底部中间的【分享 📤】按钮\n2. 在弹出菜单中下滑找到并点击【添加到主屏幕 ➕】\n\n即可直接在手机桌面生成专属 App 图标！');
+    } else {
+      alert('📱 添加到手机桌面方式：\n\n请点击浏览器右上角菜单【⋮】，在菜单中选择【安装应用】或【添加到主屏幕】，即可直接下载到桌面！');
+    }
+  },
+
   registerServiceWorker() {
     if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       window.addEventListener('load', () => {

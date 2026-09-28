@@ -4,7 +4,7 @@
  * 具备离线可用性，断网时自动启用本地题库与应用代码
  */
 
-const VERSION = 'v16';
+const VERSION = 'v18';
 const CACHE_NAME = `ky-quiz-${VERSION}`;
 
 // 核心 App Shell（轻量级，强保证秒级原子安装成功）

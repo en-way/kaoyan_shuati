@@ -472,6 +472,13 @@
         </div>
 
         <div class="sheet-action-list">
+          <button id="btnPwaInstall" class="sheet-btn sheet-btn-highlight" onclick="App.triggerPwaInstall()">
+            <span class="sheet-btn-icon">📲</span>
+            <div class="sheet-btn-info">
+              <span class="sheet-btn-title" style="color: var(--accent-cyan); font-weight: 600;">下载安装到手机桌面 (App)</span>
+              <span class="sheet-btn-sub">一键添加到主屏幕，享受全屏沉浸、免翻墙离线刷题</span>
+            </div>
+          </button>
           <button class="sheet-btn" onclick="App.exportProgress(); App.closeMoreMenu();">
             <span class="sheet-btn-icon">💾</span>
             <div class="sheet-btn-info">
