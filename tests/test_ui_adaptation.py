@@ -90,21 +90,31 @@ def test_mobile_and_tablet_media_queries():
     print("  ✓ Responsive breakpoints and iOS auto-zoom protections verified")
 
 def test_html_and_js_modal_integration():
-    print("[6/6] Testing HTML version bumps and JS scroll lock logic...")
+    print("[6/6] Testing HTML version bumps, JS scroll lock & removal of local export/import...")
     with open(HTML_FILE, 'r', encoding='utf-8') as f:
         html = f.read()
     with open(JS_FILE, 'r', encoding='utf-8') as f:
         js = f.read()
+    with open(CSS_FILE, 'r', encoding='utf-8') as f:
+        css = f.read()
 
-    assert 'v=20270924_v18' in html, "HTML static assets not bumped to v18"
+    assert 'v=20270929_v19' in html, "HTML static assets not bumped to v19"
     assert 'App.closeExamReportModal(event)' in html, "Exam report modal missing click-outside dismiss"
+
+    # Local export/import removal assertions
+    assert 'exportProgress' not in html and 'importProgress' not in html, \
+        "exportProgress/importProgress still present in index.html"
+    assert 'exportProgress' not in js and 'importProgress' not in js, \
+        "exportProgress/importProgress still present in app.js"
+    assert 'hub-quick-toolbar' not in html and 'hub-quick-toolbar' not in css, \
+        "hub-quick-toolbar still present in HTML or CSS"
 
     # JS scroll lock logic
     assert 'updateBodyScrollLock' in js, "Missing updateBodyScrollLock in app.js"
     assert 'modal-open' in js, "app.js should toggle modal-open on body"
     assert '.modal-backdrop, .drawer-backdrop' in js, "Keydown shield should check both modal and drawer backdrops"
     assert 'this.closeQuestionMoreMenu()' in js, "Escape key should close question more menu"
-    print("  ✓ JS modal state sync and keyboard shields verified")
+    print("  ✓ JS modal state sync, keyboard shields & local export/import removal verified")
 
 if __name__ == '__main__':
     print("=== UI/UX Multi-Device Responsive Adaptation Test Suite ===")

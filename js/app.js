@@ -2380,55 +2380,7 @@ const App = {
     this.startPractice(part, chapter, '', 'mistakes_only');
   },
 
-  // ================== PROGRESS BACKUP / RESTORE ==================
-  exportProgress() {
-    const ua = navigator.userAgent.toLowerCase();
-    const isWeChat = /micromessenger/.test(ua);
-    if (isWeChat) {
-      alert('⚠️ 微信内置浏览器受限制无法直接下载文件。\n\n请点击右上角「⋯」，选择「在浏览器打开」（如 Safari 或 Chrome），即可正常下载备份文件！');
-      return;
-    }
-    const userData = DB.getUserData();
-    const blob = new Blob([JSON.stringify(userData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `2027考研政治1000题_刷题进度备份_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      if (document.body.contains(a)) document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 200);
-  },
-
-  importProgress() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const imported = JSON.parse(event.target.result);
-          if (imported && (imported.answers || imported.mistakes)) {
-            DB.saveUserData(imported);
-            alert('🎉 刷题进度与错题本导入成功！');
-            this.loadOverview();
-          } else {
-            alert('无效的备份文件格式！');
-          }
-        } catch (err) {
-          alert('解析备份文件失败: ' + err);
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  },
-
+  // ================== LOCAL DATA RESET ==================
   resetLocalData() {
     this.auth.resetLocalData();
   },

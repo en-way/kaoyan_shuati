@@ -271,27 +271,6 @@ body.modal-open {
   line-height: 1.5;
 }
 
-.hub-quick-toolbar {
-  display: flex;
-  gap: 10px;
-}
-
-.btn-tool-pill {
-  background: rgba(32, 43, 63, 0.4);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.btn-tool-pill:hover {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-}
-
 .hub-stats-bar {
   display: flex;
   gap: 12px;

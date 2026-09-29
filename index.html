@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270924_v18">
+  <link rel="stylesheet" href="css/style.css?v=20270929_v19">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -63,12 +63,6 @@
       </nav>
 
       <div class="desktop-only header-tools">
-        <button class="icon-btn" onclick="App.exportProgress()" title="导出刷题进度与错题到JSON文件">
-          💾 备份
-        </button>
-        <button class="icon-btn" onclick="App.importProgress()" title="从JSON文件恢复刷题进度">
-          📥 恢复
-        </button>
         <button class="icon-btn color-coral" onclick="App.resetLocalData()" title="彻底清空本机所有刷题记录与错题本">
           🧹 清空
         </button>
@@ -137,15 +131,6 @@
         <div class="hub-welcome">
           <h2>考研政治 1000 题 · 官方全真题库</h2>
           <p class="hub-desc">肖秀荣《2027 考研政治 1000 题》全收录 · 配备全部 1,148 道官方标准答案、出处定位、详细简析与名师点拨</p>
-        </div>
-
-        <div class="hub-quick-toolbar">
-          <button class="btn-tool-pill" onclick="App.exportProgress()">
-            💾 备份我的进度
-          </button>
-          <button class="btn-tool-pill" onclick="App.importProgress()">
-            📥 导入同步进度
-          </button>
         </div>
 
         <div class="hub-stats-bar">
@@ -477,20 +462,6 @@
             <div class="sheet-btn-info">
               <span class="sheet-btn-title" style="color: var(--accent-cyan); font-weight: 600;">下载安装到手机桌面 (App)</span>
               <span class="sheet-btn-sub">一键添加到主屏幕，享受全屏沉浸、免翻墙离线刷题</span>
-            </div>
-          </button>
-          <button class="sheet-btn" onclick="App.exportProgress(); App.closeMoreMenu();">
-            <span class="sheet-btn-icon">💾</span>
-            <div class="sheet-btn-info">
-              <span class="sheet-btn-title">备份我的刷题记录</span>
-              <span class="sheet-btn-sub">导出作答记录、做对数与错题本到 JSON 文件</span>
-            </div>
-          </button>
-          <button class="sheet-btn" onclick="App.importProgress(); App.closeMoreMenu();">
-            <span class="sheet-btn-icon">📥</span>
-            <div class="sheet-btn-info">
-              <span class="sheet-btn-title">恢复/导入刷题进度</span>
-              <span class="sheet-btn-sub">从其他设备或备份文件导入进度与错题</span>
             </div>
           </button>
           <button class="sheet-btn sheet-btn-danger" onclick="App.closeMoreMenu(); App.auth.resetLocalData();">
@@ -842,6 +813,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270924_v18"></script>
+  <script src="js/app.js?v=20270929_v19"></script>
 </body>
 </html>
