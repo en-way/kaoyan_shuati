@@ -3007,19 +3007,19 @@ kbd {
 }
 
 /* ==========================================================================
-   PC 宽屏与大显示器深度适配体系 (>= 1200px)
-   包含：做题页双栏响应式工效学布局、常驻答题卡、题库大厅多列排布、错题本双列网格
+   PC 桌面端与大显示器深度适配体系 (>= 1024px & >= 1280px)
+   包含：做题页双栏响应式工效学布局、右侧专属答案解析面板、题库大厅多列排布、错题本双列网格
    ========================================================================== */
-@media (min-width: 1200px) {
-  /* 题库大厅宽屏拓宽与卡片 3~4 列自适应 */
+@media (min-width: 1024px) {
+  /* 题库大厅宽屏拓宽与卡片 2~3 列自适应 */
   #viewHub {
     max-width: 1400px;
-    padding: 36px 32px 56px;
+    padding: 32px 24px 56px;
   }
 
   #viewHub .chapters-grid {
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 22px;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px;
   }
 
   .chapter-card {
@@ -3032,19 +3032,19 @@ kbd {
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 240, 255, 0.08);
   }
 
-  /* 做题页宽屏双栏布局 (左侧沉浸卡片 + 右侧常驻答题卡与工效学快捷键) */
+  /* 做题页 PC 双栏自适应布局 (左侧题目卡片 + 右侧专属答案解析面板) */
   #viewPractice {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 24px 32px 48px;
+    padding: 24px 24px 48px;
     align-items: stretch;
   }
 
   #viewPractice .practice-container {
     max-width: 1400px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 460px;
-    gap: 24px;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 20px;
     align-items: flex-start;
   }
 
@@ -3055,7 +3055,7 @@ kbd {
     gap: 14px;
   }
 
-  /* 在 PC 宽屏下，左侧题目卡片下方的解析面板隐藏，由右侧专属面板展示，防止冗余重复 */
+  /* 在 PC 桌面端下，左侧题目卡片下方的解析面板隐藏，由右侧专属面板展示，防止冗余重复 */
   .question-card .explanation-panel {
     display: none !important;
   }
@@ -3067,7 +3067,25 @@ kbd {
     top: 76px;
     height: calc(100vh - 96px);
     max-height: 880px;
-    min-width: 420px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  @media (min-width: 1280px) {
+    #viewHub {
+      padding: 36px 32px 56px;
+    }
+    #viewHub .chapters-grid {
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 22px;
+    }
+    #viewPractice {
+      padding: 24px 32px 48px;
+    }
+    #viewPractice .practice-container {
+      grid-template-columns: minmax(0, 1fr) 460px;
+      gap: 24px;
+    }
   }
 
   .side-panel-card {
