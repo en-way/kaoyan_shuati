@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270930_v21">
+  <link rel="stylesheet" href="css/style.css?v=20270930_v22">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -182,6 +182,9 @@
               </div>
 
               <div class="p-actions-group">
+                <button id="pFontSizeBtn" class="btn-flag btn-font-ctrl" onclick="App.cycleFontSize()" title="切换阅读字号大小 (小号 / 标准 / 大字 / 特大)">
+                  <span class="font-aa-icon">Aa</span> <span id="pFontSizeLabel" class="btn-label-text">标准</span>
+                </button>
                 <button id="pFlagBtn" class="btn-flag" onclick="App.toggleFlagCurrent()">
                   <span id="flagIcon">☆</span> <span class="btn-label-text">标记</span> <kbd class="desktop-only-inline keycap-tag">F</kbd>
                 </button>
@@ -587,6 +590,20 @@
           </div>
         </div>
 
+        <!-- 四档阅读字号调节面板 (移动端设置菜单) -->
+        <div class="font-size-setting-card">
+          <div class="font-setting-header">
+            <span class="font-setting-title"><span class="font-aa-badge">Aa</span> 阅读字号大小</span>
+            <span class="font-setting-cur m-font-size-cur-label">标准 (默认)</span>
+          </div>
+          <div class="font-size-segmented" role="group" aria-label="阅读字号调节">
+            <button type="button" class="font-seg-btn" data-font-opt="sm" onclick="App.setFontSize('sm')">小号</button>
+            <button type="button" class="font-seg-btn active" data-font-opt="md" onclick="App.setFontSize('md')">标准</button>
+            <button type="button" class="font-seg-btn" data-font-opt="lg" onclick="App.setFontSize('lg')">大字</button>
+            <button type="button" class="font-seg-btn" data-font-opt="xl" onclick="App.setFontSize('xl')">特大</button>
+          </div>
+        </div>
+
         <div class="sheet-action-list">
           <button id="btnPwaInstall" class="sheet-btn sheet-btn-highlight" onclick="App.triggerPwaInstall()">
             <span class="sheet-btn-icon">📲</span>
@@ -619,11 +636,25 @@
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">⚡</span>
-          <h3>选择刷题模式</h3>
+          <h3>选择刷题模式与字号</h3>
         </div>
         <button class="modal-close" onclick="App.closeModeSelect()">&times;</button>
       </div>
       <div class="modal-body sheet-body">
+        <!-- 四档阅读字号调节面板 (刷题中途快捷调字号) -->
+        <div class="font-size-setting-card">
+          <div class="font-setting-header">
+            <span class="font-setting-title"><span class="font-aa-badge">Aa</span> 题目与解析字号</span>
+            <span class="font-setting-cur m-font-size-cur-label">标准 (默认)</span>
+          </div>
+          <div class="font-size-segmented" role="group" aria-label="阅读字号调节">
+            <button type="button" class="font-seg-btn" data-font-opt="sm" onclick="App.setFontSize('sm')">小号</button>
+            <button type="button" class="font-seg-btn active" data-font-opt="md" onclick="App.setFontSize('md')">标准</button>
+            <button type="button" class="font-seg-btn" data-font-opt="lg" onclick="App.setFontSize('lg')">大字</button>
+            <button type="button" class="font-seg-btn" data-font-opt="xl" onclick="App.setFontSize('xl')">特大</button>
+          </div>
+        </div>
+
         <div class="sheet-action-list">
           <button class="sheet-btn" id="mModeOptionInstant" onclick="App.selectModeFromSheet('instant')">
             <span class="sheet-btn-icon">⚡</span>
@@ -944,6 +975,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270930_v21"></script>
+  <script src="js/app.js?v=20270930_v22"></script>
 </body>
 </html>

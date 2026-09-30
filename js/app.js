@@ -534,10 +534,12 @@ const App = {
 
     mistakesList: [],
     filterPart: '',
-    filterChapter: ''
+    filterChapter: '',
+    fontSize: 'md'
   },
 
   async init() {
+    this.initFontSize();
     this.startSessionTimer();
     this.bindGlobalKeys();
     this.bindTouchGestures();
@@ -547,6 +549,55 @@ const App = {
     this.auth.init();
     this.loadOverview();
     this.initLanUrl();
+  },
+
+  // ================== 四档阅读字号自适应与记忆引擎 ==================
+  initFontSize() {
+    const saved = localStorage.getItem('kaoyan_font_size_2027') || 'md';
+    this.setFontSize(saved, true);
+  },
+
+  setFontSize(size, silent = false) {
+    const validSizes = ['sm', 'md', 'lg', 'xl'];
+    const target = validSizes.includes(size) ? size : 'md';
+    this.state.fontSize = target;
+    localStorage.setItem('kaoyan_font_size_2027', target);
+
+    document.documentElement.setAttribute('data-font-size', target);
+    if (document.body) {
+      document.body.setAttribute('data-font-size', target);
+    }
+
+    const labelMap = {
+      sm: { short: '小号', full: '小号 (紧凑)' },
+      md: { short: '标准', full: '标准 (默认)' },
+      lg: { short: '大字', full: '大字 (舒适)' },
+      xl: { short: '特大', full: '特大 (护眼)' }
+    };
+    const info = labelMap[target] || labelMap.md;
+
+    const pLabel = document.getElementById('pFontSizeLabel');
+    if (pLabel) pLabel.textContent = info.short;
+
+    document.querySelectorAll('.m-font-size-cur-label').forEach(el => {
+      el.textContent = info.full;
+    });
+
+    document.querySelectorAll('.font-seg-btn').forEach(btn => {
+      const opt = btn.getAttribute('data-font-opt');
+      btn.classList.toggle('active', opt === target);
+    });
+
+    if (!silent && typeof this.showToast === 'function') {
+      this.showToast(`🔤 已切换为「${info.full}」字号`);
+    }
+  },
+
+  cycleFontSize() {
+    const order = ['md', 'lg', 'xl', 'sm'];
+    const idx = order.indexOf(this.state.fontSize || 'md');
+    const next = order[(idx + 1) % order.length];
+    this.setFontSize(next, false);
   },
 
   // ================== CLOUD USER AUTH & SYNC CONTROLLER ==================
