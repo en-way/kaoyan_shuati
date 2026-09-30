@@ -1,12 +1,12 @@
 """
-PC / Desktop UI Adaptation Test Suite (v20)
+PC / Desktop UI Adaptation Test Suite (v21)
 Verifies:
-1. Two-column practice layout on wide screens (>=1200px) with sticky side palette
+1. Two-column practice layout on wide screens (>=1200px) with dedicated side explanation panel
 2. 3D Mechanical keycap badge & keyboard tag ergonomics
 3. Hub view 1400px max-width & 3~4 column chapter grid
 4. Mistakes view double-column responsive grid on desktop
-5. Palette HTML generation and real-time synchronization in app.js
-6. HTML and SW v20 versioning & mobile non-regression
+5. Side explanation panel multi-state rendering and real-time synchronization in app.js
+6. HTML and SW v21 versioning & mobile non-regression
 """
 
 import os
@@ -23,7 +23,7 @@ JS_FILE = os.path.join(BASE_DIR, 'js', 'app.js')
 SW_FILE = os.path.join(BASE_DIR, 'sw.js')
 
 def test_desktop_practice_two_column_layout():
-    print("[1/6] Testing two-column practice layout for >=1200px...")
+    print("[1/6] Testing two-column practice layout with side explanation panel (>=1200px)...")
     with open(CSS_FILE, 'r', encoding='utf-8') as f:
         css = f.read()
     with open(INDEX_FILE, 'r', encoding='utf-8') as f:
@@ -31,28 +31,33 @@ def test_desktop_practice_two_column_layout():
 
     # HTML structure check
     assert '<div class="practice-main-column">' in html, "practice-main-column container missing in index.html"
-    assert 'id="desktopSidePalette"' in html, "desktopSidePalette aside missing in index.html"
-    assert 'id="sideGridContainer"' in html, "sideGridContainer missing in desktop side palette"
-    assert 'id="sidePaletteStats"' in html, "sidePaletteStats missing in desktop side palette"
-    assert 'id="sidePaletteProgressFill"' in html, "sidePaletteProgressFill missing in desktop side palette"
-    assert 'id="sideExamSubmitBtn"' in html, "sideExamSubmitBtn missing in desktop side palette"
+    assert 'id="desktopSidePanel"' in html, "desktopSidePanel aside missing in index.html"
+    assert 'id="sideExplPlaceholder"' in html, "sideExplPlaceholder missing in desktop side panel"
+    assert 'id="sideExplActive"' in html, "sideExplActive missing in desktop side panel"
+    assert 'id="sideExamCard"' in html, "sideExamCard missing in desktop side panel"
+    assert 'id="sideExplAnswerVal"' in html, "sideExplAnswerVal missing in active explanation card"
+    assert 'id="sideExplAnalysisText"' in html, "sideExplAnalysisText missing in active explanation card"
 
     # CSS base check (<1200px hidden)
-    assert '.practice-side-palette {' in css, ".practice-side-palette base rule missing"
-    assert re.search(r'\.practice-side-palette\s*\{[^}]*display:\s*none', css), \
-        ".practice-side-palette must be display: none by default for mobile/tablet"
+    assert '.practice-side-panel {' in css or '.practice-side-panel,' in css, \
+        ".practice-side-panel base rule missing"
+    assert re.search(r'\.practice-side-panel\s*\{[^}]*display:\s*none', css) or \
+           re.search(r'\.practice-side-palette,\s*\.practice-side-panel\s*\{[^}]*display:\s*none', css), \
+        ".practice-side-panel must be display: none by default for mobile/tablet"
 
     # CSS >=1200px breakpoint check
     assert '@media (min-width: 1200px)' in css, "Missing @media (min-width: 1200px) in style.css"
     wide_section = css[css.find('@media (min-width: 1200px)'):]
     
-    assert 'grid-template-columns: minmax(0, 1fr) 340px' in wide_section or \
-           'grid-template-columns: minmax(0, 1fr) 340px' in css, \
-           "Two-column grid definition missing for desktop practice-container"
-    assert 'position: sticky' in wide_section, "Side palette sticky positioning missing"
-    assert 'calc(100vh - 96px)' in wide_section or 'calc(100vh -' in wide_section, \
-           "Side palette dynamic height missing"
-    print("  ✓ Two-column practice layout and sticky side palette verified")
+    assert 'grid-template-columns: minmax(0, 1fr) 460px' in wide_section or \
+           'grid-template-columns: minmax(0, 1fr) 460px' in css, \
+           "Two-column 460px grid definition missing for desktop practice-container"
+    assert '.question-card .explanation-panel' in wide_section, \
+        "Left card explanation panel must be hidden on desktop to avoid duplicate rendering"
+    assert 'display: none !important' in wide_section, \
+        "display: none !important missing for left card explanation on desktop"
+    assert 'position: sticky' in wide_section, "Side panel sticky positioning missing"
+    print("  ✓ Two-column practice layout and 460px side explanation panel verified")
 
 def test_mechanical_keycaps_and_keyboard_ergonomics():
     print("[2/6] Testing 3D mechanical keycap badges & shortcuts tags...")
@@ -105,35 +110,36 @@ def test_mistakes_view_double_column():
         "Mistakes list double-column layout missing for desktop"
     print("  ✓ Mistakes view desktop double-column grid verified")
 
-def test_js_palette_synchronization():
-    print("[5/6] Testing JS palette rendering and real-time synchronization...")
+def test_side_explanation_panel_sync():
+    print("[5/6] Testing side explanation panel rendering and real-time synchronization...")
     with open(JS_FILE, 'r', encoding='utf-8') as f:
         js = f.read()
 
+    assert 'renderSideExplanationPanel' in js, "renderSideExplanationPanel method missing in app.js"
+    assert 'sideExplPlaceholder' in js, "sideExplPlaceholder references missing in app.js"
+    assert 'sideExplActive' in js, "sideExplActive references missing in app.js"
+    assert 'sideExamCard' in js, "sideExamCard references missing in app.js"
+    assert 'sideResultBanner' in js, "sideResultBanner references missing in app.js"
     assert 'generatePaletteGridHtml' in js, "generatePaletteGridHtml method missing in app.js"
-    assert 'updateSidePalette' in js, "updateSidePalette method missing in app.js"
-    assert 'sideGridContainer' in js, "sideGridContainer references missing in app.js"
-    assert 'sidePaletteStats' in js, "sidePaletteStats references missing in app.js"
-    assert 'sidePaletteProgressFill' in js, "sidePaletteProgressFill references missing in app.js"
-    assert 'sideExamSubmitBtn' in js, "sideExamSubmitBtn references missing in app.js"
+    assert 'updateDrawerIfOpen' in js, "updateDrawerIfOpen method missing in app.js"
 
-    # Verify updateSidePalette is called in renderQuestion
-    render_idx = js.find('renderQuestion() {')
-    assert render_idx != -1, "renderQuestion method missing in app.js"
-    render_body = js[render_idx:render_idx + 8000]
-    assert 'this.updateSidePalette()' in render_body, \
-        "updateSidePalette must be called in renderQuestion"
+    # Verify renderSideExplanationPanel is called in renderExplanationPanel
+    render_idx = js.find('renderExplanationPanel(q) {')
+    assert render_idx != -1, "renderExplanationPanel method missing in app.js"
+    render_body = js[render_idx:render_idx + 3000]
+    assert 'this.renderSideExplanationPanel' in render_body, \
+        "renderSideExplanationPanel must be called in renderExplanationPanel"
 
-    # Verify toggleFlagCurrent updates side palette
+    # Verify toggleFlagCurrent updates sideFlagIcon
     flag_idx = js.find('toggleFlagCurrent() {')
     assert flag_idx != -1, "toggleFlagCurrent method missing in app.js"
     flag_body = js[flag_idx:flag_idx + 1500]
-    assert 'this.updateSidePalette()' in flag_body, \
-        "updateSidePalette must be called in toggleFlagCurrent"
-    print("  ✓ JS palette HTML generator and auto-sync methods verified")
+    assert 'sideFlagIcon' in flag_body, \
+        "sideFlagIcon must be updated in toggleFlagCurrent"
+    print("  ✓ Side explanation panel multi-state engine verified")
 
 def test_versioning_and_mobile_compatibility():
-    print("[6/6] Testing v20 asset versioning and mobile compatibility...")
+    print("[6/6] Testing v21 asset versioning and mobile compatibility...")
     with open(INDEX_FILE, 'r', encoding='utf-8') as f:
         html = f.read()
     with open(SW_FILE, 'r', encoding='utf-8') as f:
@@ -142,8 +148,8 @@ def test_versioning_and_mobile_compatibility():
         css = f.read()
 
     # Version bump
-    assert 'v=20270930_v20' in html, "index.html missing v=20270930_v20 query string"
-    assert "VERSION = 'v20'" in sw, "sw.js missing VERSION = 'v20'"
+    assert 'v=20270930_v21' in html, "index.html missing v=20270930_v21 query string"
+    assert "VERSION = 'v21'" in sw, "sw.js missing VERSION = 'v21'"
     assert '20270930_${VERSION}' in sw, "sw.js missing 20270930_${VERSION} asset URLs"
 
     # Mobile compatibility check: .desktop-only hidden on <= 768px
@@ -152,16 +158,16 @@ def test_versioning_and_mobile_compatibility():
         "Mobile query must hide .desktop-only elements"
     assert '.desktop-only-inline { display: none !important; }' in mobile_query, \
         "Mobile query must hide .desktop-only-inline elements"
-    print("  ✓ Version v20 bump and mobile backwards compatibility verified")
+    print("  ✓ Version v21 bump and mobile backwards compatibility verified")
 
 if __name__ == '__main__':
-    print("=== PC / Desktop UI Adaptation Test Suite (v20) ===")
+    print("=== PC / Desktop UI Adaptation Test Suite (v21) ===")
     try:
         test_desktop_practice_two_column_layout()
         test_mechanical_keycaps_and_keyboard_ergonomics()
         test_hub_view_wide_grid()
         test_mistakes_view_double_column()
-        test_js_palette_synchronization()
+        test_side_explanation_panel_sync()
         test_versioning_and_mobile_compatibility()
         print("\nAll 6 desktop adaptation tests passed successfully! 🚀")
         sys.exit(0)

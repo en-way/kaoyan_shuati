@@ -525,6 +525,7 @@ const App = {
     isFlagged: false,
     isEvaluated: false,
     explanationVisible: true,
+    manualPeek: false,
 
     questionSeconds: 0,
     sessionSeconds: 0,
@@ -1441,6 +1442,8 @@ const App = {
       if (el) el.textContent = formatted;
       const mEl = document.getElementById('mSheetSessionTimer');
       if (mEl) mEl.textContent = formatted;
+      const sideExamTimer = document.getElementById('sideExamTimer');
+      if (sideExamTimer) sideExamTimer.textContent = formatted;
     }, 1000);
   },
 
@@ -1680,10 +1683,8 @@ const App = {
 
     const btnExamSubmit = document.getElementById('btnExamSubmit');
     const drawerExam = document.getElementById('drawerExamSubmitBtn');
-    const sideExam = document.getElementById('sideExamSubmitBtn');
     if (btnExamSubmit) btnExamSubmit.style.display = (mode === 'exam') ? 'inline-flex' : 'none';
     if (drawerExam) drawerExam.style.display = (mode === 'exam') ? 'block' : 'none';
-    if (sideExam) sideExam.style.display = (mode === 'exam') ? 'block' : 'none';
   },
 
   getCurrentQuestion() {
@@ -1840,44 +1841,158 @@ const App = {
 
     this.renderExplanationPanel(q);
     this.resetQuestionTimer();
-    this.updateSidePalette();
   },
 
   renderExplanationPanel(q) {
     const panel = document.getElementById('explanationPanel');
     const mode = this.state.practiceMode;
-    const shouldShow = (mode === 'recite') || 
-      ((mode === 'instant' || mode === 'mistakes_only') && this.state.isEvaluated);
 
-    if (!shouldShow || !this.state.explanationVisible) {
-      panel.style.display = 'none';
+    let isVisible = false;
+    if (mode === 'recite') {
+      isVisible = this.state.explanationVisible;
+    } else if (mode === 'instant' || mode === 'mistakes_only') {
+      if (this.state.isEvaluated) {
+        isVisible = this.state.explanationVisible;
+      } else {
+        isVisible = !!this.state.manualPeek;
+      }
+    }
+
+    if (panel) {
+      if (!isVisible) {
+        panel.style.display = 'none';
+      } else {
+        panel.style.display = 'flex';
+        const explAns = document.getElementById('explAnswerVal');
+        if (explAns) explAns.textContent = q.answer || '—';
+
+        const srcWrap = document.getElementById('explSourceWrap');
+        if (q.source) {
+          if (srcWrap) srcWrap.style.display = 'flex';
+          const srcText = document.getElementById('explSourceText');
+          if (srcText) srcText.textContent = q.source;
+        } else if (srcWrap) {
+          srcWrap.style.display = 'none';
+        }
+
+        const analysisText = document.getElementById('explAnalysisText');
+        if (analysisText) analysisText.textContent = q.analysis || '暂无解析';
+
+        const tipsWrap = document.getElementById('explTipsWrap');
+        if (q.tips) {
+          if (tipsWrap) tipsWrap.style.display = 'flex';
+          const tipsText = document.getElementById('explTipsText');
+          if (tipsText) tipsText.textContent = q.tips;
+        } else if (tipsWrap) {
+          tipsWrap.style.display = 'none';
+        }
+      }
+    }
+
+    this.renderSideExplanationPanel(q, isVisible);
+  },
+
+  renderSideExplanationPanel(q, isVisible) {
+    const sidePanel = document.getElementById('desktopSidePanel');
+    if (!sidePanel) return;
+
+    const mode = this.state.practiceMode;
+    const placeholder = document.getElementById('sideExplPlaceholder');
+    const active = document.getElementById('sideExplActive');
+    const exam = document.getElementById('sideExamCard');
+
+    if (!q) {
+      if (placeholder) placeholder.style.display = 'flex';
+      if (active) active.style.display = 'none';
+      if (exam) exam.style.display = 'none';
       return;
     }
 
-    panel.style.display = 'flex';
-    document.getElementById('explAnswerVal').textContent = q.answer || '—';
-
-    const srcWrap = document.getElementById('explSourceWrap');
-    if (q.source) {
-      srcWrap.style.display = 'flex';
-      document.getElementById('explSourceText').textContent = q.source;
-    } else {
-      srcWrap.style.display = 'none';
+    // State 3: Exam mode in progress
+    if (mode === 'exam') {
+      if (placeholder) placeholder.style.display = 'none';
+      if (active) active.style.display = 'none';
+      if (exam) {
+        exam.style.display = 'flex';
+        const curNumEl = document.getElementById('sideExamCurNum');
+        if (curNumEl) curNumEl.textContent = `${this.state.currentIndex + 1} / ${this.state.questions.length}`;
+        const answeredCount = this.state.questions.filter(item => item.user_selected && item.user_selected.length > 0).length;
+        const countEl = document.getElementById('sideExamAnsweredCount');
+        if (countEl) countEl.textContent = `${answeredCount} 题`;
+      }
+      return;
     }
 
-    document.getElementById('explAnalysisText').textContent = q.analysis || '暂无解析';
+    if (exam) exam.style.display = 'none';
 
-    const tipsWrap = document.getElementById('explTipsWrap');
-    if (q.tips) {
-      tipsWrap.style.display = 'flex';
-      document.getElementById('explTipsText').textContent = q.tips;
+    // State 2: Active Explanation Card
+    if (isVisible) {
+      if (placeholder) placeholder.style.display = 'none';
+      if (active) {
+        active.style.display = 'flex';
+        const sideAnsVal = document.getElementById('sideExplAnswerVal');
+        if (sideAnsVal) sideAnsVal.textContent = q.answer || '—';
+
+        const sideSrcWrap = document.getElementById('sideExplSourceWrap');
+        if (q.source) {
+          if (sideSrcWrap) sideSrcWrap.style.display = 'flex';
+          const sideSrcText = document.getElementById('sideExplSourceText');
+          if (sideSrcText) sideSrcText.textContent = q.source;
+        } else if (sideSrcWrap) {
+          sideSrcWrap.style.display = 'none';
+        }
+
+        // Answer evaluation result banner
+        const banner = document.getElementById('sideResultBanner');
+        const resIcon = document.getElementById('sideResultIcon');
+        const resText = document.getElementById('sideResultText');
+        if (banner) {
+          if (this.state.isEvaluated && q.is_correct !== null && q.is_correct !== undefined) {
+            banner.style.display = 'flex';
+            if (q.is_correct) {
+              banner.className = 'side-result-banner is-correct';
+              if (resIcon) resIcon.textContent = '✓';
+              if (resText) resText.textContent = `回答正确！你的选择: ${(q.user_selected || []).join('')}`;
+            } else {
+              banner.className = 'side-result-banner is-wrong';
+              if (resIcon) resIcon.textContent = '✗';
+              const selStr = (q.user_selected || []).join('') || '未作答';
+              if (resText) resText.textContent = `回答错误。你的选择: ${selStr}，标准答案: ${q.answer}`;
+            }
+          } else {
+            banner.style.display = 'none';
+          }
+        }
+
+        const sideAnalysisText = document.getElementById('sideExplAnalysisText');
+        if (sideAnalysisText) sideAnalysisText.textContent = q.analysis || '暂无解析';
+
+        const sideTipsWrap = document.getElementById('sideExplTipsWrap');
+        if (q.tips) {
+          if (sideTipsWrap) sideTipsWrap.style.display = 'flex';
+          const sideTipsText = document.getElementById('sideExplTipsText');
+          if (sideTipsText) sideTipsText.textContent = q.tips;
+        } else if (sideTipsWrap) {
+          sideTipsWrap.style.display = 'none';
+        }
+
+        const sideFlagIcon = document.getElementById('sideFlagIcon');
+        if (sideFlagIcon) sideFlagIcon.textContent = this.state.isFlagged ? '★' : '☆';
+      }
     } else {
-      tipsWrap.style.display = 'none';
+      // State 1: Placeholder Card (waiting for answer or E toggle)
+      if (active) active.style.display = 'none';
+      if (placeholder) placeholder.style.display = 'flex';
     }
   },
 
   toggleExplanationFold() {
-    this.state.explanationVisible = !this.state.explanationVisible;
+    const mode = this.state.practiceMode;
+    if (this.state.isEvaluated || mode === 'recite') {
+      this.state.explanationVisible = !this.state.explanationVisible;
+    } else {
+      this.state.manualPeek = !this.state.manualPeek;
+    }
     const q = this.getCurrentQuestion();
     if (q) this.renderExplanationPanel(q);
   },
@@ -1959,6 +2074,7 @@ const App = {
 
   prevQuestion() {
     if (this.state.currentIndex > 0) {
+      this.state.manualPeek = false;
       this.state.currentIndex--;
       this.renderQuestion();
       this.animateCard('right');
@@ -1975,6 +2091,7 @@ const App = {
     }
 
     if (this.state.currentIndex < this.state.questions.length - 1) {
+      this.state.manualPeek = false;
       this.state.currentIndex++;
       this.renderQuestion();
       this.animateCard('left');
@@ -1990,6 +2107,7 @@ const App = {
 
   jumpToQuestion(index) {
     if (index >= 0 && index < this.state.questions.length) {
+      this.state.manualPeek = false;
       const dir = index >= this.state.currentIndex ? 'left' : 'right';
       this.state.currentIndex = index;
       this.renderQuestion();
@@ -2027,7 +2145,10 @@ const App = {
     if (qMoreIcon) qMoreIcon.textContent = this.state.isFlagged ? '★' : '☆';
     if (qMoreTitle) qMoreTitle.textContent = this.state.isFlagged ? '已标记本题 (点击取消)' : '标记本题';
 
-    this.updateSidePalette();
+    const sideFlagIcon = document.getElementById('sideFlagIcon');
+    if (sideFlagIcon) sideFlagIcon.textContent = this.state.isFlagged ? '★' : '☆';
+
+    this.updateDrawerIfOpen();
   },
 
   // ================== EXAM SUBMISSION ==================
@@ -2122,56 +2243,12 @@ const App = {
     }).join('');
   },
 
-  updateSidePalette() {
-    const sideContainer = document.getElementById('sideGridContainer');
-    if (!sideContainer) return;
-
-    const html = this.generatePaletteGridHtml();
-    sideContainer.innerHTML = html;
-
-    const total = this.state.questions.length;
-    let answered = 0;
-    this.state.questions.forEach(q => {
-      if (q.user_selected && q.user_selected.length > 0) {
-        answered++;
-      }
-    });
-
-    const percent = total > 0 ? Math.round((answered / total) * 100) : 0;
-    const statsEl = document.getElementById('sidePaletteStats');
-    if (statsEl) {
-      statsEl.textContent = `${answered}/${total} 题 (${percent}%)`;
-    }
-
-    const titleEl = document.getElementById('sidePaletteTitle');
-    if (titleEl) {
-      titleEl.textContent = this.state.practiceMode === 'exam' ? '模考答题卡' : '答题卡总览';
-    }
-
-    const fillEl = document.getElementById('sidePaletteProgressFill');
-    if (fillEl) {
-      fillEl.style.width = `${percent}%`;
-    }
-
-    const sideExamBtn = document.getElementById('sideExamSubmitBtn');
-    if (sideExamBtn) {
-      sideExamBtn.style.display = (this.state.practiceMode === 'exam') ? 'block' : 'none';
-    }
-
-    // 自动平滑滚动定位到当前题目按钮
-    requestAnimationFrame(() => {
-      const curBtn = sideContainer.querySelector('.grid-q-btn.current');
-      if (curBtn && typeof curBtn.scrollIntoView === 'function') {
-        curBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-      }
-    });
-
-    // 如果移动端抽屉处于打开状态，同步更新抽屉内的答题卡网格
+  updateDrawerIfOpen() {
     const drawer = document.getElementById('questionDrawer');
     if (drawer && drawer.style.display === 'flex') {
       const drawerContainer = document.getElementById('drawerGridContainer');
       if (drawerContainer) {
-        drawerContainer.innerHTML = html;
+        drawerContainer.innerHTML = this.generatePaletteGridHtml();
       }
     }
   },

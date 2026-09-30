@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270930_v20">
+  <link rel="stylesheet" href="css/style.css?v=20270930_v21">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -340,34 +340,26 @@
           </div>
         </div>
 
-        <!-- Right Column (Desktop Wide >=1200px): Permanent Palette & Stats -->
-        <aside class="practice-side-palette" id="desktopSidePalette">
-          <div class="side-palette-card">
-            <div class="side-palette-header">
-              <div class="side-palette-title-group">
-                <span class="side-palette-icon">📋</span>
-                <h4 id="sidePaletteTitle">答题卡总览</h4>
+        <!-- Right Column (Desktop Wide >=1200px): Dedicated Answer & Analysis Panel -->
+        <aside class="practice-side-panel" id="desktopSidePanel">
+          <!-- State 1: Placeholder Card (When not answered yet) -->
+          <div class="side-panel-card side-expl-placeholder" id="sideExplPlaceholder">
+            <div class="expl-placeholder-inner">
+              <div class="placeholder-icon-wrap">
+                <span class="placeholder-icon">💡</span>
               </div>
-              <span class="side-palette-stats" id="sidePaletteStats">0/0 题</span>
-            </div>
-            <div class="side-palette-progress">
-              <div class="progress-bar-bg">
-                <div class="progress-bar-fill" id="sidePaletteProgressFill" style="width: 0%"></div>
+              <h4 class="placeholder-title">答案与深度解析</h4>
+              <p class="placeholder-desc">作答后将在此即时呈现官方标准答案、真题考点定位与名师权威点拨</p>
+              <div class="placeholder-actions">
+                <button class="btn-secondary btn-sm" onclick="App.toggleExplanationFold()">
+                  💡 提前查看解析 <kbd class="keycap-tag">E</kbd>
+                </button>
+                <button class="btn-secondary btn-sm" onclick="App.openDrawer()">
+                  📋 打开答题卡 <kbd class="keycap-tag">Tab</kbd>
+                </button>
               </div>
             </div>
-            <div class="drawer-legend side-legend">
-              <span class="legend-item"><i class="dot dot-unanswered"></i> 未答</span>
-              <span class="legend-item"><i class="dot dot-answered"></i> 已选</span>
-              <span class="legend-item"><i class="dot dot-flagged"></i> 标记</span>
-              <span class="legend-item"><i class="dot dot-correct"></i> 正确</span>
-              <span class="legend-item"><i class="dot dot-wrong"></i> 错误</span>
-            </div>
-            <div class="side-grid-container" id="sideGridContainer">
-              <!-- 题号矩阵由 JS 自动同步驱动 -->
-            </div>
-            <button id="sideExamSubmitBtn" class="btn-primary btn-block side-exam-btn" style="display:none;" onclick="App.submitExam()">
-              📝 立即交卷评分
-            </button>
+            
             <div class="side-keyboard-shortcuts">
               <div class="shortcuts-title">⚡ 盲打快捷键</div>
               <div class="shortcuts-grid">
@@ -378,6 +370,99 @@
                 <div class="shortcut-item"><kbd class="keycap-tag">F</kbd> <span class="shortcut-desc">标记/取消重点</span></div>
                 <div class="shortcut-item"><kbd class="keycap-tag">Tab</kbd> / <kbd class="keycap-tag">M</kbd> <span class="shortcut-desc">答题卡抽屉</span></div>
               </div>
+            </div>
+          </div>
+
+          <!-- State 2: Active Explanation Card (When answered / recite mode / toggled via E) -->
+          <div class="side-panel-card side-expl-active" id="sideExplActive" style="display:none;">
+            <div class="side-expl-header">
+              <div class="side-expl-header-left">
+                <span class="side-panel-badge">💡 权威解析</span>
+                <div class="side-expl-ans-tag">
+                  <span class="side-ans-label">正确答案:</span>
+                  <span class="side-ans-val" id="sideExplAnswerVal">A</span>
+                </div>
+              </div>
+              <div class="expl-source-tag" id="sideExplSourceWrap" style="display:none;">
+                <span class="source-icon">📖</span>
+                <span id="sideExplSourceText">精讲P3考点2</span>
+              </div>
+            </div>
+
+            <!-- Scrollable Analysis Body -->
+            <div class="side-expl-scroll-body">
+              <!-- Result Banner (User answer vs standard answer) -->
+              <div class="side-result-banner" id="sideResultBanner" style="display:none;">
+                <span class="side-result-icon" id="sideResultIcon">✓</span>
+                <span class="side-result-text" id="sideResultText">回答正确</span>
+              </div>
+
+              <!-- Core Analysis -->
+              <div class="side-expl-section">
+                <div class="side-section-title">【核心简析】</div>
+                <div class="side-section-content" id="sideExplAnalysisText">
+                  解析内容正在加载...
+                </div>
+              </div>
+
+              <!-- Tips / 名师点拨 -->
+              <div class="expl-tips-box side-tips-box" id="sideExplTipsWrap" style="display:none;">
+                <div class="tips-title">
+                  <span class="tips-icon">🎯</span> 【名师点拨与真题考向】
+                </div>
+                <div class="tips-content" id="sideExplTipsText">
+                  点拨内容
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer Quick Info -->
+            <div class="side-expl-footer">
+              <div class="side-footer-actions">
+                <button class="btn-icon-sub" onclick="App.toggleFlagCurrent()" title="标记本题">
+                  <span id="sideFlagIcon">☆</span> 标记本题 <kbd class="keycap-tag">F</kbd>
+                </button>
+                <button class="btn-icon-sub" onclick="App.openDrawer()" title="打开完整答题卡">
+                  📋 答题卡 <kbd class="keycap-tag">Tab</kbd>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- State 3: Exam Mode In-Progress Card (Exam Mode Only) -->
+          <div class="side-panel-card side-exam-card" id="sideExamCard" style="display:none;">
+            <div class="side-exam-header">
+              <span class="side-panel-badge badge-exam">📝 模考进行中</span>
+              <span class="side-exam-time" id="sideExamTimer">00:00</span>
+            </div>
+            <div class="side-exam-body">
+              <h4>考场环境 · 严格防作弊模式</h4>
+              <p class="exam-notice-text">
+                本模式模拟考研政治真实考场环境。做题期间不展示标准答案与解析，交卷后系统将统一进行智能判分并出具完整成绩单与解析。
+              </p>
+              <div class="exam-stats-box">
+                <div class="exam-stat-item">
+                  <span class="label">当前题号</span>
+                  <span class="val" id="sideExamCurNum">1 / 10</span>
+                </div>
+                <div class="exam-stat-item">
+                  <span class="label">已作答题量</span>
+                  <span class="val color-cyan" id="sideExamAnsweredCount">0 题</span>
+                </div>
+              </div>
+              <div class="exam-rules-list">
+                <div class="rule-item">✓ 单项选择题 16 题，每题 1 分</div>
+                <div class="rule-item">✓ 多项选择题 17 题，每题 2 分</div>
+                <div class="rule-item">✓ 支持点击题卡快速跳题检查</div>
+              </div>
+            </div>
+            <div class="side-exam-footer">
+              <button class="btn-primary btn-block" onclick="App.submitExam()">
+                📝 立即交卷评分
+              </button>
+              <button class="btn-secondary btn-block" style="margin-top:8px;" onclick="App.openDrawer()">
+                📋 答题卡检查
+              </button>
             </div>
           </div>
         </aside>
@@ -859,6 +944,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270930_v20"></script>
+  <script src="js/app.js?v=20270930_v21"></script>
 </body>
 </html>

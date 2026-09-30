@@ -527,7 +527,8 @@ body.modal-open {
   width: 100%;
 }
 
-.practice-side-palette {
+.practice-side-palette,
+.practice-side-panel {
   display: none;
 }
 
@@ -3042,7 +3043,7 @@ kbd {
   #viewPractice .practice-container {
     max-width: 1400px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-columns: minmax(0, 1fr) 460px;
     gap: 24px;
     align-items: flex-start;
   }
@@ -3054,122 +3055,332 @@ kbd {
     gap: 14px;
   }
 
-  .practice-side-palette {
+  /* 在 PC 宽屏下，左侧题目卡片下方的解析面板隐藏，由右侧专属面板展示，防止冗余重复 */
+  .question-card .explanation-panel {
+    display: none !important;
+  }
+
+  .practice-side-panel {
     display: flex;
     flex-direction: column;
     position: sticky;
     top: 76px;
     height: calc(100vh - 96px);
     max-height: 880px;
-    min-width: 320px;
+    min-width: 420px;
   }
 
-  .side-palette-card {
+  .side-panel-card {
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 18px;
+    padding: 20px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     overflow: hidden;
+    transition: all 0.25s ease;
   }
 
-  .side-palette-header {
+  /* 状态 1: 待作答占位引导卡 */
+  .side-expl-placeholder {
+    justify-content: space-between;
+  }
+
+  .expl-placeholder-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 16px 20px;
+    margin: auto 0;
+  }
+
+  .placeholder-icon-wrap {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+  }
+
+  .placeholder-icon {
+    font-size: 28px;
+  }
+
+  .placeholder-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .placeholder-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 320px;
+    margin-bottom: 20px;
+  }
+
+  .placeholder-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  /* 状态 2: 深度解析卡片 */
+  .side-expl-active {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .side-expl-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-bottom: 12px;
+    padding-bottom: 14px;
     border-bottom: 1px solid var(--border-color);
     flex-shrink: 0;
+    gap: 10px;
   }
 
-  .side-palette-title-group {
+  .side-expl-header-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
   }
 
-  .side-palette-icon {
-    font-size: 16px;
-  }
-
-  .side-palette-title-group h4 {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
-  }
-
-  .side-palette-stats {
+  .side-panel-badge {
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 240, 255, 0.12);
     color: var(--accent-cyan);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+  }
+
+  .badge-exam {
+    background: rgba(251, 191, 36, 0.12);
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.3);
+  }
+
+  .side-expl-ans-tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .side-ans-label {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .side-ans-val {
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--accent-green);
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    padding: 1px 8px;
+    border-radius: 4px;
     font-family: var(--font-mono, monospace);
   }
 
-  .side-palette-progress {
-    padding: 10px 0 6px;
-    flex-shrink: 0;
-  }
-
-  .side-palette-progress .progress-bar-bg {
-    height: 6px;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 999px;
-    overflow: hidden;
-  }
-
-  .side-palette-progress .progress-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent-cyan), #00e1d9);
-    transition: width 0.3s ease;
-  }
-
-  .side-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    padding: 8px 0 12px;
-    font-size: 11px;
-    color: var(--text-muted);
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
-  }
-
-  .side-grid-container {
+  .side-expl-scroll-body {
     flex: 1;
     overflow-y: auto;
     overscroll-behavior: contain;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 8px;
-    padding: 12px 2px 12px 0;
+    padding: 16px 2px 16px 0;
     margin-right: -4px;
-    align-content: flex-start;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
 
-  /* Custom scrollbar for side grid */
-  .side-grid-container::-webkit-scrollbar {
+  .side-expl-scroll-body::-webkit-scrollbar {
     width: 5px;
   }
-  .side-grid-container::-webkit-scrollbar-track {
+  .side-expl-scroll-body::-webkit-scrollbar-track {
     background: transparent;
   }
-  .side-grid-container::-webkit-scrollbar-thumb {
+  .side-expl-scroll-body::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.15);
     border-radius: 4px;
   }
-  .side-grid-container::-webkit-scrollbar-thumb:hover {
+  .side-expl-scroll-body::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 240, 255, 0.4);
   }
 
-  .side-exam-btn {
-    margin-top: 10px;
+  /* 作答正误结果横幅 */
+  .side-result-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .side-result-banner.is-correct {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.4);
+    color: var(--accent-green);
+  }
+  .side-result-banner.is-wrong {
+    background: rgba(255, 71, 87, 0.15);
+    border: 1px solid rgba(255, 71, 87, 0.4);
+    color: var(--accent-coral);
+  }
+
+  .side-expl-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .side-section-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent-cyan);
+    letter-spacing: 0.2px;
+  }
+
+  .side-section-content {
+    font-size: 14.5px;
+    color: var(--text-primary);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: rgba(10, 14, 23, 0.5);
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .side-tips-box {
+    margin-top: 0 !important;
+  }
+
+  .side-expl-footer {
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
     flex-shrink: 0;
-    padding: 11px;
-    font-size: 13.5px;
+  }
+
+  .side-footer-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .btn-icon-sub {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+  }
+  .btn-icon-sub:hover {
+    color: var(--accent-cyan);
+    border-color: rgba(0, 240, 255, 0.4);
+    background: rgba(0, 240, 255, 0.08);
+  }
+
+  /* 状态 3: 模考进行中卡片 */
+  .side-exam-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .side-exam-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .side-exam-time {
+    font-size: 14px;
+    font-family: var(--font-mono, monospace);
+    color: var(--accent-amber);
+    font-weight: 700;
+  }
+
+  .side-exam-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 0;
+  }
+
+  .side-exam-body h4 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .exam-notice-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .exam-stats-box {
+    display: flex;
+    background: rgba(10, 14, 23, 0.5);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    justify-content: space-around;
+  }
+
+  .exam-stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .exam-stat-item .label {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .exam-stat-item .val {
+    font-size: 16px;
+    font-weight: 800;
+    font-family: var(--font-mono, monospace);
+    color: var(--text-primary);
+  }
+
+  .exam-rules-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .side-exam-footer {
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
   }
 
   .side-keyboard-shortcuts {
