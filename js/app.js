@@ -647,23 +647,30 @@ const App = {
       const btnOpenAuth = document.getElementById('btnOpenAuth');
       const userLoggedInBlock = document.getElementById('userLoggedInBlock');
       const userNicknameDisplay = document.getElementById('userNicknameDisplay');
+      const menuNickname = document.getElementById('menuNickname');
       const menuUsername = document.getElementById('menuUsername');
       const mBtnSync = document.getElementById('mBtnSync');
       const mUserNotLoggedIn = document.getElementById('mUserNotLoggedIn');
       const mUserLoggedIn = document.getElementById('mUserLoggedIn');
       const mUserNickname = document.getElementById('mUserNickname');
+      const mUserAccount = document.getElementById('mUserAccount');
 
       if (this.currentUser) {
+        const displayName = this.currentUser.nickname || this.currentUser.username;
+        const accountTag = `@${this.currentUser.username}`;
+
         // Desktop
         if (btnOpenAuth) btnOpenAuth.style.display = 'none';
         if (userLoggedInBlock) userLoggedInBlock.style.display = 'inline-flex';
-        if (userNicknameDisplay) userNicknameDisplay.textContent = this.currentUser.nickname || this.currentUser.username;
-        if (menuUsername) menuUsername.textContent = `@${this.currentUser.username}`;
+        if (userNicknameDisplay) userNicknameDisplay.textContent = displayName;
+        if (menuNickname) menuNickname.textContent = displayName;
+        if (menuUsername) menuUsername.textContent = accountTag;
         
-        // Mobile User Card
+        // Mobile User Card (同行并列显示昵称 + @登录账号胶囊)
         if (mUserNotLoggedIn) mUserNotLoggedIn.style.display = 'none';
         if (mUserLoggedIn) mUserLoggedIn.style.display = 'flex';
-        if (mUserNickname) mUserNickname.textContent = this.currentUser.nickname || this.currentUser.username;
+        if (mUserNickname) mUserNickname.textContent = displayName;
+        if (mUserAccount) mUserAccount.textContent = accountTag;
       } else {
         // Desktop
         if (btnOpenAuth) btnOpenAuth.style.display = 'inline-block';
@@ -675,6 +682,20 @@ const App = {
       }
 
       this.updateSyncUI();
+    },
+
+    copyUsername() {
+      if (!this.currentUser || !this.currentUser.username) return;
+      const uname = this.currentUser.username;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(uname).then(() => {
+          App.showToast(`📋 已复制登录账号：${uname}`);
+        }).catch(() => {
+          App.showToast(`👤 当前登录账号：${uname}`);
+        });
+      } else {
+        App.showToast(`👤 当前登录账号：${uname}`);
+      }
     },
 
     // 更新同步指示灯与文字

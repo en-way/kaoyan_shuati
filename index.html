@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270930_v23">
+  <link rel="stylesheet" href="css/style.css?v=20270930_v24">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -89,7 +89,10 @@
           </div>
           <div id="userDropdownMenu" class="user-dropdown-menu" style="display:none;" onclick="event.stopPropagation()">
             <div class="user-menu-header">
-              <strong id="menuUsername">@username</strong>
+              <div class="user-menu-identity">
+                <strong id="menuNickname">考研学子</strong>
+                <span id="menuUsername" class="user-account-pill" onclick="App.auth.copyUsername()" title="点击复制登录账号">@username</span>
+              </div>
               <span class="menu-sync-time" id="menuSyncTime">云端已同步</span>
             </div>
             <div class="user-menu-divider"></div>
@@ -567,6 +570,7 @@
               <div class="m-user-badge-row">
                 <span class="user-avatar-dot"></span>
                 <span class="m-user-title" id="mUserNickname">考研学子</span>
+                <span class="user-account-pill" id="mUserAccount" onclick="App.auth.copyUsername()" title="点击复制登录账号">@username</span>
               </div>
               <button class="btn-logout-compact" onclick="App.auth.logout()" title="退出当前账号">
                 🚪 退出
@@ -973,6 +977,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270930_v23"></script>
+  <script src="js/app.js?v=20270930_v24"></script>
 </body>
 </html>

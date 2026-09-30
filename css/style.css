@@ -2648,12 +2648,45 @@ kbd {
   padding: 6px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+}
+
+.user-menu-identity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .user-menu-header strong {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-primary);
+}
+
+.user-account-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.28);
+  color: var(--accent-cyan);
+  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.user-account-pill:hover,
+.user-account-pill:active {
+  background: rgba(0, 240, 255, 0.22);
+  border-color: var(--accent-cyan);
 }
 
 .menu-sync-time {
@@ -3042,6 +3075,9 @@ kbd {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .m-user-btn-group {
