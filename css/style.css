@@ -520,6 +520,17 @@ body.modal-open {
   margin: 0 auto;
 }
 
+.practice-main-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.practice-side-palette {
+  display: none;
+}
+
 /* Practice Toolbar */
 .practice-toolbar {
   display: flex;
@@ -973,17 +984,32 @@ body.modal-open {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 2.5px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2.5px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
   font-weight: 800;
+  font-family: var(--font-mono, ui-monospace, monospace);
   color: var(--text-secondary);
-  transition: all 0.2s;
+  transition: all 0.15s ease;
   flex-shrink: 0;
   margin-top: 1.5px;
+}
+
+.option-item:hover .option-key-badge {
+  color: var(--accent-cyan);
+  border-color: rgba(0, 240, 255, 0.4);
+  box-shadow: 0 2.5px 0 rgba(0, 0, 0, 0.35), 0 0 10px rgba(0, 240, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.option-item:active .option-key-badge {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
 }
 
 .option-text {
@@ -1003,10 +1029,11 @@ body.modal-open {
 }
 
 .option-item.selected .option-key-badge {
-  background: var(--accent-cyan);
+  background: linear-gradient(180deg, #00f0ff 0%, #00b4d8 100%);
   color: #050b14;
-  border-color: var(--accent-cyan);
-  box-shadow: var(--glow-cyan);
+  border-color: #00f0ff;
+  border-bottom-color: #007799;
+  box-shadow: 0 2.5px 0 #005577, var(--glow-cyan);
 }
 
 /* Correct / Wrong States (高对比度 AAA 级标准) */
@@ -1017,10 +1044,11 @@ body.modal-open {
 }
 
 .option-item.is-correct-std .option-key-badge {
-  background: var(--accent-green) !important;
-  color: #050b14 !important;
-  border-color: var(--accent-green) !important;
-  box-shadow: var(--glow-green);
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  border-color: #10b981 !important;
+  border-bottom-color: #047857 !important;
+  box-shadow: 0 2.5px 0 #065f46, var(--glow-green) !important;
 }
 
 .option-item.is-wrong-selected {
@@ -1030,10 +1058,11 @@ body.modal-open {
 }
 
 .option-item.is-wrong-selected .option-key-badge {
-  background: #e02435 !important;
+  background: linear-gradient(180deg, #ff4757 0%, #e02435 100%) !important;
   color: #ffffff !important;
-  border-color: #e02435 !important;
-  box-shadow: var(--glow-coral);
+  border-color: #ff4757 !important;
+  border-bottom-color: #b91c1c !important;
+  box-shadow: 0 2.5px 0 #991b1b, var(--glow-coral) !important;
 }
 
 /* Multi submit bar */
@@ -1245,6 +1274,28 @@ kbd {
   font-size: 10px;
   font-family: monospace;
   color: var(--text-secondary);
+}
+
+.keycap-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2.5px 6px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #243247 0%, #131c2b 100%);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.65);
+  box-shadow: 0 1.5px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  margin-left: 5px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  user-select: none;
 }
 
 /* ================== VIEW 3: MISTAKES ================== */
@@ -2952,6 +3003,247 @@ kbd {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-3px); }
   75% { transform: translateX(3px); }
+}
+
+/* ==========================================================================
+   PC 宽屏与大显示器深度适配体系 (>= 1200px)
+   包含：做题页双栏响应式工效学布局、常驻答题卡、题库大厅多列排布、错题本双列网格
+   ========================================================================== */
+@media (min-width: 1200px) {
+  /* 题库大厅宽屏拓宽与卡片 3~4 列自适应 */
+  #viewHub {
+    max-width: 1400px;
+    padding: 36px 32px 56px;
+  }
+
+  #viewHub .chapters-grid {
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 22px;
+  }
+
+  .chapter-card {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chapter-card:hover {
+    border-color: rgba(0, 240, 255, 0.45);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 240, 255, 0.08);
+  }
+
+  /* 做题页宽屏双栏布局 (左侧沉浸卡片 + 右侧常驻答题卡与工效学快捷键) */
+  #viewPractice {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 32px 48px;
+    align-items: stretch;
+  }
+
+  #viewPractice .practice-container {
+    max-width: 1400px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  .practice-main-column {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .practice-side-palette {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 76px;
+    height: calc(100vh - 96px);
+    max-height: 880px;
+    min-width: 320px;
+  }
+
+  .side-palette-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 18px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+
+  .side-palette-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .side-palette-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .side-palette-icon {
+    font-size: 16px;
+  }
+
+  .side-palette-title-group h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .side-palette-stats {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-cyan);
+    font-family: var(--font-mono, monospace);
+  }
+
+  .side-palette-progress {
+    padding: 10px 0 6px;
+    flex-shrink: 0;
+  }
+
+  .side-palette-progress .progress-bar-bg {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .side-palette-progress .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-cyan), #00e1d9);
+    transition: width 0.3s ease;
+  }
+
+  .side-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 0 12px;
+    font-size: 11px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .side-grid-container {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    padding: 12px 2px 12px 0;
+    margin-right: -4px;
+    align-content: flex-start;
+  }
+
+  /* Custom scrollbar for side grid */
+  .side-grid-container::-webkit-scrollbar {
+    width: 5px;
+  }
+  .side-grid-container::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .side-grid-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+  }
+  .side-grid-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 240, 255, 0.4);
+  }
+
+  .side-exam-btn {
+    margin-top: 10px;
+    flex-shrink: 0;
+    padding: 11px;
+    font-size: 13.5px;
+  }
+
+  .side-keyboard-shortcuts {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .shortcuts-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .shortcuts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .shortcut-item {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .shortcut-item .keycap-tag {
+    margin-left: 0;
+    font-size: 10px;
+    padding: 1.5px 5px;
+  }
+
+  .shortcut-desc {
+    color: var(--text-secondary);
+  }
+
+  /* 错题本宽屏双列排布 */
+  #viewMistakes {
+    max-width: 1400px;
+    padding: 36px 32px 56px;
+  }
+
+  #viewMistakes .mistakes-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    align-items: stretch;
+  }
+
+  #viewMistakes .mistake-card-item {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+}
+
+@media (min-width: 1440px) {
+  #viewHub .chapters-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1720px) {
+  #viewHub .chapters-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 

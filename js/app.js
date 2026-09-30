@@ -1680,8 +1680,10 @@ const App = {
 
     const btnExamSubmit = document.getElementById('btnExamSubmit');
     const drawerExam = document.getElementById('drawerExamSubmitBtn');
+    const sideExam = document.getElementById('sideExamSubmitBtn');
     if (btnExamSubmit) btnExamSubmit.style.display = (mode === 'exam') ? 'inline-flex' : 'none';
     if (drawerExam) drawerExam.style.display = (mode === 'exam') ? 'block' : 'none';
+    if (sideExam) sideExam.style.display = (mode === 'exam') ? 'block' : 'none';
   },
 
   getCurrentQuestion() {
@@ -1838,6 +1840,7 @@ const App = {
 
     this.renderExplanationPanel(q);
     this.resetQuestionTimer();
+    this.updateSidePalette();
   },
 
   renderExplanationPanel(q) {
@@ -2023,6 +2026,8 @@ const App = {
     const qMoreTitle = document.getElementById('qMoreFlagTitle');
     if (qMoreIcon) qMoreIcon.textContent = this.state.isFlagged ? '★' : '☆';
     if (qMoreTitle) qMoreTitle.textContent = this.state.isFlagged ? '已标记本题 (点击取消)' : '标记本题';
+
+    this.updateSidePalette();
   },
 
   // ================== EXAM SUBMISSION ==================
@@ -2086,14 +2091,11 @@ const App = {
     this.startPractice(this.state.currentPart, this.state.currentChapter, '', 'instant');
   },
 
-  // ================== QUESTION DRAWER ==================
-  openDrawer() {
-    const container = document.getElementById('drawerGridContainer');
-    if (!container) return;
-
+  // ================== QUESTION PALETTE & DRAWER ==================
+  generatePaletteGridHtml() {
     const mode = this.state.practiceMode;
 
-    container.innerHTML = this.state.questions.map((q, idx) => {
+    return this.state.questions.map((q, idx) => {
       let stateClass = '';
       if (idx === this.state.currentIndex) stateClass += ' current';
       if (q.is_flagged) stateClass += ' is-flagged';
@@ -2113,11 +2115,72 @@ const App = {
       }
 
       return `
-        <button class="grid-q-btn ${stateClass}" onclick="App.jumpToQuestion(${idx})">
+        <button class="grid-q-btn ${stateClass}" onclick="App.jumpToQuestion(${idx})" title="第 ${q.num} 题">
           ${q.num}
         </button>
       `;
     }).join('');
+  },
+
+  updateSidePalette() {
+    const sideContainer = document.getElementById('sideGridContainer');
+    if (!sideContainer) return;
+
+    const html = this.generatePaletteGridHtml();
+    sideContainer.innerHTML = html;
+
+    const total = this.state.questions.length;
+    let answered = 0;
+    this.state.questions.forEach(q => {
+      if (q.user_selected && q.user_selected.length > 0) {
+        answered++;
+      }
+    });
+
+    const percent = total > 0 ? Math.round((answered / total) * 100) : 0;
+    const statsEl = document.getElementById('sidePaletteStats');
+    if (statsEl) {
+      statsEl.textContent = `${answered}/${total} 题 (${percent}%)`;
+    }
+
+    const titleEl = document.getElementById('sidePaletteTitle');
+    if (titleEl) {
+      titleEl.textContent = this.state.practiceMode === 'exam' ? '模考答题卡' : '答题卡总览';
+    }
+
+    const fillEl = document.getElementById('sidePaletteProgressFill');
+    if (fillEl) {
+      fillEl.style.width = `${percent}%`;
+    }
+
+    const sideExamBtn = document.getElementById('sideExamSubmitBtn');
+    if (sideExamBtn) {
+      sideExamBtn.style.display = (this.state.practiceMode === 'exam') ? 'block' : 'none';
+    }
+
+    // 自动平滑滚动定位到当前题目按钮
+    requestAnimationFrame(() => {
+      const curBtn = sideContainer.querySelector('.grid-q-btn.current');
+      if (curBtn && typeof curBtn.scrollIntoView === 'function') {
+        curBtn.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      }
+    });
+
+    // 如果移动端抽屉处于打开状态，同步更新抽屉内的答题卡网格
+    const drawer = document.getElementById('questionDrawer');
+    if (drawer && drawer.style.display === 'flex') {
+      const drawerContainer = document.getElementById('drawerGridContainer');
+      if (drawerContainer) {
+        drawerContainer.innerHTML = html;
+      }
+    }
+  },
+
+  openDrawer() {
+    const container = document.getElementById('drawerGridContainer');
+    if (!container) return;
+
+    container.innerHTML = this.generatePaletteGridHtml();
 
     const drawer = document.getElementById('questionDrawer');
     if (drawer) {

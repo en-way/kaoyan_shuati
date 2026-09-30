@@ -15,7 +15,7 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270929_v19">
+  <link rel="stylesheet" href="css/style.css?v=20270930_v20">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -167,174 +167,220 @@
     <!-- VIEW 2: PRACTICE STREAM (沉浸式卡片流) -->
     <section id="viewPractice" class="view-section">
       <div class="practice-container">
-        <!-- Top Toolbar (Desktop Only) -->
-        <div class="practice-toolbar desktop-only">
-          <div class="p-toolbar-top-row">
-            <div class="p-left-group">
-              <div class="p-meta-tags">
-                <span id="pSubjectTag" class="p-subject-tag">马原</span>
-                <span id="pChapterTag" class="p-chapter-tag desktop-only-inline">导论</span>
-                <span id="pTypeTag" class="p-type-tag type-single">单选</span>
-                <span id="pModeTag" class="p-mode-tag" style="display:none;">错题专训</span>
+        <!-- Main Column (Questions, Options, Controls) -->
+        <div class="practice-main-column">
+          <!-- Top Toolbar (Desktop Only) -->
+          <div class="practice-toolbar desktop-only">
+            <div class="p-toolbar-top-row">
+              <div class="p-left-group">
+                <div class="p-meta-tags">
+                  <span id="pSubjectTag" class="p-subject-tag">马原</span>
+                  <span id="pChapterTag" class="p-chapter-tag desktop-only-inline">导论</span>
+                  <span id="pTypeTag" class="p-type-tag type-single">单选</span>
+                  <span id="pModeTag" class="p-mode-tag" style="display:none;">错题专训</span>
+                </div>
+              </div>
+
+              <div class="p-actions-group">
+                <button id="pFlagBtn" class="btn-flag" onclick="App.toggleFlagCurrent()">
+                  <span id="flagIcon">☆</span> <span class="btn-label-text">标记</span> <kbd class="desktop-only-inline keycap-tag">F</kbd>
+                </button>
+                <button id="pToggleExplBtn" class="btn-flag" onclick="App.toggleExplanationFold()">
+                  💡 <span class="btn-label-text">解析</span> <kbd class="desktop-only-inline keycap-tag">E</kbd>
+                </button>
+                <button class="btn-drawer desktop-only" onclick="App.openDrawer()">
+                  📋 答题卡 <kbd class="desktop-only-inline keycap-tag">Tab</kbd>
+                </button>
               </div>
             </div>
 
-            <div class="p-actions-group">
-              <button id="pFlagBtn" class="btn-flag" onclick="App.toggleFlagCurrent()">
-                <span id="flagIcon">☆</span> <span class="btn-label-text">标记</span>
+            <!-- Mode Switcher Pill Group (Desktop Only) -->
+            <div class="p-toolbar-bottom-row desktop-only">
+              <div class="mode-switch-group">
+                <button id="modeBtnInstant" class="btn-mode-pill active" onclick="App.switchMode('instant')">
+                  ⚡ 即做即判
+                </button>
+                <button id="modeBtnExam" class="btn-mode-pill" onclick="App.switchMode('exam')">
+                  📝 模考自测
+                </button>
+                <button id="modeBtnRecite" class="btn-mode-pill" onclick="App.switchMode('recite')">
+                  📖 直接背题
+                </button>
+              </div>
+
+              <div class="progress-indicator">
+                <span class="p-num" id="pCurrentNum">1</span>
+                <span class="p-sep">/</span>
+                <span class="p-total" id="pTotalNum">10</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobile Row 1: Translucent Operation Bar (Above Card) -->
+          <div class="m-practice-top-bar mobile-only">
+            <button id="mModePillBtn" class="m-mode-pill" onclick="App.openModeSelect()" title="点击切换做题模式">
+              <span id="mModePillIcon">⚡</span>
+              <span id="mModePillText">即做即判</span>
+              <span class="m-mode-chevron">▾</span>
+            </button>
+
+            <div class="m-top-actions">
+              <button id="mFlagBtn" class="m-action-pill" onclick="App.toggleFlagCurrent()" title="标记重点题">
+                <span id="mFlagIcon">☆</span> <span class="m-btn-label">标记</span>
               </button>
-              <button id="pToggleExplBtn" class="btn-flag" onclick="App.toggleExplanationFold()">
-                💡 <span class="btn-label-text">解析</span>
+              <button id="mToggleExplBtn" class="m-action-pill" onclick="App.toggleExplanationFold()" title="查看/折叠解析">
+                💡 <span class="m-btn-label">解析</span>
               </button>
-              <button class="btn-drawer desktop-only" onclick="App.openDrawer()">
-                📋 答题卡 (M)
+              <button id="mDrawerBtn" class="m-action-pill" onclick="App.openDrawer()" title="打开答题卡">
+                📋 <span class="m-btn-label">题卡</span>
               </button>
             </div>
           </div>
 
-          <!-- Mode Switcher Pill Group (Desktop Only) -->
-          <div class="p-toolbar-bottom-row desktop-only">
-            <div class="mode-switch-group">
-              <button id="modeBtnInstant" class="btn-mode-pill active" onclick="App.switchMode('instant')">
-                ⚡ 即做即判
-              </button>
-              <button id="modeBtnExam" class="btn-mode-pill" onclick="App.switchMode('exam')">
-                📝 模考自测
-              </button>
-              <button id="modeBtnRecite" class="btn-mode-pill" onclick="App.switchMode('recite')">
-                📖 直接背题
-              </button>
+          <!-- Question Card Box -->
+          <div class="question-card" id="questionCard">
+            <div class="q-header">
+              <!-- Desktop Badges -->
+              <div class="q-badges-wrap desktop-only">
+                <span class="q-badge" id="qNumberBadge">第 1 题</span>
+                <span class="q-tag-badge" id="qSpecialTag" style="display:none;">时政储备题</span>
+              </div>
+
+              <!-- Mobile Row 2: Question Info Row (Inside Card Top) -->
+              <div class="m-q-info-row mobile-only">
+                <div class="m-q-info-left">
+                  <span class="m-q-progress-badge" id="mCardProgress">1/10</span>
+                  <span class="p-type-tag type-single" id="mCardTypeTag">单选</span>
+                  <span class="p-subject-tag m-subject-pill" id="mCardSubjectTag">马原</span>
+                  <span class="q-tag-badge" id="mCardSpecialTag" style="display:none;">时政储备题</span>
+                </div>
+                <div class="m-q-info-right">
+                  <span class="m-swipe-tip">滑动切题 ⇄</span>
+                </div>
+              </div>
             </div>
 
-            <div class="progress-indicator">
-              <span class="p-num" id="pCurrentNum">1</span>
-              <span class="p-sep">/</span>
-              <span class="p-total" id="pTotalNum">10</span>
+            <!-- Question Stem -->
+            <div class="q-stem" id="qStem">
+              正在加载题目...
             </div>
+
+            <!-- Sub-items list (①②③④) if any -->
+            <div class="q-sub-items" id="qSubItems" style="display:none;"></div>
+
+            <!-- Options Grid -->
+            <div class="q-options" id="qOptions">
+              <!-- Options A, B, C, D injected here -->
+            </div>
+
+            <!-- Multi-choice Submit Action (Only visible for multi-choice in instant mode) -->
+            <div id="multiSubmitBar" class="multi-submit-bar" style="display:none;">
+              <button class="btn-submit-multi" onclick="App.submitCurrentMultiChoice()">
+                ✓ 确认提交本题
+              </button>
+              <span class="multi-tip-text">请勾选选项后提交判分</span>
+            </div>
+
+            <!-- RICH EXPLANATION PANEL (平滑折叠解析卡片) -->
+            <div class="explanation-panel" id="explanationPanel" style="display:none;">
+              <div class="expl-header">
+                <div class="expl-ans-tag">
+                  <span class="label">官方答案:</span>
+                  <span class="ans-val" id="explAnswerVal">A</span>
+                </div>
+                <div class="expl-source-tag" id="explSourceWrap" style="display:none;">
+                  <span class="source-icon">📖</span>
+                  <span id="explSourceText">精讲P3考点2</span>
+                </div>
+              </div>
+
+              <!-- Analysis content -->
+              <div class="expl-body" id="explBodyWrap">
+                <div class="expl-section-title">【核心简析】</div>
+                <div class="expl-text" id="explAnalysisText">
+                  详细解析正在加载...
+                </div>
+              </div>
+
+              <!-- Tips callout box (名师点拨) -->
+              <div class="expl-tips-box" id="explTipsWrap" style="display:none;">
+                <div class="tips-title">
+                  <span class="tips-icon">🎯</span> 【名师点拨与真题考向】
+                </div>
+                <div class="tips-content" id="explTipsText">
+                  点拨内容
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Practice Bottom Action Bar -->
+          <div class="practice-bottom-bar">
+            <button class="ctrl-btn btn-prev" onclick="App.prevQuestion()">
+              <span class="arrow">←</span> 上一题 <kbd class="desktop-only-inline keycap-tag">J</kbd>
+            </button>
+            
+            <div class="keyboard-hints desktop-only">
+              <span><kbd class="keycap-tag">A</kbd>-<kbd class="keycap-tag">D</kbd> 选答案</span>
+              <span><kbd class="keycap-tag">J</kbd> / <kbd class="keycap-tag">←</kbd> 上题</span>
+              <span><kbd class="keycap-tag">K</kbd> / <kbd class="keycap-tag">→</kbd> / <kbd class="keycap-tag">Space</kbd> 下题</span>
+              <span><kbd class="keycap-tag">E</kbd> 解析</span>
+              <span><kbd class="keycap-tag">F</kbd> 标记</span>
+              <span><kbd class="keycap-tag">Tab</kbd> 题卡</span>
+            </div>
+
+            <!-- In exam mode, shows Submit Exam button -->
+            <button id="btnExamSubmit" class="ctrl-btn btn-exam-finish" style="display:none;" onclick="App.submitExam()">
+              📝 交卷评分
+            </button>
+
+            <button class="ctrl-btn btn-next" onclick="App.nextQuestion()">
+              下一题 <kbd class="desktop-only-inline keycap-tag">K / 空格</kbd> <span class="arrow">→</span>
+            </button>
           </div>
         </div>
 
-        <!-- Mobile Row 1: Translucent Operation Bar (Above Card) -->
-        <div class="m-practice-top-bar mobile-only">
-          <button id="mModePillBtn" class="m-mode-pill" onclick="App.openModeSelect()" title="点击切换做题模式">
-            <span id="mModePillIcon">⚡</span>
-            <span id="mModePillText">即做即判</span>
-            <span class="m-mode-chevron">▾</span>
-          </button>
-
-          <div class="m-top-actions">
-            <button id="mFlagBtn" class="m-action-pill" onclick="App.toggleFlagCurrent()" title="标记重点题">
-              <span id="mFlagIcon">☆</span> <span class="m-btn-label">标记</span>
+        <!-- Right Column (Desktop Wide >=1200px): Permanent Palette & Stats -->
+        <aside class="practice-side-palette" id="desktopSidePalette">
+          <div class="side-palette-card">
+            <div class="side-palette-header">
+              <div class="side-palette-title-group">
+                <span class="side-palette-icon">📋</span>
+                <h4 id="sidePaletteTitle">答题卡总览</h4>
+              </div>
+              <span class="side-palette-stats" id="sidePaletteStats">0/0 题</span>
+            </div>
+            <div class="side-palette-progress">
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="sidePaletteProgressFill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="drawer-legend side-legend">
+              <span class="legend-item"><i class="dot dot-unanswered"></i> 未答</span>
+              <span class="legend-item"><i class="dot dot-answered"></i> 已选</span>
+              <span class="legend-item"><i class="dot dot-flagged"></i> 标记</span>
+              <span class="legend-item"><i class="dot dot-correct"></i> 正确</span>
+              <span class="legend-item"><i class="dot dot-wrong"></i> 错误</span>
+            </div>
+            <div class="side-grid-container" id="sideGridContainer">
+              <!-- 题号矩阵由 JS 自动同步驱动 -->
+            </div>
+            <button id="sideExamSubmitBtn" class="btn-primary btn-block side-exam-btn" style="display:none;" onclick="App.submitExam()">
+              📝 立即交卷评分
             </button>
-            <button id="mToggleExplBtn" class="m-action-pill" onclick="App.toggleExplanationFold()" title="查看/折叠解析">
-              💡 <span class="m-btn-label">解析</span>
-            </button>
-            <button id="mDrawerBtn" class="m-action-pill" onclick="App.openDrawer()" title="打开答题卡">
-              📋 <span class="m-btn-label">题卡</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Question Card Box -->
-        <div class="question-card" id="questionCard">
-          <div class="q-header">
-            <!-- Desktop Badges -->
-            <div class="q-badges-wrap desktop-only">
-              <span class="q-badge" id="qNumberBadge">第 1 题</span>
-              <span class="q-tag-badge" id="qSpecialTag" style="display:none;">时政储备题</span>
-            </div>
-
-            <!-- Mobile Row 2: Question Info Row (Inside Card Top) -->
-            <div class="m-q-info-row mobile-only">
-              <div class="m-q-info-left">
-                <span class="m-q-progress-badge" id="mCardProgress">1/10</span>
-                <span class="p-type-tag type-single" id="mCardTypeTag">单选</span>
-                <span class="p-subject-tag m-subject-pill" id="mCardSubjectTag">马原</span>
-                <span class="q-tag-badge" id="mCardSpecialTag" style="display:none;">时政储备题</span>
-              </div>
-              <div class="m-q-info-right">
-                <span class="m-swipe-tip">滑动切题 ⇄</span>
+            <div class="side-keyboard-shortcuts">
+              <div class="shortcuts-title">⚡ 盲打快捷键</div>
+              <div class="shortcuts-grid">
+                <div class="shortcut-item"><kbd class="keycap-tag">A</kbd>-<kbd class="keycap-tag">D</kbd> / <kbd class="keycap-tag">1</kbd>-<kbd class="keycap-tag">4</kbd> <span class="shortcut-desc">选择答案</span></div>
+                <div class="shortcut-item"><kbd class="keycap-tag">J</kbd> / <kbd class="keycap-tag">←</kbd> <span class="shortcut-desc">上一题</span></div>
+                <div class="shortcut-item"><kbd class="keycap-tag">K</kbd> / <kbd class="keycap-tag">→</kbd> / <kbd class="keycap-tag">空格</kbd> <span class="shortcut-desc">下一题</span></div>
+                <div class="shortcut-item"><kbd class="keycap-tag">E</kbd> <span class="shortcut-desc">展开/折叠解析</span></div>
+                <div class="shortcut-item"><kbd class="keycap-tag">F</kbd> <span class="shortcut-desc">标记/取消重点</span></div>
+                <div class="shortcut-item"><kbd class="keycap-tag">Tab</kbd> / <kbd class="keycap-tag">M</kbd> <span class="shortcut-desc">答题卡抽屉</span></div>
               </div>
             </div>
           </div>
-
-          <!-- Question Stem -->
-          <div class="q-stem" id="qStem">
-            正在加载题目...
-          </div>
-
-          <!-- Sub-items list (①②③④) if any -->
-          <div class="q-sub-items" id="qSubItems" style="display:none;"></div>
-
-          <!-- Options Grid -->
-          <div class="q-options" id="qOptions">
-            <!-- Options A, B, C, D injected here -->
-          </div>
-
-          <!-- Multi-choice Submit Action (Only visible for multi-choice in instant mode) -->
-          <div id="multiSubmitBar" class="multi-submit-bar" style="display:none;">
-            <button class="btn-submit-multi" onclick="App.submitCurrentMultiChoice()">
-              ✓ 确认提交本题
-            </button>
-            <span class="multi-tip-text">请勾选选项后提交判分</span>
-          </div>
-
-          <!-- RICH EXPLANATION PANEL (平滑折叠解析卡片) -->
-          <div class="explanation-panel" id="explanationPanel" style="display:none;">
-            <div class="expl-header">
-              <div class="expl-ans-tag">
-                <span class="label">官方答案:</span>
-                <span class="ans-val" id="explAnswerVal">A</span>
-              </div>
-              <div class="expl-source-tag" id="explSourceWrap" style="display:none;">
-                <span class="source-icon">📖</span>
-                <span id="explSourceText">精讲P3考点2</span>
-              </div>
-            </div>
-
-            <!-- Analysis content -->
-            <div class="expl-body" id="explBodyWrap">
-              <div class="expl-section-title">【核心简析】</div>
-              <div class="expl-text" id="explAnalysisText">
-                详细解析正在加载...
-              </div>
-            </div>
-
-            <!-- Tips callout box (名师点拨) -->
-            <div class="expl-tips-box" id="explTipsWrap" style="display:none;">
-              <div class="tips-title">
-                <span class="tips-icon">🎯</span> 【名师点拨与真题考向】
-              </div>
-              <div class="tips-content" id="explTipsText">
-                点拨内容
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Practice Bottom Action Bar -->
-        <div class="practice-bottom-bar">
-          <button class="ctrl-btn btn-prev" onclick="App.prevQuestion()">
-            <span class="arrow">←</span> 上一题
-          </button>
-          
-          <div class="keyboard-hints desktop-only">
-            <span><kbd>A</kbd>-<kbd>D</kbd> 选项</span>
-            <span><kbd>Enter</kbd> 确认/下题</span>
-            <span><kbd>E</kbd> 开关解析</span>
-            <span><kbd>F</kbd> 标记</span>
-            <span><kbd>M</kbd> 答题卡</span>
-          </div>
-
-          <!-- In exam mode, shows Submit Exam button -->
-          <button id="btnExamSubmit" class="ctrl-btn btn-exam-finish" style="display:none;" onclick="App.submitExam()">
-            📝 交卷评分
-          </button>
-
-          <button class="ctrl-btn btn-next" onclick="App.nextQuestion()">
-            下一题 <span class="arrow">→</span>
-          </button>
-        </div>
+        </aside>
       </div>
     </section>
 
@@ -813,6 +859,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270929_v19"></script>
+  <script src="js/app.js?v=20270930_v20"></script>
 </body>
 </html>
