@@ -142,7 +142,7 @@ def test_side_explanation_panel_sync():
     print("  ✓ Side explanation panel multi-state engine verified")
 
 def test_versioning_and_mobile_compatibility():
-    print("[6/6] Testing v22 asset versioning, fluid typography & 4-tier font size controls...")
+    print("[6/6] Testing v23 asset versioning, fluid typography & bottom bar non-wrapping...")
     with open(INDEX_FILE, 'r', encoding='utf-8') as f:
         html = f.read()
     with open(SW_FILE, 'r', encoding='utf-8') as f:
@@ -153,8 +153,8 @@ def test_versioning_and_mobile_compatibility():
         js = f.read()
 
     # Version bump
-    assert 'v=20270930_v22' in html, "index.html missing v=20270930_v22 query string"
-    assert "VERSION = 'v22'" in sw, "sw.js missing VERSION = 'v22'"
+    assert 'v=20270930_v23' in html, "index.html missing v=20270930_v23 query string"
+    assert "VERSION = 'v23'" in sw, "sw.js missing VERSION = 'v23'"
     assert '20270930_${VERSION}' in sw, "sw.js missing 20270930_${VERSION} asset URLs"
 
     # Fluid typography & 4-tier manual font scaling checks
@@ -165,6 +165,7 @@ def test_versioning_and_mobile_compatibility():
     assert 'id="pFontSizeBtn"' in html, "Missing PC font size switcher button #pFontSizeBtn in index.html"
     assert 'class="font-size-segmented"' in html, "Missing mobile 4-tier font size segmented control in index.html"
     assert 'setFontSize(' in js and 'cycleFontSize(' in js, "Missing setFontSize / cycleFontSize methods in app.js"
+    assert '.keyboard-hints > span' in css, "Missing .keyboard-hints > span alignment rule in style.css"
 
     # Mobile compatibility check: .desktop-only hidden on <= 768px
     mobile_query = css[css.find('@media (max-width: 768px)'):css.find('@media (max-width: 480px)')]
@@ -172,10 +173,10 @@ def test_versioning_and_mobile_compatibility():
         "Mobile query must hide .desktop-only elements"
     assert '.desktop-only-inline { display: none !important; }' in mobile_query, \
         "Mobile query must hide .desktop-only-inline elements"
-    print("  ✓ Version v22, fluid typography, 4-tier font scaling & mobile compatibility verified")
+    print("  ✓ Version v23, fluid typography, 4-tier font scaling & bottom bar alignment verified")
 
 if __name__ == '__main__':
-    print("=== PC / Desktop UI & Typography Adaptation Test Suite (v22) ===")
+    print("=== PC / Desktop UI & Typography Adaptation Test Suite (v23) ===")
     try:
         test_desktop_practice_two_column_layout()
         test_mechanical_keycaps_and_keyboard_ergonomics()
