@@ -1296,6 +1296,8 @@ const App = {
             this.currentUser = JSON.parse(cachedUser);
             this.renderAuthUI();
           } catch (e) {}
+        }
+
         // 客户端本地预检 JWT 是否已过期，已过期直接清除会话，0 消耗网络
         if (this.token && this.token.includes('.')) {
           try {

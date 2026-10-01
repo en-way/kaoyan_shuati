@@ -25,8 +25,22 @@ GEN_CODE_JS = os.path.join(BASE_DIR, 'functions', 'api', 'admin', 'generate-rese
 SCHEMA_SQL = os.path.join(BASE_DIR, 'functions', 'schema.sql')
 SYNC_JS = os.path.join(BASE_DIR, 'functions', 'api', 'progress', 'sync.js')
 
+def test_module0_syntax_compilation():
+    print("[0/6] Testing Module 0: JavaScript Syntax Compilation (node -c)...")
+    import subprocess
+    js_files = [APP_JS, SW_JS]
+    for root, _, files in os.walk(os.path.join(BASE_DIR, 'functions')):
+        for file in files:
+            if file.endswith('.js'):
+                js_files.append(os.path.join(root, file))
+
+    for js_file in js_files:
+        res = subprocess.run(['node', '-c', js_file], capture_output=True, text=True)
+        assert res.returncode == 0, f"Syntax Error in {os.path.basename(js_file)}:\n{res.stderr}"
+    print(f"  ✓ All {len(js_files)} JavaScript files verified clean by V8 compiler (0 SyntaxErrors)")
+
 def test_module1_practice_engine():
-    print("[1/5] Testing Module 1: Practice Engine & State Machine Hardening...")
+    print("[1/6] Testing Module 1: Practice Engine & State Machine Hardening...")
     with open(APP_JS, 'r', encoding='utf-8') as f:
         content = f.read()
 
@@ -188,12 +202,13 @@ def test_module5_quota_and_sync_integrity():
 if __name__ == '__main__':
     print("=== Multi-Agent Audit Hardening (v25) Test Suite ===")
     try:
+        test_module0_syntax_compilation()
         test_module1_practice_engine()
         test_module2_security_and_edge_cpu()
         test_module3_pwa_and_storage_resilience()
         test_module4_ui_ux_and_responsive()
         test_module5_quota_and_sync_integrity()
-        print("\nAll 5 audit hardening modules passed successfully! 🚀")
+        print("\nAll 6 audit hardening modules passed successfully! 🚀")
         sys.exit(0)
     except AssertionError as e:
         print(f"\n❌ Test Failed: {e}")
