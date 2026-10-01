@@ -15,7 +15,27 @@
   <meta name="theme-color" content="#0a0e17">
   
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
-  <link rel="stylesheet" href="css/style.css?v=20270930_v25">
+
+  <!-- 极端缓存自愈与容错防护：若旧版缓存抛出 SyntaxError 或 App 未定义，自动秒级清理 Service Worker 缓存并恢复 -->
+  <script>
+    window.addEventListener('error', function(e) {
+      if (e && e.message && (e.message.indexOf('SyntaxError') !== -1 || e.message.indexOf('App is not defined') !== -1 || e.message.indexOf('Unexpected token') !== -1)) {
+        console.warn('[Self-Healing] Detected stale cached script issue, purging caches and re-registering...');
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(n) { if (n.indexOf('ky-quiz') !== -1) caches.delete(n); });
+          });
+        }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) { r.unregister(); });
+          });
+        }
+      }
+    });
+  </script>
+
+  <link rel="stylesheet" href="css/style.css?v=20270930_v26">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -977,6 +997,6 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20270930_v25"></script>
+  <script src="js/app.js?v=20270930_v26"></script>
 </body>
 </html>

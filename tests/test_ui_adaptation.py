@@ -98,7 +98,7 @@ def test_html_and_js_modal_integration():
     with open(CSS_FILE, 'r', encoding='utf-8') as f:
         css = f.read()
 
-    assert any(v in html for v in ['v=20270930_v25', 'v=20270930_v24', 'v=20270930_v23', 'v=20270930_v22', 'v=20270930_v21', 'v=20270930_v20', 'v=20270929_v19']), "HTML static assets not bumped to v25"
+    assert any(v in html for v in ['v=20270930_v26', 'v=20270930_v25', 'v=20270930_v24', 'v=20270930_v23', 'v=20270930_v22', 'v=20270930_v21', 'v=20270930_v20', 'v=20270929_v19']), "HTML static assets not bumped to v26"
     assert 'App.closeExamReportModal(event)' in html, "Exam report modal missing click-outside dismiss"
 
     # Local export/import removal assertions

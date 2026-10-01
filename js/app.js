@@ -202,6 +202,16 @@ const DB = {
     const answers = userData.answers || {};
     const mistakes = userData.mistakes || {};
 
+    if (!this.questionsData || !this.questionsData.subjects_tree || !this.questionsData.questions) {
+      return {
+        total_questions: 0,
+        total_answered: 0,
+        total_mistakes: 0,
+        overall_accuracy: 0,
+        subjects: []
+      };
+    }
+
     const subjects = [];
     for (const [partName, chapters] of Object.entries(this.questionsData.subjects_tree)) {
       const subjectInfo = {
@@ -265,6 +275,9 @@ const DB = {
   },
 
   getQuestions(part, chapter, qType, mode) {
+    if (!this.questionsData || !this.questionsData.questions) {
+      return { total: 0, questions: [] };
+    }
     const userData = this.getUserData();
     const answers = userData.answers || {};
     const mistakes = userData.mistakes || {};
@@ -573,16 +586,20 @@ const App = {
   },
 
   async init() {
-    this.initFontSize();
-    this.startSessionTimer();
-    this.bindGlobalKeys();
-    this.bindTouchGestures();
-    this.initPwaInstall();
-    this.registerServiceWorker();
-    await DB.init();
-    this.auth.init();
-    this.loadOverview();
-    this.initLanUrl();
+    try {
+      this.initFontSize();
+      this.startSessionTimer();
+      this.bindGlobalKeys();
+      this.bindTouchGestures();
+      this.initPwaInstall();
+      this.registerServiceWorker();
+      await DB.init();
+      this.auth.init();
+      this.loadOverview();
+      this.initLanUrl();
+    } catch (err) {
+      console.error('[App.init] Error during initialization:', err);
+    }
   },
 
   // ================== 四档阅读字号自适应与记忆引擎 ==================
@@ -2743,10 +2760,12 @@ const App = {
 
   registerServiceWorker() {
     if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      window.addEventListener('load', () => {
+      const doRegister = () => {
         navigator.serviceWorker.register('./sw.js', { scope: './' })
           .then((reg) => {
             console.log('[PWA] Service Worker registered with scope:', reg.scope);
+            // 每次页面访问主动触发 SW 检查最新版本
+            reg.update().catch(() => {});
             reg.onupdatefound = () => {
               const installingWorker = reg.installing;
               if (installingWorker) {
@@ -2761,6 +2780,21 @@ const App = {
           .catch((err) => {
             console.warn('[PWA] Service Worker registration failed:', err);
           });
+      };
+
+      if (document.readyState === 'complete') {
+        doRegister();
+      } else {
+        window.addEventListener('load', doRegister);
+      }
+
+      // 当新的 SW 接管时自动安全刷新页面，确保用户无缝获取最新版本
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
       });
     }
   },

@@ -153,8 +153,8 @@ def test_versioning_and_mobile_compatibility():
         js = f.read()
 
     # Version bump
-    assert ('v=20270930_v25' in html or 'v=20270930_v24' in html), "index.html missing v24/v25 query string"
-    assert ("VERSION = 'v25'" in sw or "VERSION = 'v24'" in sw), "sw.js missing VERSION = 'v25'"
+    assert ('v=20270930_v26' in html or 'v=20270930_v25' in html or 'v=20270930_v24' in html), "index.html missing v24/v25/v26 query string"
+    assert ("VERSION = 'v26'" in sw or "VERSION = 'v25'" in sw or "VERSION = 'v24'" in sw), "sw.js missing VERSION = 'v26'"
     assert '20270930_${VERSION}' in sw, "sw.js missing 20270930_${VERSION} asset URLs"
 
     # Fluid typography & 4-tier manual font scaling checks

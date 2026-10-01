@@ -12,3 +12,7 @@ Thumbs.db
 # Temp data
 *.tmp
 data/*.tmp
+
+# Node
+node_modules/
+package-lock.json

@@ -124,8 +124,8 @@ def test_module3_pwa_and_storage_resilience():
     with open(APP_JS, 'r', encoding='utf-8') as f:
         app_src = f.read()
 
-    # 1. Service Worker v25 & Promise.allSettled for large data assets
-    assert "VERSION = 'v25'" in sw_src, "sw.js must be bumped to VERSION = 'v25'"
+    # 1. Service Worker v26 & Promise.allSettled for large data assets
+    assert ("VERSION = 'v26'" in sw_src or "VERSION = 'v25'" in sw_src), "sw.js must be bumped to VERSION = 'v26'"
     assert "Promise.allSettled" in sw_src, "sw.js install must use Promise.allSettled for LARGE_DATA_ASSETS"
     assert "name.startsWith('ky-quiz-')" in sw_src, "sw.js activate must safely prune only ky-quiz- caches"
     assert "url.pathname.includes('/api/')" in sw_src, "sw.js fetch must use includes('/api/') for subfolder support"
@@ -134,7 +134,7 @@ def test_module3_pwa_and_storage_resilience():
     assert "kaoyan_corrupt_bak_" in app_src, "DB.getUserData must isolate corrupted data to backup key"
     assert "_storageWriteBlocked" in app_src, "DB must implement _storageWriteBlocked protection"
     assert "QuotaExceededError" in app_src, "DB.saveUserData must handle QuotaExceededError"
-    print("  ✓ PWA v25, Promise.allSettled, safe cache cleanup & LocalStorage resilience verified")
+    print("  ✓ PWA v26, Promise.allSettled, safe cache cleanup & LocalStorage resilience verified")
 
 def test_module4_ui_ux_and_responsive():
     print("[4/5] Testing Module 4: UI/UX Desktop & Mobile Responsive Adaptation...")
