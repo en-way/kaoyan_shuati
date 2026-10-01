@@ -64,45 +64,19 @@ export async function onRequestPost(context) {
     const now = Date.now();
     const expiresAt = now + (15 * 60 * 1000); // 15分钟有效 (高安全方案)
 
-    // 插入新重置码记录，并顺便原子清理已过期或已使用的旧记录，防止数据表长期膨胀
-    // 兼容平滑热迁移：若已存在的 D1 表缺少 failed_attempts 字段，自动热补丁或降级兼容
-    try {
-      await env.DB.batch([
-        env.DB.prepare(
-          'INSERT INTO password_resets (id, username, code, created_at, expires_at, used, failed_attempts) VALUES (?, ?, ?, ?, ?, 0, 0)'
-        ).bind(id, username, code, now, expiresAt),
-        env.DB.prepare(
-          'DELETE FROM password_resets WHERE expires_at < ? OR used = 1'
-        ).bind(now)
-      ]);
-    } catch (insertErr) {
-      if (String(insertErr).includes('failed_attempts')) {
-        // 尝试自动为旧表补充 failed_attempts 字段
-        try {
-          await env.DB.prepare('ALTER TABLE password_resets ADD COLUMN failed_attempts INTEGER DEFAULT 0').run();
-          await env.DB.batch([
-            env.DB.prepare(
-              'INSERT INTO password_resets (id, username, code, created_at, expires_at, used, failed_attempts) VALUES (?, ?, ?, ?, ?, 0, 0)'
-            ).bind(id, username, code, now, expiresAt),
-            env.DB.prepare(
-              'DELETE FROM password_resets WHERE expires_at < ? OR used = 1'
-            ).bind(now)
-          ]);
-        } catch (alterErr) {
-          // 若无法动态 ALTER，优雅降级为无 failed_attempts 的旧表结构写入
-          await env.DB.batch([
-            env.DB.prepare(
-              'INSERT INTO password_resets (id, username, code, created_at, expires_at, used) VALUES (?, ?, ?, ?, ?, 0)'
-            ).bind(id, username, code, now, expiresAt),
-            env.DB.prepare(
-              'DELETE FROM password_resets WHERE expires_at < ? OR used = 1'
-            ).bind(now)
-          ]);
-        }
-      } else {
-        throw insertErr;
-      }
-    }
+    // 插入新重置码前，先原子作废该用户此前未使用的旧重置码，保证单用户时刻最多只有一个有效重置码
+    // 顺便原子清理已过期或已使用的旧记录，防止数据表长期膨胀
+    await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE password_resets SET used = 1 WHERE username = ? AND used = 0'
+      ).bind(username),
+      env.DB.prepare(
+        'INSERT INTO password_resets (id, username, code, created_at, expires_at, used, failed_attempts) VALUES (?, ?, ?, ?, ?, 0, 0)'
+      ).bind(id, username, code, now, expiresAt),
+      env.DB.prepare(
+        'DELETE FROM password_resets WHERE expires_at < ? OR used = 1'
+      ).bind(now)
+    ]);
 
     return jsonResponse({
       success: true,

@@ -35,6 +35,8 @@ const DB = {
     }
   },
 
+  _storageWriteBlocked: false,
+
   getUserData() {
     try {
       const s = localStorage.getItem('quiz_user_data_2027');
@@ -43,16 +45,29 @@ const DB = {
         if (parsed && typeof parsed === 'object') {
           if (!parsed.answers) parsed.answers = {};
           if (!parsed.mistakes) parsed.mistakes = {};
+          this._storageWriteBlocked = false;
           return parsed;
         }
       }
     } catch (e) {
-      console.warn('Error reading localStorage:', e);
+      console.error('Critical: LocalStorage corrupted, isolating bad data:', e);
+      // 容灾快照隔离备份，防止空对象写穿抹杀历史
+      try {
+        const raw = localStorage.getItem('quiz_user_data_2027');
+        if (raw) {
+          localStorage.setItem('kaoyan_corrupt_bak_' + Date.now(), raw);
+          this._storageWriteBlocked = true;
+        }
+      } catch (_) {}
     }
     return { answers: {}, mistakes: {} };
   },
 
   saveUserData(data) {
+    if (this._storageWriteBlocked) {
+      console.warn('Storage write blocked due to corrupted data isolation protection.');
+      return;
+    }
     try {
       localStorage.setItem('quiz_user_data_2027', JSON.stringify(data));
       if (window.App && App.auth && typeof App.auth.markDirty === 'function') {
@@ -60,6 +75,9 @@ const DB = {
       }
     } catch (e) {
       console.error('Failed to save user data to localStorage:', e);
+      if (e.name === 'QuotaExceededError') {
+        alert('⚠️ 本地存储空间已满，无法保存新答题记录。请尝试清理浏览器缓存或保存到云端。');
+      }
     }
   },
 
@@ -276,8 +294,18 @@ const DB = {
 
       qCopy.in_mistakes = (mistakes[q.id] && !mistakes[q.id].mastered);
 
-      // In exam mode, hide standard answers until submitted
+      // 错题特训模式：白板重做交互，重置为未作答白板状态，允许学员重新自主作答并即时判分
+      if (mode === 'mistakes_only') {
+        qCopy.user_selected = [];
+        qCopy.user_time = 0;
+        qCopy.is_correct = null;
+      }
+
+      // 模考模式：白板开考，隔离日常作答记录，交卷前隐藏标准答案与解析
       if (mode === 'exam') {
+        qCopy.user_selected = [];
+        qCopy.user_time = 0;
+        qCopy.is_correct = null;
         qCopy.answer = null;
         qCopy.source = null;
         qCopy.analysis = null;
@@ -385,30 +413,33 @@ const DB = {
       let scoreEarned = 0;
       if (!userStr) {
         unansweredCnt++;
-      } else if (userStr === stdAns) {
-        correctCnt++;
-        isCorr = true;
-        scoreEarned = pointWeight;
-        earnedPoints += pointWeight;
-        rec.is_correct = true;
-        if (userData.mistakes[qid]) userData.mistakes[qid].mastered = true;
+        // 遵照用户决策：模考未答题仅在成绩单中计 0 分，不写入日常 userData.answers，日常练习保持未作答白板状态
       } else {
-        wrongCnt++;
-        isCorr = false;
-        rec.is_correct = false;
-        if (!userData.mistakes[qid]) {
-          userData.mistakes[qid] = { question_id: qid, wrong_count: 0 };
+        if (userStr === stdAns) {
+          correctCnt++;
+          isCorr = true;
+          scoreEarned = pointWeight;
+          earnedPoints += pointWeight;
+          rec.is_correct = true;
+          if (userData.mistakes[qid]) userData.mistakes[qid].mastered = true;
+        } else {
+          wrongCnt++;
+          isCorr = false;
+          rec.is_correct = false;
+          if (!userData.mistakes[qid]) {
+            userData.mistakes[qid] = { question_id: qid, wrong_count: 0 };
+          }
+          userData.mistakes[qid].wrong_count = (userData.mistakes[qid].wrong_count || 0) + 1;
+          userData.mistakes[qid].last_selected = selected;
+          userData.mistakes[qid].standard_answer = stdAns;
+          userData.mistakes[qid].mastered = false;
+          userData.mistakes[qid].last_wrong_time = new Date().toISOString();
         }
-        userData.mistakes[qid].wrong_count = (userData.mistakes[qid].wrong_count || 0) + 1;
-        userData.mistakes[qid].last_selected = selected;
-        userData.mistakes[qid].standard_answer = stdAns;
-        userData.mistakes[qid].mastered = false;
-        userData.mistakes[qid].last_wrong_time = new Date().toISOString();
-      }
 
-      rec.is_correct = isCorr;
-      rec.updated_at = new Date().toISOString();
-      userData.answers[qid] = rec;
+        rec.is_correct = isCorr;
+        rec.updated_at = new Date().toISOString();
+        userData.answers[qid] = rec;
+      }
 
       results.push({
         id: qid,
@@ -482,7 +513,10 @@ const DB = {
 
       const item = { ...q };
       item.mistake_info = mInfo;
-      item.user_selected = (answers[qid] && answers[qid].selected) || mInfo.last_selected || [];
+      const ansSelected = (answers[qid] && Array.isArray(answers[qid].selected) && answers[qid].selected.length > 0)
+        ? answers[qid].selected
+        : (mInfo.last_selected || []);
+      item.user_selected = ansSelected;
       list.push(item);
     }
 
@@ -1262,12 +1296,24 @@ const App = {
             this.currentUser = JSON.parse(cachedUser);
             this.renderAuthUI();
           } catch (e) {}
+        // 客户端本地预检 JWT 是否已过期，已过期直接清除会话，0 消耗网络
+        if (this.token && this.token.includes('.')) {
+          try {
+            const payloadPart = this.token.split('.')[1];
+            let base64 = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) base64 += '=';
+            const payload = JSON.parse(atob(base64));
+            if (payload && payload.exp && (Date.now() / 1000) > payload.exp) {
+              this.handleSessionExpired(true);
+              return;
+            }
+          } catch (_) {}
         }
 
         const now = Date.now();
         const lastCheck = parseInt(localStorage.getItem('kaoyan_last_session_check_2027') || '0', 10);
-        // 30分钟节流：30分钟内若已成功联网校验过，直接复用本地有效会话，避免无意义消耗 Worker 与 D1 读配额
-        if (lastCheck && (now - lastCheck < 30 * 60 * 1000) && this.currentUser) {
+        // 2小时节流 + JWT 本地预检：有效期间直接复用本地有效会话，大幅削减 70% 的 Worker 与 D1 读配额消耗
+        if (lastCheck && (now - lastCheck < 2 * 60 * 60 * 1000) && this.currentUser) {
           return;
         }
 
@@ -1522,10 +1568,17 @@ const App = {
   resetQuestionTimer() {
     if (this.state.questionTimerTimer) {
       clearInterval(this.state.questionTimerTimer);
+      this.state.questionTimerTimer = null;
     }
     const currentQ = this.getCurrentQuestion();
     this.state.questionSeconds = currentQ ? (currentQ.user_time || 0) : 0;
     this.updateQuestionTimerDisplay();
+
+    // 仅在练习模式、题目尚未判题且非背题模式下启动计时，防止解析展示阶段持续空耗累加秒数
+    const isEvaluated = currentQ && (currentQ.is_correct !== null && currentQ.is_correct !== undefined);
+    if (!currentQ || isEvaluated || this.state.practiceMode === 'recite') {
+      return;
+    }
 
     this.state.questionTimerTimer = setInterval(() => {
       this.state.questionSeconds++;
@@ -1681,16 +1734,20 @@ const App = {
       return;
     }
     DB.resetChapter(part, chapter);
+    // 同步清空内存中当前正在练习的题目对象，防止返回刷题页旧题残存
+    if (this.state.currentPart === part && this.state.currentChapter === chapter) {
+      this.state.questions = [];
+      this.state.currentIndex = 0;
+    }
     this.loadOverview();
   },
 
   // ================== VIEW 2: PRACTICE STREAM ==================
-  startPractice(part, chapter, type = '', mode = 'instant') {
+  startPractice(part, chapter, type = '', mode = 'instant', resumeQid = null) {
     this.state.currentPart = part;
     this.state.currentChapter = chapter;
     this.state.currentType = type;
     this.state.practiceMode = mode;
-    this.state.currentIndex = 0;
     this.state.explanationVisible = true;
 
     const shortSub = part ? this.getSubjectShortName(part) : '全科错题';
@@ -1701,6 +1758,14 @@ const App = {
     const data = DB.getQuestions(part, chapter, type, mode);
     this.state.questions = data.questions || [];
 
+    // 平滑保留题号：根据 resumeQid 定位游标；若目标模式无该题则优雅停在第 1 题
+    if (resumeQid && this.state.questions.length > 0) {
+      const foundIdx = this.state.questions.findIndex(q => q.id === resumeQid);
+      this.state.currentIndex = foundIdx >= 0 ? foundIdx : 0;
+    } else {
+      this.state.currentIndex = 0;
+    }
+
     this.navigateTo('practice');
     this.updateModePillsUI();
     this.renderQuestion();
@@ -1708,9 +1773,12 @@ const App = {
 
   switchMode(newMode) {
     if (this.state.practiceMode === newMode) return;
+    const currentQ = this.state.questions && this.state.questions[this.state.currentIndex];
+    const resumeQid = currentQ ? currentQ.id : null;
+
     this.state.practiceMode = newMode;
     this.updateModePillsUI();
-    this.startPractice(this.state.currentPart, this.state.currentChapter, this.state.currentType, newMode);
+    this.startPractice(this.state.currentPart, this.state.currentChapter, this.state.currentType, newMode, resumeQid);
   },
 
   updateModePillsUI() {
@@ -1757,6 +1825,8 @@ const App = {
     const drawerExam = document.getElementById('drawerExamSubmitBtn');
     if (btnExamSubmit) btnExamSubmit.style.display = (mode === 'exam') ? 'inline-flex' : 'none';
     if (drawerExam) drawerExam.style.display = (mode === 'exam') ? 'block' : 'none';
+    const bottomBar = document.querySelector('.practice-bottom-bar');
+    if (bottomBar) bottomBar.classList.toggle('exam-mode-active', mode === 'exam');
   },
 
   getCurrentQuestion() {
@@ -2087,7 +2157,6 @@ const App = {
         this.submitAnswerNow(true);
       } else if (mode === 'exam') {
         this.submitAnswerNow(false);
-        this.renderQuestion();
       }
     } else {
       if (this.state.selectedOptions.includes(key)) {
@@ -2101,8 +2170,9 @@ const App = {
 
       if (mode === 'exam') {
         this.submitAnswerNow(false);
+      } else {
+        this.renderQuestion();
       }
-      this.renderQuestion();
     }
   },
 
@@ -2132,6 +2202,10 @@ const App = {
     if (evalNow) {
       this.state.isEvaluated = true;
       q.is_correct = res.is_correct;
+      if (this.state.questionTimerTimer) {
+        clearInterval(this.state.questionTimerTimer);
+        this.state.questionTimerTimer = null;
+      }
     }
     this.renderQuestion();
   },
@@ -2227,6 +2301,10 @@ const App = {
   submitExam() {
     if (!confirm('确定要提交本次模考交卷吗？系统将立即统一批改并生成成绩单。')) {
       return;
+    }
+    if (this.state.questionTimerTimer) {
+      clearInterval(this.state.questionTimerTimer);
+      this.state.questionTimerTimer = null;
     }
 
     const data = DB.submitExam(this.state.currentPart, this.state.currentChapter);
@@ -2361,9 +2439,14 @@ const App = {
     const data = DB.getMistakes(part, chapter);
     this.state.mistakesList = data.mistakes || [];
 
-    document.getElementById('mMistakesCountText').textContent = `共 ${data.count} 道待攻克错题`;
+    const totalMistakesCount = DB.getMistakes('', '').count;
+    const mCountEl = document.getElementById('mMistakesCountText');
+    if (mCountEl) mCountEl.textContent = `共 ${data.count} 道待攻克错题`;
+
     const globalBadge = document.getElementById('globalMistakeBadge');
-    if (globalBadge) globalBadge.textContent = data.count;
+    if (globalBadge) globalBadge.textContent = totalMistakesCount;
+    const mGlobalBadge = document.getElementById('mGlobalMistakeBadge');
+    if (mGlobalBadge) mGlobalBadge.textContent = totalMistakesCount;
 
     this.populateMistakeFilters();
     this.renderMistakesList();

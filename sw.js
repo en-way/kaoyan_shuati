@@ -1,10 +1,10 @@
 /**
- * 2027 考研政治 1000 题 · Service Worker (v24)
+ * 2027 考研政治 1000 题 · Service Worker (v25)
  * 缓存策略: Network-First (网络优先 + 离线缓存秒级降级)
  * 具备离线可用性，断网时自动启用本地题库与应用代码
  */
 
-const VERSION = 'v24';
+const VERSION = 'v25';
 const CACHE_NAME = `ky-quiz-${VERSION}`;
 
 // 核心 App Shell（轻量级，强保证秒级原子安装成功）
@@ -19,36 +19,39 @@ const CORE_SHELL_ASSETS = [
   './icons/apple-touch-icon.png'
 ];
 
-// 题库大数据包（~1.9MB，采用第二阶段后台异步容错预存，杜绝因网络抖动中断整个 App Shell 安装）
+// 题库大数据包（~1.9MB，采用第二阶段异步容错预存，杜绝因网络抖动中断整个 App Shell 安装）
 const LARGE_DATA_ASSETS = [
   './data/questions.json'
 ];
 
-// 1. Install: 两阶段渐进式缓存
+// 1. Install: 两阶段渐进式缓存（使用 Promise.allSettled 确保题库预存不被线程休眠中断）
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('[ServiceWorker v16] Precaching Core App Shell');
+      console.log(`[ServiceWorker ${VERSION}] Precaching Core App Shell`);
       await cache.addAll(CORE_SHELL_ASSETS);
 
-      // 第二阶段：异步容错缓存大体积题库
-      LARGE_DATA_ASSETS.forEach((asset) => {
-        cache.add(asset).catch((err) => {
-          console.warn('[ServiceWorker v16] Resilient prefetch for data asset failed, will fetch on-demand:', asset, err);
-        });
-      });
+      // 第二阶段：安全预存大体积题库文件，确保离线刷题可用
+      console.log(`[ServiceWorker ${VERSION}] Precaching Large Data Assets`);
+      await Promise.allSettled(
+        LARGE_DATA_ASSETS.map((asset) =>
+          cache.add(asset).catch((err) => {
+            console.warn(`[ServiceWorker ${VERSION}] Resilient prefetch for data asset failed:`, asset, err);
+          })
+        )
+      );
     }).then(() => self.skipWaiting())
   );
 });
 
-// 2. Activate: Clear Old Caches
+// 2. Activate: Clear Old Caches (限定只清理以 ky-quiz- 开头的本应用旧版本缓存)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((name) => {
-          if (name !== CACHE_NAME) {
-            console.log('[ServiceWorker] Removing old cache:', name);
+          if (name.startsWith('ky-quiz-') && name !== CACHE_NAME) {
+            console.log(`[ServiceWorker ${VERSION}] Removing old cache:`, name);
             return caches.delete(name);
           }
         })
@@ -65,7 +68,7 @@ self.addEventListener('fetch', (event) => {
   if (!url.protocol.startsWith('http')) return;
 
   // 离线 API 拦截降级：如果是 /api/ 接口请求且断网，返回结构化 JSON 503 避免客户端 res.json() 语法崩溃
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.includes('/api/')) {
     event.respondWith(
       fetch(event.request).catch(() => {
         return new Response(JSON.stringify({

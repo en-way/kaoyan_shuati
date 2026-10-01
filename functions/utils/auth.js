@@ -81,13 +81,10 @@ export async function hashPassword(password, saltHex, iterations = PBKDF2_DEFAUL
   return bytesToHex(new Uint8Array(derivedBits));
 }
 
-// 3. 校验密码是否匹配（先使用 20k 次迭代快速比对，未匹配时向下兼容 100k 次旧账号）
+// 3. 校验密码是否匹配（严格使用 20k 次迭代，耗时 5~7ms 稳控在 Worker 10ms CPU 限额内）
 export async function verifyPassword(password, saltHex, targetHash) {
   const hash = await hashPassword(password, saltHex, PBKDF2_DEFAULT_ITERATIONS);
-  if (hash === targetHash) return true;
-  // 向下兼容历史 100k 迭代账号
-  const legacyHash = await hashPassword(password, saltHex, PBKDF2_LEGACY_ITERATIONS);
-  return legacyHash === targetHash;
+  return hash === targetHash;
 }
 
 // 4. 生成 6 位纯数字密码重置码 (100000 ~ 999999)
@@ -121,6 +118,8 @@ export function getJwtSecret(secretOrEnv) {
   if (secretOrEnv && typeof secretOrEnv === 'object' && secretOrEnv.JWT_SECRET && typeof secretOrEnv.JWT_SECRET === 'string' && secretOrEnv.JWT_SECRET.trim()) {
     return secretOrEnv.JWT_SECRET.trim();
   }
+  // 双轨制：未配置环境变量时，使用受控内部兜底并在控制台输出安全警示
+  console.warn('[Security Warning] JWT_SECRET 环境变量未配置，使用内置默认安全密钥。建议在 Cloudflare 控制台配置 JWT_SECRET 环境变量以提升安全性。');
   return DEFAULT_JWT_SECRET;
 }
 
@@ -196,8 +195,9 @@ export async function verifyJwt(token, secretOrEnv) {
     if (!isValid) return null;
 
     const payload = JSON.parse(base64UrlDecode(encodedPayload));
-    if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) {
-      return null; // 已过期
+    if (!payload || typeof payload !== 'object') return null;
+    if (!payload.exp || typeof payload.exp !== 'number' || Math.floor(Date.now() / 1000) > payload.exp) {
+      return null; // 缺少 exp 或已过期
     }
     return payload;
   } catch (e) {
