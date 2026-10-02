@@ -668,7 +668,7 @@ const App = {
           window.location.hostname === '127.0.0.1' ||
           window.location.protocol === 'file:'
         );
-        const base = isLocal ? 'https://kaoyan-shuati.pages.dev' : '';
+        const base = isLocal ? 'https://kaoyan-shuati.enway.dpdns.org' : '';
         return `${base}${path}`;
       } catch (_) {
         return path;
