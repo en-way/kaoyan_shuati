@@ -660,6 +660,21 @@ const App = {
     isSyncing: false,
     _lastAdminResult: null,
 
+    // 智能 API 基础路径路由：当在本地运行（localhost/127.0.0.1/file:）时自动跨域路由到 Cloudflare 生产环境后端
+    getApiUrl(path) {
+      try {
+        const isLocal = typeof window !== 'undefined' && (
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1' ||
+          window.location.protocol === 'file:'
+        );
+        const base = isLocal ? 'https://kaoyan-shuati.pages.dev' : '';
+        return `${base}${path}`;
+      } catch (_) {
+        return path;
+      }
+    },
+
     init() {
       // 点击页面任意空白处关闭用户下拉菜单
       document.addEventListener('click', () => {
@@ -902,7 +917,7 @@ const App = {
         submitBtn.textContent = '登录中...';
         this.showNotice('', 'none');
 
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch(this.getApiUrl('/api/auth/login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
@@ -953,7 +968,7 @@ const App = {
         submitBtn.textContent = '注册中...';
         this.showNotice('', 'none');
 
-        const res = await fetch('/api/auth/register', {
+        const res = await fetch(this.getApiUrl('/api/auth/register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, nickname, password })
@@ -1004,7 +1019,7 @@ const App = {
         submitBtn.textContent = '重置中...';
         this.showNotice('', 'none');
 
-        const res = await fetch('/api/auth/reset-password', {
+        const res = await fetch(this.getApiUrl('/api/auth/reset-password'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, code, newPassword })
@@ -1094,7 +1109,7 @@ const App = {
           notice.style.display = 'block';
         }
 
-        const res = await fetch('/api/admin/verify-secret', {
+        const res = await fetch(this.getApiUrl('/api/admin/verify-secret'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1163,7 +1178,7 @@ const App = {
         submitBtn.textContent = '生成中...';
         notice.style.display = 'none';
 
-        const res = await fetch('/api/admin/generate-reset-code', {
+        const res = await fetch(this.getApiUrl('/api/admin/generate-reset-code'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1336,9 +1351,9 @@ const App = {
           return;
         }
 
-        const res = await fetch('/api/auth/me', {
+        const res = await fetch(this.getApiUrl('/api/auth/me'), {
           headers: { 'Authorization': `Bearer ${this.token}` },
-          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined
+          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined
         });
 
         if (res.status === 401) {
@@ -1432,14 +1447,14 @@ const App = {
         this.isSyncing = true;
         this.updateSyncUI();
 
-        const res = await fetch('/api/progress/sync', {
+        const res = await fetch(this.getApiUrl('/api/progress/sync'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${this.token}`
           },
           body: JSON.stringify({ ...compactData, dataHash: currentHash }),
-          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined
+          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined
         });
 
         if (res.status === 401) {
@@ -1474,7 +1489,13 @@ const App = {
       } catch (err) {
         console.error('Upload failed:', err);
         if (!isSilent) {
-          alert(`上传保存失败: ${err.message || err}`);
+          if (err && (err.name === 'TimeoutError' || (err.message && err.message.includes('timeout')))) {
+            alert('⚠️ 云端上传连接超时（15秒）。请检查您的网络连接或代理，本地做题记录完好保存在本机！');
+          } else if (err && err.message && err.message.includes('离线')) {
+            alert('⚠️ ' + err.message);
+          } else {
+            alert(`上传保存失败: ${err.message || err}`);
+          }
         }
       } finally {
         this.isSyncing = false;
@@ -1501,12 +1522,12 @@ const App = {
         this.updateSyncUI();
 
         const clientTime = this.lastSyncTime || 0;
-        const res = await fetch(`/api/progress/sync?clientTime=${clientTime}`, {
+        const res = await fetch(this.getApiUrl(`/api/progress/sync?clientTime=${clientTime}`), {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${this.token}`
           },
-          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(8000) : undefined
+          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined
         });
 
         if (res.status === 401) {
@@ -1550,7 +1571,13 @@ const App = {
       } catch (err) {
         console.error('Download failed:', err);
         if (!isSilent) {
-          alert(`下载失败: ${err.message || err}`);
+          if (err && (err.name === 'TimeoutError' || (err.message && err.message.includes('timeout')))) {
+            alert('⚠️ 云端下载连接超时（15秒）。请检查您的网络连接或代理，本地做题记录完好保存在本机！');
+          } else if (err && err.message && err.message.includes('离线')) {
+            alert('⚠️ ' + err.message);
+          } else {
+            alert(`从云端下载失败: ${err.message || err}`);
+          }
         }
       } finally {
         this.isSyncing = false;
