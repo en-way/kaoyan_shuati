@@ -2611,6 +2611,18 @@ kbd {
   animation: pulse-sync 2s infinite ease-in-out;
 }
 
+.btn-sync-pill.network-weak {
+  background: rgba(245, 158, 11, 0.16) !important;
+  border-color: rgba(245, 158, 11, 0.75) !important;
+  color: #f59e0b !important;
+  animation: pulse-sync 1.8s infinite ease-in-out;
+}
+
+.btn-sync-pill.network-weak:hover {
+  background: rgba(245, 158, 11, 0.25) !important;
+  border-color: #f59e0b !important;
+}
+
 @keyframes pulse-sync {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.03); }
@@ -3068,6 +3080,13 @@ kbd {
   border-color: rgba(255, 204, 0, 0.5);
   color: var(--accent-gold);
   animation: pulse-sync 2s infinite ease-in-out;
+}
+
+.m-cloud-btn-upload.network-weak {
+  background: rgba(245, 158, 11, 0.18) !important;
+  border-color: rgba(245, 158, 11, 0.75) !important;
+  color: #f59e0b !important;
+  animation: pulse-sync 1.8s infinite ease-in-out;
 }
 
 .m-cloud-btn-upload.syncing .m-cloud-icon {
@@ -3760,4 +3779,69 @@ kbd {
   border-color: rgba(0, 240, 255, 0.45);
   color: var(--accent-cyan);
   box-shadow: 0 0 12px rgba(0, 240, 255, 0.15);
+}
+
+/* ================== APP TOAST NOTIFICATIONS ================== */
+.app-toast-container {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  max-width: 90vw;
+}
+
+.app-toast {
+  pointer-events: auto;
+  padding: 8px 18px;
+  border-radius: 24px;
+  font-size: 13.5px;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  transform: translateY(-8px) scale(0.96);
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  word-break: break-word;
+  text-align: center;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.app-toast.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.app-toast.hide {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.96);
+}
+
+.app-toast.toast-info {
+  background: rgba(26, 32, 44, 0.92);
+  color: #f7fafc;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.app-toast.toast-success {
+  background: rgba(16, 185, 129, 0.94);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.app-toast.toast-warning {
+  background: rgba(245, 158, 11, 0.95);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.app-toast.toast-error {
+  background: rgba(239, 68, 68, 0.95);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }

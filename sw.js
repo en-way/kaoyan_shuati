@@ -1,18 +1,18 @@
 /**
- * 2027 考研政治 1000 题 · Service Worker (v26)
+ * 2027 考研政治 1000 题 · Service Worker (v27)
  * 缓存策略: Network-First (网络优先 + 离线缓存秒级降级)
  * 具备离线可用性，断网时自动启用本地题库与应用代码
  */
 
-const VERSION = 'v26';
+const VERSION = 'v27';
 const CACHE_NAME = `ky-quiz-${VERSION}`;
 
 // 核心 App Shell（轻量级，强保证秒级原子安装成功）
 const CORE_SHELL_ASSETS = [
   './',
   './index.html',
-  `./css/style.css?v=20270930_${VERSION}`,
-  `./js/app.js?v=20270930_${VERSION}`,
+  `./css/style.css?v=20271002_${VERSION}`,
+  `./js/app.js?v=20271002_${VERSION}`,
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

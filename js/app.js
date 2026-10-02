@@ -651,6 +651,33 @@ const App = {
     this.setFontSize(next, false);
   },
 
+  // 轻量级非阻塞 Toast 提示组件
+  showToast(message, type = 'info', duration = 3000) {
+    let container = document.getElementById('appToastContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'appToastContainer';
+      container.className = 'app-toast-container';
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `app-toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+
+    setTimeout(() => {
+      toast.classList.remove('show');
+      toast.classList.add('hide');
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 300);
+    }, duration);
+  },
+
   // ================== CLOUD USER AUTH & SYNC CONTROLLER ==================
   auth: {
     currentUser: null,
@@ -658,7 +685,60 @@ const App = {
     isDirty: false,
     lastSyncTime: localStorage.getItem('kaoyan_last_sync_time_2027') ? parseInt(localStorage.getItem('kaoyan_last_sync_time_2027'), 10) : null,
     isSyncing: false,
+    isNetworkWeak: false,
+    retryStatusText: '',
     _lastAdminResult: null,
+
+    // 高韧性网络请求引擎：弹性超时 (默认20s) + 指数退避重试 (Exponential Backoff, 1.5s / 3.0s)
+    async fetchWithRetry(url, options = {}, maxRetries = 2, timeoutMs = 20000, onRetry = null) {
+      let attempt = 0;
+      while (true) {
+        let timer = null;
+        let controller = null;
+        let signal = options.signal;
+
+        if (typeof AbortController !== 'undefined') {
+          controller = new AbortController();
+          timer = setTimeout(() => {
+            controller.abort(new DOMException('TimeoutError', 'TimeoutError'));
+          }, timeoutMs);
+          signal = controller.signal;
+        }
+
+        try {
+          const res = await fetch(url, { ...options, signal });
+          if (timer) clearTimeout(timer);
+
+          // 若遇到 Cloudflare 边缘临时网关抖动 (502, 503, 504)，且重试次数未耗尽，自动退避重试
+          if (res.status >= 502 && res.status <= 504 && attempt < maxRetries) {
+            attempt++;
+            const backoffMs = attempt === 1 ? 1500 : 3000;
+            if (typeof onRetry === 'function') {
+              onRetry(attempt, maxRetries, backoffMs, new Error(`HTTP ${res.status}`));
+            }
+            await new Promise(r => setTimeout(r, backoffMs));
+            continue;
+          }
+
+          return res;
+        } catch (err) {
+          if (timer) clearTimeout(timer);
+          const isTimeout = err.name === 'TimeoutError' || (err.message && err.message.toLowerCase().includes('timeout'));
+          const isNetworkErr = err.name === 'TypeError' || (err.message && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed')));
+
+          if ((isTimeout || isNetworkErr) && attempt < maxRetries) {
+            attempt++;
+            const backoffMs = attempt === 1 ? 1500 : 3000;
+            if (typeof onRetry === 'function') {
+              onRetry(attempt, maxRetries, backoffMs, err);
+            }
+            await new Promise(r => setTimeout(r, backoffMs));
+            continue;
+          }
+          throw err;
+        }
+      }
+    },
 
     // 智能 API 基础路径路由：当在本地运行（localhost/127.0.0.1/file:）时自动跨域路由到 Cloudflare 生产环境后端
     getApiUrl(path) {
@@ -679,6 +759,16 @@ const App = {
       // 点击页面任意空白处关闭用户下拉菜单
       document.addEventListener('click', () => {
         this.closeUserMenu();
+      });
+
+      // 监听网络恢复事件，当由离线/弱网转为在线且有未同步数据时，自动后台静默补传
+      window.addEventListener('online', () => {
+        console.log('[Network] Connection restored to online.');
+        if (this.token && (this.isDirty || this.isNetworkWeak)) {
+          this.uploadToCloud(true).catch(e => {
+            console.warn('[Network] Auto-resume upload deferred:', e);
+          });
+        }
       });
 
       // 初始化检查数据脏状态：若本地数据指纹与最后上传指纹不一致，或存在显式标脏标记，则自动恢复未保存黄灯提示
@@ -788,30 +878,47 @@ const App = {
       }
 
       if (this.isSyncing) {
+        const syncingLabel = this.retryStatusText || '保存中...';
         if (btnUploadCloud) {
           btnUploadCloud.classList.add('syncing');
-          btnUploadCloud.classList.remove('dirty');
+          btnUploadCloud.classList.remove('dirty', 'network-weak');
         }
         if (desktopSyncIcon) desktopSyncIcon.textContent = '🔄';
-        if (desktopSyncText) desktopSyncText.textContent = '保存中...';
+        if (desktopSyncText) desktopSyncText.textContent = syncingLabel;
 
         if (mBtnUploadCloud) {
           mBtnUploadCloud.classList.add('syncing');
-          mBtnUploadCloud.classList.remove('dirty');
+          mBtnUploadCloud.classList.remove('dirty', 'network-weak');
         }
         if (mCloudUploadIcon) mCloudUploadIcon.textContent = '🔄';
-        if (mCloudUploadText) mCloudUploadText.textContent = '保存中...';
-        if (mUserSyncStatus) mUserSyncStatus.textContent = '正在保存至云端...';
-      } else if (this.isDirty) {
+        if (mCloudUploadText) mCloudUploadText.textContent = syncingLabel;
+        if (mUserSyncStatus) mUserSyncStatus.textContent = this.retryStatusText ? `正在重试同步 (${this.retryStatusText})...` : '正在保存至云端...';
+      } else if (this.isNetworkWeak) {
         if (btnUploadCloud) {
           btnUploadCloud.classList.remove('syncing');
+          btnUploadCloud.classList.add('dirty', 'network-weak');
+        }
+        if (desktopSyncIcon) desktopSyncIcon.textContent = '⚠️';
+        if (desktopSyncText) desktopSyncText.textContent = '待同步 (网络弱)';
+
+        if (mBtnUploadCloud) {
+          mBtnUploadCloud.classList.remove('syncing');
+          mBtnUploadCloud.classList.add('dirty', 'network-weak');
+        }
+        if (mCloudUploadIcon) mCloudUploadIcon.textContent = '⚠️';
+        if (mCloudUploadText) mCloudUploadText.textContent = '待同步 (网络弱)';
+        if (mUserSyncStatus) mUserSyncStatus.textContent = '网络较弱，答题已暂存本地 (点击补传)';
+        if (menuSyncTime) menuSyncTime.textContent = `上次保存: ${timeStr} (⚠️ 弱网待同步)`;
+      } else if (this.isDirty) {
+        if (btnUploadCloud) {
+          btnUploadCloud.classList.remove('syncing', 'network-weak');
           btnUploadCloud.classList.add('dirty');
         }
         if (desktopSyncIcon) desktopSyncIcon.textContent = '🟡';
         if (desktopSyncText) desktopSyncText.textContent = '保存云端';
 
         if (mBtnUploadCloud) {
-          mBtnUploadCloud.classList.remove('syncing');
+          mBtnUploadCloud.classList.remove('syncing', 'network-weak');
           mBtnUploadCloud.classList.add('dirty');
         }
         if (mCloudUploadIcon) mCloudUploadIcon.textContent = '🟡';
@@ -820,13 +927,13 @@ const App = {
         if (menuSyncTime) menuSyncTime.textContent = `上次保存: ${timeStr} (有未上传)`;
       } else {
         if (btnUploadCloud) {
-          btnUploadCloud.classList.remove('syncing', 'dirty');
+          btnUploadCloud.classList.remove('syncing', 'dirty', 'network-weak');
         }
         if (desktopSyncIcon) desktopSyncIcon.textContent = '☁️';
         if (desktopSyncText) desktopSyncText.textContent = '已存云端';
 
         if (mBtnUploadCloud) {
-          mBtnUploadCloud.classList.remove('syncing', 'dirty');
+          mBtnUploadCloud.classList.remove('syncing', 'dirty', 'network-weak');
         }
         if (mCloudUploadIcon) mCloudUploadIcon.textContent = '☁️';
         if (mCloudUploadText) mCloudUploadText.textContent = '上传云端';
@@ -1353,7 +1460,7 @@ const App = {
 
         const res = await fetch(this.getApiUrl('/api/auth/me'), {
           headers: { 'Authorization': `Bearer ${this.token}` },
-          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined
+          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(20000) : undefined
         });
 
         if (res.status === 401) {
@@ -1415,7 +1522,7 @@ const App = {
       location.reload();
     },
 
-    // 功能 1：☁️ 上传到云端（带客户端与服务端双重防重复拦截，0请求/0写入）
+    // 功能 1：☁️ 上传到云端（带客户端与服务端双重防重复拦截，三级退避重试 + 20s 弹性超时）
     async uploadToCloud(isSilent = false) {
       if (!this.token) {
         if (!isSilent) this.openAuthModal('login');
@@ -1430,8 +1537,9 @@ const App = {
       // 客户端防重复拦截：数据未变化且无未保存操作，直接跳过请求，节省 100% Worker 请求与 D1 写入配额！
       if (!this.isDirty && lastUploadHash && lastUploadHash === currentHash) {
         if (!isSilent) {
-          alert('💡 当前做题进度已与云端一致，无需重复保存！');
+          App.showToast('💡 当前做题进度已与云端一致，无需重复保存！', 'info');
         }
+        this.isNetworkWeak = false;
         this.updateSyncUI();
         return;
       }
@@ -1445,17 +1553,26 @@ const App = {
 
       try {
         this.isSyncing = true;
+        this.retryStatusText = '';
         this.updateSyncUI();
 
-        const res = await fetch(this.getApiUrl('/api/progress/sync'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.token}`
+        const res = await this.fetchWithRetry(
+          this.getApiUrl('/api/progress/sync'),
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.token}`
+            },
+            body: JSON.stringify({ ...compactData, dataHash: currentHash })
           },
-          body: JSON.stringify({ ...compactData, dataHash: currentHash }),
-          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined
-        });
+          2,     // maxRetries = 2
+          20000, // timeoutMs = 20s
+          (attempt, maxRetries) => {
+            this.retryStatusText = `重试中 (${attempt}/${maxRetries})...`;
+            this.updateSyncUI();
+          }
+        );
 
         if (res.status === 401) {
           this.handleSessionExpired(isSilent);
@@ -1477,33 +1594,40 @@ const App = {
         localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(updatedCompact));
         localStorage.removeItem('kaoyan_is_dirty_2027');
         this.isDirty = false;
+        this.isNetworkWeak = false;
+        this.retryStatusText = '';
         this.updateSyncUI();
 
         if (!isSilent) {
           if (data.notModified) {
-            alert('💡 当前做题进度已与云端一致，无需重复保存！');
+            App.showToast('💡 当前做题进度已与云端一致，无需重复保存！', 'info');
           } else {
-            alert('☁️ 当前最新做题记录与错题本已成功保存至云端数据库！');
+            App.showToast('☁️ 当前最新做题记录与错题本已成功保存至云端！', 'success');
           }
         }
       } catch (err) {
         console.error('Upload failed:', err);
+        this.isNetworkWeak = true;
+        this.isDirty = true;
+        this.retryStatusText = '';
+        this.updateSyncUI();
+
         if (!isSilent) {
-          if (err && (err.name === 'TimeoutError' || (err.message && err.message.includes('timeout')))) {
-            alert('⚠️ 云端上传连接超时（15秒）。请检查您的网络连接或代理，本地做题记录完好保存在本机！');
-          } else if (err && err.message && err.message.includes('离线')) {
-            alert('⚠️ ' + err.message);
+          const isTimeout = err && (err.name === 'TimeoutError' || (err.message && err.message.toLowerCase().includes('timeout')));
+          if (isTimeout) {
+            App.showToast('⚠️ 网络连接较弱（已重试2次）。答题进度已暂存本地，联网后自动同步！', 'warning', 4000);
           } else {
-            alert(`上传保存失败: ${err.message || err}`);
+            App.showToast(`⚠️ 云端连接异常，答题已暂存本机（${err.message || '网络不稳定'}）`, 'warning', 4000);
           }
         }
       } finally {
         this.isSyncing = false;
+        this.retryStatusText = '';
         this.updateSyncUI();
       }
     },
 
-    // 功能 2：📥 从云端下载（带增量时间戳比对，防全量无用传输与覆盖）
+    // 功能 2：📥 从云端下载（带增量时间戳比对，三级退避重试 + 20s 弹性超时）
     async downloadFromCloud(isSilent = false) {
       if (!this.token) {
         if (!isSilent) this.openAuthModal('login');
@@ -1519,16 +1643,25 @@ const App = {
 
       try {
         this.isSyncing = true;
+        this.retryStatusText = '';
         this.updateSyncUI();
 
         const clientTime = this.lastSyncTime || 0;
-        const res = await fetch(this.getApiUrl(`/api/progress/sync?clientTime=${clientTime}`), {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${this.token}`
+        const res = await this.fetchWithRetry(
+          this.getApiUrl(`/api/progress/sync?clientTime=${clientTime}`),
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${this.token}`
+            }
           },
-          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined
-        });
+          2,     // maxRetries = 2
+          20000, // timeoutMs = 20s
+          (attempt, maxRetries) => {
+            this.retryStatusText = `重试中 (${attempt}/${maxRetries})...`;
+            this.updateSyncUI();
+          }
+        );
 
         if (res.status === 401) {
           this.handleSessionExpired(isSilent);
@@ -1546,10 +1679,10 @@ const App = {
 
         // 云端未变动防重复覆盖（节省宽带与无意义 DOM 重载）
         if (data.notModified) {
-          // 注意：切勿清空 this.isDirty，保留本地离线修改待保存状态
+          this.isNetworkWeak = false;
           this.updateSyncUI();
           if (!isSilent) {
-            alert('💡 云端数据与本机一致（无更新），无需重复覆盖！');
+            App.showToast('💡 云端数据与本机一致（无更新），无需重复覆盖！', 'info');
           }
           return;
         }
@@ -1562,25 +1695,30 @@ const App = {
         localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(newCompact));
         localStorage.removeItem('kaoyan_is_dirty_2027');
         this.isDirty = false;
+        this.isNetworkWeak = false;
+        this.retryStatusText = '';
         this.updateSyncUI();
 
         if (!isSilent) {
-          alert('📥 云端数据同步成功！即将刷新页面呈现最新进度。');
-          location.reload();
+          App.showToast('📥 云端数据同步成功！即将刷新呈现最新进度...', 'success', 2000);
+          setTimeout(() => location.reload(), 1200);
         }
       } catch (err) {
         console.error('Download failed:', err);
+        this.isNetworkWeak = true;
+        this.updateSyncUI();
+
         if (!isSilent) {
-          if (err && (err.name === 'TimeoutError' || (err.message && err.message.includes('timeout')))) {
-            alert('⚠️ 云端下载连接超时（15秒）。请检查您的网络连接或代理，本地做题记录完好保存在本机！');
-          } else if (err && err.message && err.message.includes('离线')) {
-            alert('⚠️ ' + err.message);
+          const isTimeout = err && (err.name === 'TimeoutError' || (err.message && err.message.toLowerCase().includes('timeout')));
+          if (isTimeout) {
+            App.showToast('⚠️ 云端下载超时（已重试2次）。请检查网络，本机答题记录完好保留！', 'warning', 4000);
           } else {
-            alert(`从云端下载失败: ${err.message || err}`);
+            App.showToast(`⚠️ 从云端下载失败: ${err.message || '网络不稳定'}`, 'warning', 4000);
           }
         }
       } finally {
         this.isSyncing = false;
+        this.retryStatusText = '';
         this.updateSyncUI();
       }
     },

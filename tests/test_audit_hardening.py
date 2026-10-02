@@ -124,8 +124,8 @@ def test_module3_pwa_and_storage_resilience():
     with open(APP_JS, 'r', encoding='utf-8') as f:
         app_src = f.read()
 
-    # 1. Service Worker v26 & Promise.allSettled for large data assets
-    assert ("VERSION = 'v26'" in sw_src or "VERSION = 'v25'" in sw_src), "sw.js must be bumped to VERSION = 'v26'"
+    # 1. Service Worker v27 & Promise.allSettled for large data assets
+    assert ("VERSION = 'v27'" in sw_src or "VERSION = 'v26'" in sw_src or "VERSION = 'v25'" in sw_src), "sw.js must be bumped to VERSION = 'v27'"
     assert "Promise.allSettled" in sw_src, "sw.js install must use Promise.allSettled for LARGE_DATA_ASSETS"
     assert "name.startsWith('ky-quiz-')" in sw_src, "sw.js activate must safely prune only ky-quiz- caches"
     assert "url.pathname.includes('/api/')" in sw_src, "sw.js fetch must use includes('/api/') for subfolder support"
@@ -181,7 +181,7 @@ def test_module4_ui_ux_and_responsive():
     print("  ✓ PC exam panel internal scroll, <=360px compact bar, safe-areas & typography verified")
 
 def test_module5_quota_and_sync_integrity():
-    print("[5/5] Testing Module 5: Cloudflare Free Quota Protection & Sync Untouched...")
+    print("[5/6] Testing Module 5: Cloudflare Free Quota Protection & Sync Untouched...")
     with open(APP_JS, 'r', encoding='utf-8') as f:
         app_src = f.read()
     with open(SYNC_JS, 'r', encoding='utf-8') as f:
@@ -199,8 +199,49 @@ def test_module5_quota_and_sync_integrity():
     assert 'status: 409' not in sync_src, "sync.js must NOT introduce 409 conflict aborts"
     print("  ✓ 2-hour quota throttle, client exp precheck & sync.js pristine integrity verified")
 
+def test_module6_network_resilience_and_retry():
+    print("[6/6] Testing Module 6: Network Resilience, Retry Engine (v27) & Non-blocking Feedback...")
+    with open(APP_JS, 'r', encoding='utf-8') as f:
+        app_src = f.read()
+    with open(STYLE_CSS, 'r', encoding='utf-8') as f:
+        css = f.read()
+
+    # 1. fetchWithRetry engine declaration
+    assert "async fetchWithRetry(url, options = {}, maxRetries = 2, timeoutMs = 20000" in app_src, \
+        "App.auth must implement fetchWithRetry with 20s default timeout and 2 max retries"
+
+    # 2. Exponential backoff intervals (1500ms, 3000ms)
+    assert "attempt === 1 ? 1500 : 3000" in app_src, \
+        "fetchWithRetry must use 1.5s / 3.0s exponential backoff"
+
+    # 3. Dynamic retry status in uploadToCloud and downloadFromCloud
+    assert "this.retryStatusText = `重试中 (${attempt}/${maxRetries})...`;" in app_src, \
+        "uploadToCloud and downloadFromCloud must report real-time retry status"
+
+    # 4. Non-blocking App.showToast notification method & container styles
+    assert "showToast(message, type = 'info', duration = 3000)" in app_src, \
+        "App must implement showToast non-blocking notification"
+    assert ".app-toast-container" in css and ".app-toast" in css, \
+        "style.css must define .app-toast-container and .app-toast"
+
+    # 5. Online event listener for automatic background sync
+    assert "window.addEventListener('online'" in app_src, \
+        "App.auth.init must register online event listener for auto-resume sync"
+
+    # 6. Weak network warning state indicator in updateSyncUI and CSS
+    assert "待同步 (网络弱)" in app_src, \
+        "updateSyncUI must render 待同步 (网络弱) badge when isNetworkWeak is true"
+    assert ".btn-sync-pill.network-weak" in css and ".m-cloud-btn-upload.network-weak" in css, \
+        "style.css must style .network-weak buttons"
+
+    # 7. CheckSession timeout upgraded to 20s
+    assert "AbortSignal.timeout(20000)" in app_src, \
+        "checkSession must use 20000ms timeout"
+
+    print("  ✓ 20s elastic timeout, 2x retry backoff, online auto-resume & non-blocking toast verified")
+
 if __name__ == '__main__':
-    print("=== Multi-Agent Audit Hardening (v25) Test Suite ===")
+    print("=== Multi-Agent Audit Hardening (v27) Test Suite ===")
     try:
         test_module0_syntax_compilation()
         test_module1_practice_engine()
@@ -208,7 +249,8 @@ if __name__ == '__main__':
         test_module3_pwa_and_storage_resilience()
         test_module4_ui_ux_and_responsive()
         test_module5_quota_and_sync_integrity()
-        print("\nAll 6 audit hardening modules passed successfully! 🚀")
+        test_module6_network_resilience_and_retry()
+        print("\nAll 7 audit hardening modules passed successfully! 🚀")
         sys.exit(0)
     except AssertionError as e:
         print(f"\n❌ Test Failed: {e}")
