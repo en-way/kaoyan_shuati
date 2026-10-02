@@ -596,7 +596,6 @@ const App = {
       await DB.init();
       this.auth.init();
       this.loadOverview();
-      this.initLanUrl();
     } catch (err) {
       console.error('[App.init] Error during initialization:', err);
     }
@@ -2965,35 +2964,6 @@ const App = {
     }
   },
 
-  // ================== LAN / MOBILE ==================
-  initLanUrl() {
-    const box = document.getElementById('lanUrlBox');
-    if (box) {
-      box.textContent = window.location.href;
-    }
-  },
-
-  openLanModal() {
-    const modal = document.getElementById('lanModal');
-    if (modal) modal.style.display = 'flex';
-    this.updateBodyScrollLock();
-  },
-
-  closeLanModal() {
-    const modal = document.getElementById('lanModal');
-    if (modal) modal.style.display = 'none';
-    this.updateBodyScrollLock();
-  },
-
-  copyLanUrl() {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url).then(() => {
-      alert('链接已复制，在手机/iPad浏览器中粘贴即可打开！');
-    }).catch(() => {
-      alert('复制失败，请手动复制：' + url);
-    });
-  },
-
   // ================== MOBILE MORE MENU ==================
   openMoreMenu() {
     const modal = document.getElementById('moreMenuModal');
@@ -3075,7 +3045,6 @@ const App = {
     const modalIds = [
       'authModal',
       'adminModal',
-      'lanModal',
       'moreMenuModal',
       'modeSelectModal',
       'questionMoreModal',
@@ -3134,7 +3103,6 @@ const App = {
       if (tag === 'input' || tag === 'textarea' || tag === 'select') {
         if (e.key === 'Escape') {
           this.closeDrawer();
-          this.closeLanModal();
           this.closeMoreMenu();
           this.closeModeSelect();
           this.closeQuestionMoreMenu();
@@ -3145,7 +3113,6 @@ const App = {
 
       if (e.key === 'Escape') {
         this.closeDrawer();
-        this.closeLanModal();
         this.closeMoreMenu();
         this.closeModeSelect();
         this.closeQuestionMoreMenu();
