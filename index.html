@@ -19,8 +19,9 @@
   <!-- 极端缓存自愈与容错防护：若旧版缓存抛出 SyntaxError 或 App 未定义，自动秒级清理 Service Worker 缓存并恢复 -->
   <script>
     window.addEventListener('error', function(e) {
-      if (e && e.message && (e.message.indexOf('SyntaxError') !== -1 || e.message.indexOf('App is not defined') !== -1 || e.message.indexOf('Unexpected token') !== -1)) {
-        console.warn('[Self-Healing] Detected stale cached script issue, purging caches and re-registering...');
+      var isAppError = e && e.filename && e.filename.indexOf('app.js') !== -1;
+      if (isAppError && e.message && (e.message.indexOf('SyntaxError') !== -1 || e.message.indexOf('Unexpected token') !== -1)) {
+        console.warn('[Self-Healing] Detected stale cached script issue in app.js, purging caches...');
         if ('caches' in window) {
           caches.keys().then(function(names) {
             names.forEach(function(n) { if (n.indexOf('ky-quiz') !== -1) caches.delete(n); });

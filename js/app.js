@@ -2788,10 +2788,11 @@ const App = {
         window.addEventListener('load', doRegister);
       }
 
-      // 当新的 SW 接管时自动安全刷新页面，确保用户无缝获取最新版本
+      // 只有在之前已有旧版 SW 控制页面（即发生了版本升级更新）时，才在接管后自动重载，避免首次访问时无谓刷新
+      const hadPreviousController = !!navigator.serviceWorker.controller;
       let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
+        if (!refreshing && hadPreviousController) {
           refreshing = true;
           window.location.reload();
         }
