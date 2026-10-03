@@ -3,6 +3,8 @@ import {
   jsonResponse,
   errorResponse
 } from '../../utils/auth.js';
+import { readJsonBody, handleError } from '../../utils/http.js';
+import { MAX_SYNC_BODY_BYTES } from '../../utils/constants.js';
 
 export async function onRequestOptions() {
   return jsonResponse({}, 200);
@@ -124,7 +126,7 @@ export async function onRequestGet(context) {
       updatedAt: row.updated_at
     });
   } catch (err) {
-    return errorResponse(`拉取云端进度失败: ${err.message || err}`, 500);
+    return handleError(err, 'progress/sync:get');
   }
 }
 
@@ -143,9 +145,9 @@ export async function onRequestPost(context) {
 
   let body;
   try {
-    body = await request.json();
+    body = await readJsonBody(request, MAX_SYNC_BODY_BYTES);
   } catch (e) {
-    return errorResponse('请求参数格式错误 (需为 JSON)', 400);
+    return handleError(e, 'progress/sync:parse');
   }
 
   const { answers: localAnswers, mistakes: localMistakes } = body || {};
@@ -225,6 +227,6 @@ export async function onRequestPost(context) {
       message: '云端做题数据保存成功'
     });
   } catch (err) {
-    return errorResponse(`同步做题数据失败: ${err.message || err}`, 500);
+    return handleError(err, 'progress/sync:post');
   }
 }

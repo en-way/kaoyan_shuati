@@ -4,15 +4,17 @@
  * 具备离线可用性，断网时自动启用本地题库与应用代码
  */
 
-const VERSION = 'v27';
+const VERSION = 'v28';
 const CACHE_NAME = `ky-quiz-${VERSION}`;
 
 // 核心 App Shell（轻量级，强保证秒级原子安装成功）
 const CORE_SHELL_ASSETS = [
   './',
   './index.html',
-  `./css/style.css?v=20271002_${VERSION}`,
-  `./js/app.js?v=20271002_${VERSION}`,
+  `./css/style.css?v=20271003_${VERSION}`,
+  `./js/config.js?v=20271003_${VERSION}`,
+  `./js/api.js?v=20271003_${VERSION}`,
+  `./js/app.js?v=20271003_${VERSION}`,
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

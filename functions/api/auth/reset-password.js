@@ -1,130 +1,93 @@
 import {
   generateSalt,
   hashPassword,
+  hashResetCode,
   signJwt,
-  jsonResponse,
-  errorResponse,
   timingSafeEqualStr
 } from '../../utils/auth.js';
+import { jsonResponse, handleError, requireDb, readJsonBody, HttpError } from '../../utils/http.js';
+import { normalizeUsername, assertPassword } from '../../utils/validate.js';
+import { MAX_AUTH_BODY_BYTES, RESET_CODE_MAX_ATTEMPTS } from '../../utils/constants.js';
 
-export async function onRequestOptions() {
-  return jsonResponse({}, 200);
-}
-
-export async function onRequestPost(context) {
-  const { request, env } = context;
-
-  if (!env.DB) {
-    return errorResponse('Cloudflare D1 数据库未绑定 (DB 未在 Pages 设置中绑定)', 500);
-  }
-
-  let body;
+export async function onRequestPost({ request, env }) {
   try {
-    body = await request.json();
-  } catch (e) {
-    return errorResponse('请求参数格式错误 (必须为有效 JSON)', 400);
-  }
+    const db = requireDb(env);
+    const body = await readJsonBody(request, MAX_AUTH_BODY_BYTES);
 
-  let { username, code, newPassword } = body || {};
-
-  if (!username || typeof username !== 'string') {
-    return errorResponse('请输入账号', 400);
-  }
-  username = username.trim().toLowerCase();
-
-  if (!code || typeof code !== 'string') {
-    return errorResponse('请输入 6 位密码重置码', 400);
-  }
-  code = code.trim();
-
-  if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
-    return errorResponse('新密码长度不能少于 6 位', 400);
-  }
-
-  try {
-    // 1. 查询该学员账号最新且未被使用的重置码记录
-    const resetRecord = await env.DB.prepare(
-      'SELECT id, code, expires_at, used, failed_attempts FROM password_resets WHERE username = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'
-    ).bind(username).first();
-
-    if (!resetRecord) {
-      return errorResponse('该账号暂无有效的密码重置码，请联系管理员重新获取', 400);
-    }
+    const username = normalizeUsername(body.username);
+    const code = typeof body.code === 'string' ? body.code.trim() : '';
+    if (!username) throw new HttpError(400, '请输入账号');
+    if (!/^\d{6}$/.test(code)) throw new HttpError(400, '请输入 6 位数字密码重置码');
+    assertPassword(body.newPassword);
 
     const now = Date.now();
-    if (now > resetRecord.expires_at) {
-      return errorResponse('重置码已过期（有效时长为 15 分钟），请联系管理员重新生成', 400);
-    }
 
-    const failedAttempts = resetRecord.failed_attempts || 0;
-
-    // 检查防爆破限制：输错达到 5 次立即作废
-    if (failedAttempts >= 5) {
-      await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
-      return errorResponse('该重置码因连续输错超过 5 次已被系统安全作废，请联系管理员重新生成', 400);
-    }
-
-    // 恒定时间校验重置码
-    const isCodeMatch = await timingSafeEqualStr(code, resetRecord.code);
-    if (!isCodeMatch) {
-      // 原子自增错误计数，防并发多端绕过
-      await env.DB.prepare(
-        'UPDATE password_resets SET failed_attempts = failed_attempts + 1 WHERE id = ?'
-      ).bind(resetRecord.id).run();
-
-      const nextFailed = failedAttempts + 1;
-      if (nextFailed >= 5) {
-        await env.DB.prepare('UPDATE password_resets SET used = 1 WHERE id = ?').bind(resetRecord.id).run();
-        return errorResponse('重置码错误！连续输错达到 5 次，该重置码已立即安全作废，请联系管理员重新生成', 400);
-      } else {
-        const remain = 5 - nextFailed;
-        return errorResponse(`重置码错误，请重新核对输入（还剩 ${remain} 次尝试机会）`, 400);
-      }
-    }
-
-    // 2. 查询用户
-    const user = await env.DB.prepare(
-      'SELECT id, username, nickname FROM users WHERE username = ?'
+    // 1. 取该账号最新且未使用的重置码记录
+    const record = await db.prepare(
+      'SELECT id, code, expires_at, failed_attempts FROM password_resets WHERE username = ? AND used = 0 ORDER BY created_at DESC LIMIT 1'
     ).bind(username).first();
 
-    if (!user) {
-      return errorResponse('关联的用户不存在', 404);
+    if (!record) {
+      throw new HttpError(400, '该账号暂无有效的密码重置码，请联系管理员重新获取', 'RESET_CODE_MISSING');
+    }
+    if (now > record.expires_at) {
+      throw new HttpError(400, '重置码已过期，请联系管理员重新生成', 'RESET_CODE_EXPIRED');
     }
 
-    // 3. 生成新盐与新哈希
-    const newSalt = generateSalt();
-    const newPasswordHash = await hashPassword(newPassword, newSalt);
+    // 2. 原子抢占「尝试名额」：条件写在 UPDATE 的 WHERE 里，D1 对写入串行执行，
+    //    因此无论并发多少，最多只有 RESET_CODE_MAX_ATTEMPTS 个请求能走到下面的比对。
+    const claim = await db.prepare(
+      'UPDATE password_resets SET failed_attempts = failed_attempts + 1 WHERE id = ? AND used = 0 AND failed_attempts < ? AND expires_at > ?'
+    ).bind(record.id, RESET_CODE_MAX_ATTEMPTS, now).run();
 
-    // 4. 更新密码并使当前重置码作废 (单次使用)，顺便清理历史过期记录
-    await env.DB.batch([
-      env.DB.prepare(
-        'UPDATE users SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ?'
-      ).bind(newPasswordHash, newSalt, now, user.id),
-      env.DB.prepare(
-        'UPDATE password_resets SET used = 1 WHERE id = ?'
-      ).bind(resetRecord.id),
-      env.DB.prepare(
-        'DELETE FROM password_resets WHERE expires_at < ?'
-      ).bind(now)
+    if (!claim.meta || claim.meta.changes !== 1) {
+      throw new HttpError(400, '重置码已失效（输错次数过多或已过期），请联系管理员重新生成', 'RESET_CODE_LOCKED');
+    }
+
+    // 3. 恒定时间比对 HMAC 后的重置码
+    const givenHash = await hashResetCode(username, code, env);
+    if (!(await timingSafeEqualStr(givenHash, record.code))) {
+      const attemptNo = (record.failed_attempts || 0) + 1;
+      const remain = Math.max(0, RESET_CODE_MAX_ATTEMPTS - attemptNo);
+      throw new HttpError(
+        400,
+        remain > 0
+          ? `重置码错误，请重新核对（还剩 ${remain} 次尝试机会）`
+          : '重置码错误且尝试次数已用尽，该重置码已作废，请联系管理员重新生成',
+        'RESET_CODE_INVALID'
+      );
+    }
+
+    const user = await db.prepare('SELECT id, username, nickname FROM users WHERE username = ?')
+      .bind(username).first();
+    if (!user) throw new HttpError(404, '关联的用户不存在');
+
+    // 4. 原子「消费」重置码：只有把 used 0->1 成功的那一个请求才能继续改密码（防双花）
+    const consume = await db.prepare(
+      'UPDATE password_resets SET used = 1 WHERE id = ? AND used = 0'
+    ).bind(record.id).run();
+    if (!consume.meta || consume.meta.changes !== 1) {
+      throw new HttpError(400, '该重置码已被使用，请联系管理员重新生成', 'RESET_CODE_USED');
+    }
+
+    // 5. 更新密码(同时刷新 users.updated_at => 使旧 JWT 失效)，并顺带清理过期记录
+    const newSalt = generateSalt();
+    const newHash = await hashPassword(body.newPassword, newSalt);
+    await db.batch([
+      db.prepare('UPDATE users SET password_hash = ?, salt = ?, updated_at = ? WHERE id = ?')
+        .bind(newHash, newSalt, now, user.id),
+      db.prepare('DELETE FROM password_resets WHERE expires_at < ?').bind(now)
     ]);
 
-    // 5. 签发全新 JWT 凭证，实现重置后自动静默登录
-    const token = await signJwt(
-      { id: user.id, username: user.username, nickname: user.nickname },
-      env
-    );
+    const token = await signJwt({ id: user.id, username: user.username, nickname: user.nickname }, env);
 
     return jsonResponse({
       success: true,
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        nickname: user.nickname
-      },
+      user: { id: user.id, username: user.username, nickname: user.nickname },
       message: '密码重置成功！已自动为您登录并恢复学习'
     });
   } catch (err) {
-    return errorResponse(`重置密码失败: ${err.message || err}`, 500);
+    return handleError(err, 'auth/reset-password');
   }
 }

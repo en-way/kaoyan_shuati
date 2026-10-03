@@ -1,81 +1,38 @@
-import {
-  generate6DigitCode,
-  jsonResponse,
-  errorResponse,
-  timingSafeEqualStr
-} from '../../utils/auth.js';
+import { generate6DigitCode, hashResetCode } from '../../utils/auth.js';
+import { assertAdmin } from '../../utils/admin.js';
+import { jsonResponse, handleError, requireDb, readJsonBody, HttpError } from '../../utils/http.js';
+import { normalizeUsername } from '../../utils/validate.js';
+import { MAX_AUTH_BODY_BYTES, RESET_CODE_TTL_MS, RESET_CODE_TTL_MINUTES } from '../../utils/constants.js';
 
-export async function onRequestOptions() {
-  return jsonResponse({}, 200);
-}
-
-export async function onRequestPost(context) {
-  const { request, env } = context;
-
-  if (!env.DB) {
-    return errorResponse('Cloudflare D1 数据库未绑定 (DB 未在 Pages 设置中绑定)', 500);
-  }
-
-  let body = {};
+export async function onRequestPost({ request, env }) {
   try {
-    body = await request.json();
-  } catch (e) {
-    // allow empty body if params in header
-  }
+    const db = requireDb(env);
+    // 允许仅用请求头携带密钥的空 body
+    const body = await readJsonBody(request, MAX_AUTH_BODY_BYTES).catch(() => ({}));
+    await assertAdmin(request, env, body);
 
-  const headerSecret = request.headers.get('x-admin-secret');
-  const providedSecret = (headerSecret || body.adminSecret || '').trim();
+    const username = normalizeUsername(body.username);
+    if (!username) throw new HttpError(400, '请输入需要重置密码的学员账号/用户名');
 
-  const configuredSecret = env.ADMIN_SECRET ? env.ADMIN_SECRET.trim() : null;
-  if (!configuredSecret) {
-    return errorResponse(
-      '服务端安全限制：Cloudflare Pages 环境变量中尚未配置 ADMIN_SECRET，管理员功能未启用。请前往 Cloudflare Pages 后台「设置 -> 环境变量」添加 ADMIN_SECRET 密钥后再使用。',
-      500
-    );
-  }
-
-  if (!providedSecret) {
-    return errorResponse('请输入管理员密钥', 400);
-  }
-
-  const isMatch = await timingSafeEqualStr(providedSecret, configuredSecret);
-  if (!isMatch) {
-    return errorResponse('管理员口令/密钥错误，无权生成重置码', 403);
-  }
-
-  let username = (body.username || '').trim().toLowerCase();
-  if (!username) {
-    return errorResponse('请输入需要重置密码的学员账号/用户名', 400);
-  }
-
-  try {
-    // 检查学员用户是否存在
-    const user = await env.DB.prepare(
-      'SELECT id, username, nickname FROM users WHERE username = ?'
-    ).bind(username).first();
-
+    const user = await db.prepare('SELECT id, username, nickname FROM users WHERE username = ?')
+      .bind(username).first();
     if (!user) {
-      return errorResponse(`未找到账号为「${username}」的学员，请核对账号是否正确`, 404);
+      throw new HttpError(404, `未找到账号为「${username}」的学员，请核对账号是否正确`);
     }
 
-    // 生成 6 位随机重置码
     const code = generate6DigitCode();
-    const id = crypto.randomUUID();
     const now = Date.now();
-    const expiresAt = now + (15 * 60 * 1000); // 15分钟有效 (高安全方案)
+    const expiresAt = now + RESET_CODE_TTL_MS;
+    // 库中只存 HMAC，明文码仅在本次响应中返回一次
+    const codeHash = await hashResetCode(user.username, code, env);
 
-    // 插入新重置码前，先原子作废该用户此前未使用的旧重置码，保证单用户时刻最多只有一个有效重置码
-    // 顺便原子清理已过期或已使用的旧记录，防止数据表长期膨胀
-    await env.DB.batch([
-      env.DB.prepare(
-        'UPDATE password_resets SET used = 1 WHERE username = ? AND used = 0'
-      ).bind(username),
-      env.DB.prepare(
+    // 原子批处理：作废旧码 -> 写入新码 -> 清理过期/已用记录
+    await db.batch([
+      db.prepare('UPDATE password_resets SET used = 1 WHERE username = ? AND used = 0').bind(user.username),
+      db.prepare(
         'INSERT INTO password_resets (id, username, code, created_at, expires_at, used, failed_attempts) VALUES (?, ?, ?, ?, ?, 0, 0)'
-      ).bind(id, username, code, now, expiresAt),
-      env.DB.prepare(
-        'DELETE FROM password_resets WHERE expires_at < ? OR used = 1'
-      ).bind(now)
+      ).bind(crypto.randomUUID(), user.username, codeHash, now, expiresAt),
+      db.prepare('DELETE FROM password_resets WHERE expires_at < ? OR used = 1').bind(now)
     ]);
 
     return jsonResponse({
@@ -84,10 +41,10 @@ export async function onRequestPost(context) {
       username: user.username,
       nickname: user.nickname,
       expiresAt,
-      expiresInMinutes: 15,
-      message: `重置码生成成功！请在 15 分钟内发给学员使用（连续输错 5 次将作废）。`
+      expiresInMinutes: RESET_CODE_TTL_MINUTES,
+      message: `重置码生成成功！请在 ${RESET_CODE_TTL_MINUTES} 分钟内发给学员使用（连续输错 5 次将作废）。`
     });
   } catch (err) {
-    return errorResponse(`生成重置码失败: ${err.message || err}`, 500);
+    return handleError(err, 'admin/generate-reset-code');
   }
 }

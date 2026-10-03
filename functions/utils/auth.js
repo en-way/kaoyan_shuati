@@ -2,15 +2,33 @@
  * 考研政治 1000 题 · 原生 Web Crypto 安全工具库
  * 零第三方 npm 依赖，完美兼容 Cloudflare Pages / Workers 原生执行环境
  */
+import {
+  JWT_TTL_SECONDS,
+  LEGACY_DEFAULT_JWT_SECRET,
+  PBKDF2_ITERATIONS,
+  MAX_PASSWORD_LENGTH
+} from './constants.js';
+import { ErrorCode } from './http.js';
 
-// 辅助：Uint8Array 转 Hex 字符串
+// 向后兼容：sync.js 仍从 auth.js 引入这两个函数
+export { jsonResponse, errorResponse } from './http.js';
+
+// 配置缺失异常（handleError 会统一转为 500 且不泄露细节）
+export class ConfigError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ConfigError';
+    this.code = ErrorCode.CONFIG_ERROR;
+  }
+}
+
+// ---------- 编码辅助 ----------
 export function bytesToHex(bytes) {
   return Array.from(bytes)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
 
-// 辅助：Hex 字符串转 Uint8Array
 export function hexToBytes(hex) {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
@@ -19,214 +37,184 @@ export function hexToBytes(hex) {
   return bytes;
 }
 
-// 辅助：Base64URL 编码与解码
-export function base64UrlEncode(str) {
-  const utf8Bytes = new TextEncoder().encode(str);
+function bytesToBase64Url(bytes) {
   let binary = '';
-  for (let i = 0; i < utf8Bytes.length; i++) {
-    binary += String.fromCharCode(utf8Bytes[i]);
-  }
-  return btoa(binary)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64UrlToBytes(str) {
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) base64 += '=';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+export function base64UrlEncode(str) {
+  return bytesToBase64Url(new TextEncoder().encode(str));
 }
 
 export function base64UrlDecode(str) {
-  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-  while (base64.length % 4) {
-    base64 += '=';
-  }
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return new TextDecoder().decode(bytes);
+  return new TextDecoder().decode(base64UrlToBytes(str));
 }
 
-// 1. 生成 16 字节安全随机盐
+// ---------- 密码哈希 (PBKDF2-SHA256) ----------
 export function generateSalt() {
   const salt = new Uint8Array(16);
   crypto.getRandomValues(salt);
   return bytesToHex(salt);
 }
 
-// 2. PBKDF2 安全密码哈希配置 (Cloudflare Free 版 10ms CPU 最佳实践：20,000 次；同时向下兼容 100,000 次)
-export const PBKDF2_DEFAULT_ITERATIONS = 20000;
-export const PBKDF2_LEGACY_ITERATIONS = 100000;
-
-export async function hashPassword(password, saltHex, iterations = PBKDF2_DEFAULT_ITERATIONS) {
-  const enc = new TextEncoder();
+export async function hashPassword(password, saltHex, iterations = PBKDF2_ITERATIONS) {
   const passKey = await crypto.subtle.importKey(
     'raw',
-    enc.encode(password),
+    new TextEncoder().encode(password),
     'PBKDF2',
     false,
     ['deriveBits']
   );
-
-  const saltBytes = hexToBytes(saltHex);
   const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: saltBytes,
-      iterations: iterations,
-      hash: 'SHA-256'
-    },
+    { name: 'PBKDF2', salt: hexToBytes(saltHex), iterations, hash: 'SHA-256' },
     passKey,
     256
   );
-
   return bytesToHex(new Uint8Array(derivedBits));
 }
 
-// 3. 校验密码是否匹配（严格使用 20k 次迭代，耗时 5~7ms 稳控在 Worker 10ms CPU 限额内）
-export async function verifyPassword(password, saltHex, targetHash) {
-  const hash = await hashPassword(password, saltHex, PBKDF2_DEFAULT_ITERATIONS);
-  return hash === targetHash;
-}
-
-// 4. 生成 6 位纯数字密码重置码 (100000 ~ 999999)
-export function generate6DigitCode() {
-  const randomBuffer = new Uint32Array(1);
-  crypto.getRandomValues(randomBuffer);
-  const code = 100000 + (randomBuffer[0] % 900000);
-  return code.toString();
-}
-
-// 4.5. 恒定时间字符串比对（防御时序侧信道反推秘钥/重置码）
+// 恒定时间字符串比对（防时序侧信道）
 export async function timingSafeEqualStr(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
   const enc = new TextEncoder();
   const hashA = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(a)));
   const hashB = new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(b)));
   let diff = 0;
-  for (let i = 0; i < 32; i++) {
-    diff |= (hashA[i] ^ hashB[i]);
-  }
+  for (let i = 0; i < 32; i++) diff |= hashA[i] ^ hashB[i];
   return diff === 0;
 }
 
-// JWT 签名密钥默认兜底（在用户未在 Cloudflare Pages 后台配置 JWT_SECRET 时保障开箱即用）
-export const DEFAULT_JWT_SECRET = 'kaoyan2027_production_jwt_signing_fallback_key';
+// 单次 PBKDF2 校验，且改用恒定时间比较哈希
+export async function verifyPassword(password, saltHex, targetHash) {
+  if (typeof password !== 'string' || password.length > MAX_PASSWORD_LENGTH) return false;
+  const hash = await hashPassword(password, saltHex, PBKDF2_ITERATIONS);
+  return timingSafeEqualStr(hash, targetHash);
+}
 
+// ---------- 随机重置码 ----------
+// 6 位纯数字 (100000~999999)，使用拒绝采样消除取模偏差
+export function generate6DigitCode() {
+  const buf = new Uint32Array(1);
+  const limit = Math.floor(0x100000000 / 900000) * 900000;
+  do {
+    crypto.getRandomValues(buf);
+  } while (buf[0] >= limit);
+  return String(100000 + (buf[0] % 900000));
+}
+
+// ---------- JWT 密钥（fail-closed） ----------
+// 绝不再使用任何内置兜底密钥：未配置/配置成历史公开默认值 => 抛 ConfigError
 export function getJwtSecret(secretOrEnv) {
-  if (typeof secretOrEnv === 'string' && secretOrEnv.trim()) {
-    return secretOrEnv.trim();
+  const raw = typeof secretOrEnv === 'string'
+    ? secretOrEnv
+    : (secretOrEnv && secretOrEnv.JWT_SECRET);
+  const secret = typeof raw === 'string' ? raw.trim() : '';
+  if (!secret) {
+    throw new ConfigError('JWT_SECRET 环境变量未配置');
   }
-  if (secretOrEnv && typeof secretOrEnv === 'object' && secretOrEnv.JWT_SECRET && typeof secretOrEnv.JWT_SECRET === 'string' && secretOrEnv.JWT_SECRET.trim()) {
-    return secretOrEnv.JWT_SECRET.trim();
+  if (secret === LEGACY_DEFAULT_JWT_SECRET) {
+    throw new ConfigError('JWT_SECRET 不得使用仓库中公开的历史默认值');
   }
-  // 双轨制：未配置环境变量时，使用受控内部兜底并在控制台输出安全警示
-  console.warn('[Security Warning] JWT_SECRET 环境变量未配置，使用内置默认安全密钥。建议在 Cloudflare 控制台配置 JWT_SECRET 环境变量以提升安全性。');
-  return DEFAULT_JWT_SECRET;
+  if (secret.length < 32) {
+    console.warn('[Security Warning] JWT_SECRET 长度不足 32 字符，建议更换为 32 位以上随机串');
+  }
+  return secret;
 }
 
-// 5. JWT HMAC-SHA256 签发 (有效期默认 30 天)
+// HMAC 密钥导入结果按 secret 缓存（同一 isolate 内复用，节省每请求 CPU）
+const hmacKeyCache = new Map();
+function getHmacKey(secret) {
+  let pending = hmacKeyCache.get(secret);
+  if (!pending) {
+    pending = crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign', 'verify']
+    );
+    hmacKeyCache.set(secret, pending);
+  }
+  return pending;
+}
+
+// 通用 HMAC-SHA256 十六进制摘要（用于重置码加盐存储）
+export async function hmacSha256Hex(secretOrEnv, message) {
+  const key = await getHmacKey(getJwtSecret(secretOrEnv));
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message));
+  return bytesToHex(new Uint8Array(sig));
+}
+
+// 重置码入库形态：HMAC(secret, "reset:<username>:<code>")，库泄露也无法反推 6 位码
+export function hashResetCode(username, code, secretOrEnv) {
+  return hmacSha256Hex(secretOrEnv, `reset:${username}:${code}`);
+}
+
+// ---------- JWT ----------
 export async function signJwt(payload, secretOrEnv) {
-  const secret = getJwtSecret(secretOrEnv);
+  const key = await getHmacKey(getJwtSecret(secretOrEnv));
+  const now = Math.floor(Date.now() / 1000);
   const header = { alg: 'HS256', typ: 'JWT' };
-  const exp = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // 30天
-  const fullPayload = { ...payload, exp };
+  const fullPayload = { ...payload, iat: now, exp: now + JWT_TTL_SECONDS };
 
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(fullPayload));
-  const dataToSign = `${encodedHeader}.${encodedPayload}`;
-
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  const signature = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    enc.encode(dataToSign)
-  );
-
-  const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-
-  return `${dataToSign}.${encodedSignature}`;
+  const dataToSign = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(fullPayload))}`;
+  const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(dataToSign));
+  return `${dataToSign}.${bytesToBase64Url(new Uint8Array(signature))}`;
 }
 
-// 6. JWT HMAC-SHA256 校验与解析
+// 校验失败一律返回 null；密钥缺失抛 ConfigError（由调用方处理）
 export async function verifyJwt(token, secretOrEnv) {
   if (!token || typeof token !== 'string') return null;
-  const secret = getJwtSecret(secretOrEnv);
   const parts = token.split('.');
   if (parts.length !== 3) return null;
 
+  const key = await getHmacKey(getJwtSecret(secretOrEnv));
   const [encodedHeader, encodedPayload, signature] = parts;
-  const dataToSign = `${encodedHeader}.${encodedPayload}`;
 
   try {
-    const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      enc.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    );
-
-    let base64Sig = signature.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64Sig.length % 4) base64Sig += '=';
-    const sigBinary = atob(base64Sig);
-    const sigBytes = new Uint8Array(sigBinary.length);
-    for (let i = 0; i < sigBinary.length; i++) {
-      sigBytes[i] = sigBinary.charCodeAt(i);
-    }
+    // 严格要求 header.alg === HS256，拒绝 none 等其他算法
+    const header = JSON.parse(base64UrlDecode(encodedHeader));
+    if (!header || header.alg !== 'HS256') return null;
 
     const isValid = await crypto.subtle.verify(
       'HMAC',
       key,
-      sigBytes,
-      enc.encode(dataToSign)
+      base64UrlToBytes(signature),
+      new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
     );
-
     if (!isValid) return null;
 
     const payload = JSON.parse(base64UrlDecode(encodedPayload));
     if (!payload || typeof payload !== 'object') return null;
-    if (!payload.exp || typeof payload.exp !== 'number' || Math.floor(Date.now() / 1000) > payload.exp) {
-      return null; // 缺少 exp 或已过期
-    }
+    if (typeof payload.exp !== 'number' || Math.floor(Date.now() / 1000) > payload.exp) return null;
     return payload;
   } catch (e) {
     return null;
   }
 }
 
-// 从请求头获取当前登录用户
+// 从请求头获取当前登录用户；JWT_SECRET 缺失时记录错误并按未登录处理（fail-closed）
 export async function getAuthUser(request, env) {
   const authHeader = request.headers.get('Authorization') || '';
   if (!authHeader.startsWith('Bearer ')) return null;
   const token = authHeader.substring(7).trim();
-  const secret = getJwtSecret(env);
-  return await verifyJwt(token, secret);
-}
-
-// 统一 JSON 响应封装
-export function jsonResponse(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-admin-secret'
+  try {
+    return await verifyJwt(token, env);
+  } catch (e) {
+    if (e instanceof ConfigError) {
+      console.error('[getAuthUser] 配置错误:', e.message);
+      return null;
     }
-  });
-}
-
-export function errorResponse(message, status = 400) {
-  return jsonResponse({ success: false, error: message }, status);
+    throw e;
+  }
 }

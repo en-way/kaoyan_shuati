@@ -39,7 +39,7 @@ const DB = {
 
   getUserData() {
     try {
-      const s = localStorage.getItem('quiz_user_data_2027');
+      const s = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.USER_DATA);
       if (s) {
         const parsed = JSON.parse(s);
         if (parsed && typeof parsed === 'object') {
@@ -53,7 +53,7 @@ const DB = {
       console.error('Critical: LocalStorage corrupted, isolating bad data:', e);
       // 容灾快照隔离备份，防止空对象写穿抹杀历史
       try {
-        const raw = localStorage.getItem('quiz_user_data_2027');
+        const raw = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.USER_DATA);
         if (raw) {
           localStorage.setItem('kaoyan_corrupt_bak_' + Date.now(), raw);
           this._storageWriteBlocked = true;
@@ -69,7 +69,7 @@ const DB = {
       return;
     }
     try {
-      localStorage.setItem('quiz_user_data_2027', JSON.stringify(data));
+      localStorage.setItem(KY_CONFIG.STORAGE_KEYS.USER_DATA, JSON.stringify(data));
       if (window.App && App.auth && typeof App.auth.markDirty === 'function') {
         App.auth.markDirty();
       }
@@ -153,7 +153,7 @@ const DB = {
       }
     }
 
-    localStorage.setItem('quiz_user_data_2027', JSON.stringify(userData));
+    localStorage.setItem(KY_CONFIG.STORAGE_KEYS.USER_DATA, JSON.stringify(userData));
     return userData;
   },
 
@@ -193,7 +193,7 @@ const DB = {
       };
     }
 
-    localStorage.setItem('quiz_user_data_2027', JSON.stringify(newUserData));
+    localStorage.setItem(KY_CONFIG.STORAGE_KEYS.USER_DATA, JSON.stringify(newUserData));
     return newUserData;
   },
 
@@ -603,7 +603,7 @@ const App = {
 
   // ================== 四档阅读字号自适应与记忆引擎 ==================
   initFontSize() {
-    const saved = localStorage.getItem('kaoyan_font_size_2027') || 'md';
+    const saved = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.FONT_SIZE) || 'md';
     this.setFontSize(saved, true);
   },
 
@@ -611,7 +611,7 @@ const App = {
     const validSizes = ['sm', 'md', 'lg', 'xl'];
     const target = validSizes.includes(size) ? size : 'md';
     this.state.fontSize = target;
-    localStorage.setItem('kaoyan_font_size_2027', target);
+    localStorage.setItem(KY_CONFIG.STORAGE_KEYS.FONT_SIZE, target);
 
     document.documentElement.setAttribute('data-font-size', target);
     if (document.body) {
@@ -680,78 +680,22 @@ const App = {
   // ================== CLOUD USER AUTH & SYNC CONTROLLER ==================
   auth: {
     currentUser: null,
-    token: localStorage.getItem('kaoyan_jwt_token_2027') || null,
+    token: localStorage.getItem(KY_CONFIG.STORAGE_KEYS.TOKEN) || null,
     isDirty: false,
-    lastSyncTime: localStorage.getItem('kaoyan_last_sync_time_2027') ? parseInt(localStorage.getItem('kaoyan_last_sync_time_2027'), 10) : null,
+    lastSyncTime: localStorage.getItem(KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME) ? parseInt(localStorage.getItem(KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME), 10) : null,
     isSyncing: false,
     isNetworkWeak: false,
     retryStatusText: '',
     _lastAdminResult: null,
 
-    // 高韧性网络请求引擎：弹性超时 (默认20s) + 指数退避重试 (Exponential Backoff, 1.5s / 3.0s)
-    async fetchWithRetry(url, options = {}, maxRetries = 2, timeoutMs = 20000, onRetry = null) {
-      let attempt = 0;
-      while (true) {
-        let timer = null;
-        let controller = null;
-        let signal = options.signal;
-
-        if (typeof AbortController !== 'undefined') {
-          controller = new AbortController();
-          timer = setTimeout(() => {
-            controller.abort(new DOMException('TimeoutError', 'TimeoutError'));
-          }, timeoutMs);
-          signal = controller.signal;
-        }
-
-        try {
-          const res = await fetch(url, { ...options, signal });
-          if (timer) clearTimeout(timer);
-
-          // 若遇到 Cloudflare 边缘临时网关抖动 (502, 503, 504)，且重试次数未耗尽，自动退避重试
-          if (res.status >= 502 && res.status <= 504 && attempt < maxRetries) {
-            attempt++;
-            const backoffMs = attempt === 1 ? 1500 : 3000;
-            if (typeof onRetry === 'function') {
-              onRetry(attempt, maxRetries, backoffMs, new Error(`HTTP ${res.status}`));
-            }
-            await new Promise(r => setTimeout(r, backoffMs));
-            continue;
-          }
-
-          return res;
-        } catch (err) {
-          if (timer) clearTimeout(timer);
-          const isTimeout = err.name === 'TimeoutError' || (err.message && err.message.toLowerCase().includes('timeout'));
-          const isNetworkErr = err.name === 'TypeError' || (err.message && (err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed')));
-
-          if ((isTimeout || isNetworkErr) && attempt < maxRetries) {
-            attempt++;
-            const backoffMs = attempt === 1 ? 1500 : 3000;
-            if (typeof onRetry === 'function') {
-              onRetry(attempt, maxRetries, backoffMs, err);
-            }
-            await new Promise(r => setTimeout(r, backoffMs));
-            continue;
-          }
-          throw err;
-        }
-      }
+    // 高韧性网络请求：实现已下沉到 js/api.js，此处保留签名以兼容现有调用
+    fetchWithRetry(url, options = {}, maxRetries, timeoutMs, onRetry = null) {
+      return KyApi.fetchWithRetry(url, options, { maxRetries, timeoutMs, onRetry });
     },
 
-    // 智能 API 基础路径路由：当在本地运行（localhost/127.0.0.1/file:）时自动跨域路由到 Cloudflare 生产环境后端
+    // 前端与 Functions 同源部署，直接使用相对路径
     getApiUrl(path) {
-      try {
-        const isLocal = typeof window !== 'undefined' && (
-          window.location.hostname === 'localhost' ||
-          window.location.hostname === '127.0.0.1' ||
-          window.location.protocol === 'file:'
-        );
-        const base = isLocal ? 'https://kaoyan-shuati.enway.dpdns.org' : '';
-        return `${base}${path}`;
-      } catch (_) {
-        return path;
-      }
+      return path;
     },
 
     init() {
@@ -774,8 +718,8 @@ const App = {
       try {
         const compactData = DB.toCompact();
         const currentHash = this.computeDataFingerprint(compactData);
-        const lastUploadHash = localStorage.getItem('kaoyan_last_upload_hash_2027');
-        const isExplicitDirty = localStorage.getItem('kaoyan_is_dirty_2027') === '1';
+        const lastUploadHash = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.LAST_UPLOAD_HASH);
+        const isExplicitDirty = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.IS_DIRTY) === '1';
         if (isExplicitDirty || (lastUploadHash && currentHash !== lastUploadHash)) {
           this.isDirty = true;
         }
@@ -793,7 +737,7 @@ const App = {
 
     markDirty() {
       this.isDirty = true;
-      localStorage.setItem('kaoyan_is_dirty_2027', '1');
+      localStorage.setItem(KY_CONFIG.STORAGE_KEYS.IS_DIRTY, '1');
       this.updateSyncUI();
     },
 
@@ -1039,10 +983,10 @@ const App = {
 
         // 关键防竞态：清除旧同步时间戳，强制向云端全量拉取，避免被 304 拦截导致本地空数据
         this.lastSyncTime = null;
-        localStorage.removeItem('kaoyan_last_sync_time_2027');
-        localStorage.removeItem('quiz_user_data_2027');
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME);
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_DATA);
 
-        localStorage.setItem('kaoyan_last_session_check_2027', String(Date.now()));
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, String(Date.now()));
         // 登录成功瞬间自动拉取该账号在云端的真实进度覆盖本地
         await this.downloadFromCloud(true);
         this.renderAuthUI();
@@ -1089,12 +1033,12 @@ const App = {
         this.closeAuthModal();
 
         // 关键防污染：新账号彻底清空本地临时做题数据，以 0 进度全新起步（不上传本地脏数据）
-        localStorage.removeItem('quiz_user_data_2027');
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_DATA);
         DB.setFromCloud({ answers: {}, mistakes: {}, updatedAt: Date.now() });
         this.lastSyncTime = Date.now();
-        localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
-        localStorage.setItem('kaoyan_last_session_check_2027', String(this.lastSyncTime));
-        localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(DB.toCompact()));
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME, String(this.lastSyncTime));
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, String(this.lastSyncTime));
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_UPLOAD_HASH, this.computeDataFingerprint(DB.toCompact()));
         this.isDirty = false;
         this.updateSyncUI();
         App.loadOverview();
@@ -1141,9 +1085,9 @@ const App = {
 
         // 关键防污染与防竞态：清除旧时间戳后全量拉取
         this.lastSyncTime = null;
-        localStorage.removeItem('kaoyan_last_sync_time_2027');
-        localStorage.removeItem('quiz_user_data_2027');
-        localStorage.setItem('kaoyan_last_session_check_2027', String(Date.now()));
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME);
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_DATA);
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, String(Date.now()));
         await this.downloadFromCloud(true);
         this.renderAuthUI();
         App.loadOverview();
@@ -1311,7 +1255,7 @@ const App = {
         this._lastAdminResult = {
           username: data.username,
           code: data.code,
-          expiresIn: 30
+          expiresIn: data.expiresInMinutes || 15
         };
       } catch (err) {
         notice.textContent = err.message;
@@ -1326,7 +1270,7 @@ const App = {
 
     copyAdminGeneratedCode() {
       if (!this._lastAdminResult) return;
-      const text = `【考研政治 1000 题】学员 ${this._lastAdminResult.username}，您的密码重置码为：${this._lastAdminResult.code}，请在 30 分钟内点击登录界面的「忘记密码」输入该验证码重置新密码。`;
+      const text = `【考研政治 1000 题】学员 ${this._lastAdminResult.username}，您的密码重置码为：${this._lastAdminResult.code}，请在 ${this._lastAdminResult.expiresIn} 分钟内点击登录界面的「忘记密码」输入该验证码重置新密码。`;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
           alert('重置码及使用说明已复制到剪贴板，可直接粘贴发送给学员！');
@@ -1340,12 +1284,12 @@ const App = {
 
     // 核心安全清理：当用户主动要求注销或清空时彻底清空本地所有答题记录与缓存
     purgeAllUserData(reason) {
-      localStorage.removeItem('quiz_user_data_2027');
-      localStorage.removeItem('kaoyan_jwt_token_2027');
-      localStorage.removeItem('kaoyan_user_info_2027');
-      localStorage.removeItem('kaoyan_last_sync_time_2027');
-      localStorage.removeItem('kaoyan_last_session_check_2027');
-      localStorage.removeItem('kaoyan_last_upload_hash_2027');
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_DATA);
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.TOKEN);
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_INFO);
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME);
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK);
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_UPLOAD_HASH);
 
       this.token = null;
       this.currentUser = null;
@@ -1373,9 +1317,9 @@ const App = {
     handleSessionExpired(isSilent = false) {
       this.token = null;
       this.currentUser = null;
-      localStorage.removeItem('kaoyan_jwt_token_2027');
-      localStorage.removeItem('kaoyan_user_info_2027');
-      localStorage.removeItem('kaoyan_last_session_check_2027');
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.TOKEN);
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_INFO);
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK);
       this.renderAuthUI();
       if (!isSilent) {
         alert('🔑 您的登录凭证已过期或失效，本地做题记录已为您完整保留，请重新登录！');
@@ -1389,9 +1333,9 @@ const App = {
       if (keep) {
         this.token = null;
         this.currentUser = null;
-        localStorage.removeItem('kaoyan_jwt_token_2027');
-        localStorage.removeItem('kaoyan_user_info_2027');
-        localStorage.removeItem('kaoyan_last_session_check_2027');
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.TOKEN);
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_INFO);
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK);
         this.renderAuthUI();
         alert('已为您保留本地做题记录，当前已转为离线访客模式。');
       } else {
@@ -1402,9 +1346,9 @@ const App = {
     setSession(token, user) {
       this.token = token;
       this.currentUser = user;
-      localStorage.setItem('kaoyan_jwt_token_2027', token);
+      localStorage.setItem(KY_CONFIG.STORAGE_KEYS.TOKEN, token);
       if (user) {
-        localStorage.setItem('kaoyan_user_info_2027', JSON.stringify(user));
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.USER_INFO, JSON.stringify(user));
       }
       this.renderAuthUI();
     },
@@ -1428,7 +1372,7 @@ const App = {
     async checkSession() {
       if (!this.token) return;
       try {
-        const cachedUser = localStorage.getItem('kaoyan_user_info_2027');
+        const cachedUser = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.USER_INFO);
         if (cachedUser) {
           try {
             this.currentUser = JSON.parse(cachedUser);
@@ -1451,15 +1395,15 @@ const App = {
         }
 
         const now = Date.now();
-        const lastCheck = parseInt(localStorage.getItem('kaoyan_last_session_check_2027') || '0', 10);
+        const lastCheck = parseInt(localStorage.getItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK) || '0', 10);
         // 2小时节流 + JWT 本地预检：有效期间直接复用本地有效会话，大幅削减 70% 的 Worker 与 D1 读配额消耗
-        if (lastCheck && (now - lastCheck < 2 * 60 * 60 * 1000) && this.currentUser) {
+        if (lastCheck && (now - lastCheck < KY_CONFIG.SESSION.CHECK_INTERVAL_MS) && this.currentUser) {
           return;
         }
 
         const res = await fetch(this.getApiUrl('/api/auth/me'), {
           headers: { 'Authorization': `Bearer ${this.token}` },
-          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(20000) : undefined
+          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(KY_CONFIG.SYNC.TIMEOUT_MS) : undefined
         });
 
         if (res.status === 401) {
@@ -1475,8 +1419,8 @@ const App = {
           const data = await res.json();
           if (data.success && data.user) {
             this.currentUser = data.user;
-            localStorage.setItem('kaoyan_user_info_2027', JSON.stringify(data.user));
-            localStorage.setItem('kaoyan_last_session_check_2027', String(now));
+            localStorage.setItem(KY_CONFIG.STORAGE_KEYS.USER_INFO, JSON.stringify(data.user));
+            localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, String(now));
             this.renderAuthUI();
           }
         }
@@ -1499,11 +1443,11 @@ const App = {
       if (!confirm('⚠️ 确定要清空本机所有的刷题记录与错题本吗？\n清空后本机进度归零。若需同步清空云端，可在刷新后点击「上传」按钮覆盖云端。')) {
         return;
       }
-      localStorage.removeItem('quiz_user_data_2027');
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_DATA);
       DB.saveUserData({ answers: {}, mistakes: {} });
-      localStorage.removeItem('kaoyan_last_sync_time_2027');
-      localStorage.removeItem('kaoyan_last_upload_hash_2027');
-      localStorage.setItem('kaoyan_is_dirty_2027', '1');
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME);
+      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_UPLOAD_HASH);
+      localStorage.setItem(KY_CONFIG.STORAGE_KEYS.IS_DIRTY, '1');
       this.isDirty = true;
       this.lastSyncTime = null;
 
@@ -1531,7 +1475,7 @@ const App = {
       // 采集本地当前全部真实做题数据快照与指纹
       const compactData = DB.toCompact();
       const currentHash = this.computeDataFingerprint(compactData);
-      const lastUploadHash = localStorage.getItem('kaoyan_last_upload_hash_2027');
+      const lastUploadHash = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.LAST_UPLOAD_HASH);
 
       // 客户端防重复拦截：数据未变化且无未保存操作，直接跳过请求，节省 100% Worker 请求与 D1 写入配额！
       if (!this.isDirty && lastUploadHash && lastUploadHash === currentHash) {
@@ -1566,7 +1510,7 @@ const App = {
             body: JSON.stringify({ ...compactData, dataHash: currentHash })
           },
           2,     // maxRetries = 2
-          20000, // timeoutMs = 20s
+          KY_CONFIG.SYNC.TIMEOUT_MS, // timeoutMs = 20s
           (attempt, maxRetries) => {
             this.retryStatusText = `重试中 (${attempt}/${maxRetries})...`;
             this.updateSyncUI();
@@ -1588,10 +1532,10 @@ const App = {
         }
 
         this.lastSyncTime = data.updatedAt || Date.now();
-        localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME, String(this.lastSyncTime));
         const updatedCompact = DB.toCompact();
-        localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(updatedCompact));
-        localStorage.removeItem('kaoyan_is_dirty_2027');
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_UPLOAD_HASH, this.computeDataFingerprint(updatedCompact));
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.IS_DIRTY);
         this.isDirty = false;
         this.isNetworkWeak = false;
         this.retryStatusText = '';
@@ -1655,7 +1599,7 @@ const App = {
             }
           },
           2,     // maxRetries = 2
-          20000, // timeoutMs = 20s
+          KY_CONFIG.SYNC.TIMEOUT_MS, // timeoutMs = 20s
           (attempt, maxRetries) => {
             this.retryStatusText = `重试中 (${attempt}/${maxRetries})...`;
             this.updateSyncUI();
@@ -1689,10 +1633,10 @@ const App = {
         // 客户端快照权威覆盖模式：以云端全量数据直接覆写本机进度
         DB.setFromCloud(data);
         this.lastSyncTime = data.updatedAt || Date.now();
-        localStorage.setItem('kaoyan_last_sync_time_2027', String(this.lastSyncTime));
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME, String(this.lastSyncTime));
         const newCompact = DB.toCompact();
-        localStorage.setItem('kaoyan_last_upload_hash_2027', this.computeDataFingerprint(newCompact));
-        localStorage.removeItem('kaoyan_is_dirty_2027');
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_UPLOAD_HASH, this.computeDataFingerprint(newCompact));
+        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.IS_DIRTY);
         this.isDirty = false;
         this.isNetworkWeak = false;
         this.retryStatusText = '';

@@ -1,66 +1,37 @@
-import {
-  verifyPassword,
-  signJwt,
-  jsonResponse,
-  errorResponse
-} from '../../utils/auth.js';
+import { verifyPassword, signJwt } from '../../utils/auth.js';
+import { jsonResponse, handleError, requireDb, readJsonBody, HttpError } from '../../utils/http.js';
+import { normalizeUsername } from '../../utils/validate.js';
+import { MAX_AUTH_BODY_BYTES, MAX_USERNAME_LENGTH, MAX_PASSWORD_LENGTH } from '../../utils/constants.js';
 
-export async function onRequestOptions() {
-  return jsonResponse({}, 200);
-}
-
-export async function onRequestPost(context) {
-  const { request, env } = context;
-
-  if (!env.DB) {
-    return errorResponse('Cloudflare D1 数据库未绑定 (DB 未在 Pages 设置中绑定)', 500);
-  }
-
-  let body;
+export async function onRequestPost({ request, env }) {
   try {
-    body = await request.json();
-  } catch (e) {
-    return errorResponse('请求参数格式错误 (必须为有效 JSON)', 400);
-  }
+    const db = requireDb(env);
+    const body = await readJsonBody(request, MAX_AUTH_BODY_BYTES);
 
-  let { username, password } = body || {};
+    const username = normalizeUsername(body.username);
+    const password = typeof body.password === 'string' ? body.password : '';
+    if (!username || username.length > MAX_USERNAME_LENGTH || !password || password.length > MAX_PASSWORD_LENGTH) {
+      throw new HttpError(400, '请输入账号与密码');
+    }
 
-  if (!username || typeof username !== 'string' || !password || typeof password !== 'string') {
-    return errorResponse('请输入账号与密码', 400);
-  }
-  username = username.trim().toLowerCase();
-
-  try {
-    const user = await env.DB.prepare(
+    const user = await db.prepare(
       'SELECT id, username, nickname, password_hash, salt FROM users WHERE username = ?'
     ).bind(username).first();
 
-    if (!user) {
-      return errorResponse('账号不存在或密码错误', 401);
+    // 账号不存在与密码错误返回同一文案与错误码；登录全程 0 次 D1 写入
+    if (!user || !(await verifyPassword(password, user.salt, user.password_hash))) {
+      throw new HttpError(401, '账号不存在或密码错误', 'INVALID_CREDENTIALS');
     }
 
-    const isMatch = await verifyPassword(password, user.salt, user.password_hash);
-    if (!isMatch) {
-      return errorResponse('账号不存在或密码错误', 401);
-    }
-
-    // 签发 JWT (免写 D1 数据库，节约每日 10 万行写入配额)
-    const token = await signJwt(
-      { id: user.id, username: user.username, nickname: user.nickname },
-      env.JWT_SECRET
-    );
+    const token = await signJwt({ id: user.id, username: user.username, nickname: user.nickname }, env);
 
     return jsonResponse({
       success: true,
       token,
-      user: {
-        id: user.id,
-        username: user.username,
-        nickname: user.nickname
-      },
+      user: { id: user.id, username: user.username, nickname: user.nickname },
       message: '登录成功'
     });
   } catch (err) {
-    return errorResponse(`登录失败: ${err.message || err}`, 500);
+    return handleError(err, 'auth/login');
   }
 }
