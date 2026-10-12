@@ -1885,11 +1885,35 @@ const App = {
     const data = DB.getQuestions(part, chapter, type, mode);
     this.state.questions = data.questions || [];
 
-    // 平滑保留题号：根据 resumeQid 定位游标；若目标模式无该题则优雅停在第 1 题
+    // 平滑保留题号与智能首题定位：
     if (resumeQid && this.state.questions.length > 0) {
+      // 场景 1：模式切换等显式指定 resumeQid 时，精准保留在学员当前所看题目
       const foundIdx = this.state.questions.findIndex(q => q.id === resumeQid);
       this.state.currentIndex = foundIdx >= 0 ? foundIdx : 0;
+    } else if ((mode === 'instant' || mode === 'recite') && this.state.questions.length > 0) {
+      // 场景 2：即时刷题与背题模式，自动定位至该章第一道未作答题目
+      const firstUnansweredIdx = this.state.questions.findIndex(
+        q => !q.user_selected || q.user_selected.length === 0
+      );
+
+      if (firstUnansweredIdx > 0) {
+        // 跳过了前面已做题目
+        this.state.currentIndex = firstUnansweredIdx;
+        if (typeof this.showToast === 'function') {
+          this.showToast(`📍 已自动定位至未刷题目：第 ${firstUnansweredIdx + 1} 题`, 'info');
+        }
+      } else if (firstUnansweredIdx === -1) {
+        // 全章节题目已全部完成，从头复习
+        this.state.currentIndex = 0;
+        if (typeof this.showToast === 'function') {
+          this.showToast('🎉 本章题目已全部刷完，从第 1 题开始复习', 'success');
+        }
+      } else {
+        // 第一题本身就是未作答题目，静默停在第 1 题
+        this.state.currentIndex = 0;
+      }
     } else {
+      // 场景 3：模考自测 (exam) 或错题专训 (mistakes_only)，从第 1 题规范开刷
       this.state.currentIndex = 0;
     }
 
