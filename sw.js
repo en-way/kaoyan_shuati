@@ -4,7 +4,7 @@
  * 具备离线可用性，断网时自动启用本地题库与应用代码
  */
 
-const VERSION = 'v29';
+const VERSION = 'v30';
 const CACHE_NAME = `ky-quiz-${VERSION}`;
 
 // 核心 App Shell（轻量级，强保证秒级原子安装成功）
@@ -21,9 +21,9 @@ const CORE_SHELL_ASSETS = [
   './icons/apple-touch-icon.png'
 ];
 
-// 题库大数据包（~1.9MB，采用第二阶段异步容错预存，杜绝因网络抖动中断整个 App Shell 安装）
+// 题库大数据包（~1.8MB，采用第二阶段异步容错预存，杜绝因网络抖动中断整个 App Shell 安装）
 const LARGE_DATA_ASSETS = [
-  './data/questions.json'
+  `./data/questions.json?v=20271012_${VERSION}`
 ];
 
 // 1. Install: 两阶段渐进式缓存（使用 Promise.allSettled 确保题库预存不被线程休眠中断）
