@@ -16,3 +16,7 @@ data/*.tmp
 # Node
 node_modules/
 package-lock.json
+
+# Local source reference documents
+*.docx
+*.doc
