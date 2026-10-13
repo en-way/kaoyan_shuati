@@ -13,13 +13,13 @@ const DB = {
   async init() {
     if (!this.questionsData) {
       try {
-        const res = await fetch('data/questions.json?v=20271012_v35');
+        const res = await fetch('data/questions.json?v=20271013_v36');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         this.questionsData = await res.json();
       } catch (e) {
         // Fallback for different subpaths
         try {
-          const res2 = await fetch('./data/questions.json?v=20271012_v35');
+          const res2 = await fetch('./data/questions.json?v=20271013_v36');
           this.questionsData = await res2.json();
         } catch (e2) {
           console.error('Failed to load questions.json:', e2);
