@@ -1,20 +1,20 @@
 /**
- * 2027 考研政治 1000 题 · Service Worker (v36)
+ * 2027 考研政治 1000 题 · Service Worker (v37)
  * 缓存策略: Network-First (网络优先 + 离线缓存秒级降级)
  * 具备离线可用性，断网时自动启用本地题库与应用代码
  */
 
-const VERSION = 'v36';
+const VERSION = 'v37';
 const CACHE_NAME = `ky-quiz-${VERSION}`;
 
 // 核心 App Shell（轻量级，强保证秒级原子安装成功）
 const CORE_SHELL_ASSETS = [
   './',
   './index.html',
-  `./css/style.css?v=20271013_${VERSION}`,
-  `./js/config.js?v=20271013_${VERSION}`,
-  `./js/api.js?v=20271013_${VERSION}`,
-  `./js/app.js?v=20271013_${VERSION}`,
+  `./css/style.css?v=20271016_${VERSION}`,
+  `./js/config.js?v=20271016_${VERSION}`,
+  `./js/api.js?v=20271016_${VERSION}`,
+  `./js/app.js?v=20271016_${VERSION}`,
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -23,7 +23,7 @@ const CORE_SHELL_ASSETS = [
 
 // 题库大数据包（~1.8MB，采用第二阶段异步容错预存，杜绝因网络抖动中断整个 App Shell 安装）
 const LARGE_DATA_ASSETS = [
-  `./data/questions.json?v=20271013_${VERSION}`
+  `./data/questions.json?v=20271016_${VERSION}`
 ];
 
 // 1. Install: 两阶段渐进式缓存（使用 Promise.allSettled 确保题库预存不被线程休眠中断）
