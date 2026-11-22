@@ -2,10 +2,12 @@ import { generateSalt, hashPassword, signJwt } from '../../utils/auth.js';
 import { jsonResponse, handleError, requireDb, readJsonBody, HttpError } from '../../utils/http.js';
 import { normalizeUsername, assertRegisterUsername, assertPassword, sanitizeNickname, DEFAULT_BANK_ID } from '../../utils/validate.js';
 import { MAX_AUTH_BODY_BYTES } from '../../utils/constants.js';
+import { ensureMultiBankSchema } from '../../utils/db-migrate.js';
 
 export async function onRequestPost({ request, env }) {
   try {
     const db = requireDb(env);
+    await ensureMultiBankSchema(db);
     const body = await readJsonBody(request, MAX_AUTH_BODY_BYTES);
 
     const username = normalizeUsername(body.username);

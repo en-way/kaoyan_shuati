@@ -6,6 +6,7 @@ import {
 import { readJsonBody, handleError } from '../../utils/http.js';
 import { MAX_SYNC_BODY_BYTES } from '../../utils/constants.js';
 import { resolveBankId } from '../../utils/validate.js';
+import { ensureMultiBankSchema } from '../../utils/db-migrate.js';
 
 export async function onRequestOptions() {
   return jsonResponse({}, 200);
@@ -81,6 +82,7 @@ export async function onRequestGet(context) {
   }
 
   try {
+    await ensureMultiBankSchema(env.DB);
     const url = new URL(request.url);
     const bankId = resolveBankId(url.searchParams.get('bankId'));
     const clientTimeParam = url.searchParams.get('clientTime');
@@ -168,6 +170,7 @@ export async function onRequestPost(context) {
   }
 
   try {
+    await ensureMultiBankSchema(env.DB);
     const url = new URL(request.url);
     const rawBankId = (body && body.bankId !== undefined) ? body.bankId : url.searchParams.get('bankId');
     const bankId = resolveBankId(rawBankId);

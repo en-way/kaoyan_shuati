@@ -2,6 +2,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { onRequestGet, onRequestPost } from '../functions/api/progress/sync.js';
 import { signJwt } from '../functions/utils/auth.js';
+import { ensureMultiBankSchema, resetMigrationCacheForTest } from '../functions/utils/db-migrate.js';
 
 /**
  * 内存级 Cloudflare D1 Mock，完整模拟 users 与 user_progress 复合主键 (user_id, bank_id) 读写
@@ -283,5 +284,46 @@ describe('functions/api/progress/sync.js 多题库云同步、时间戳合并与
     });
     const res = await onRequestPost({ request: hugeReq, env });
     assert.equal(res.status, 413);
+  });
+
+  it('旧版 v37 单主键 user_progress 表在首次访问时应自动无损迁移至复合主键并保留全部历史数据', async () => {
+    resetMigrationCacheForTest();
+    let hasBankIdColumn = false;
+    const executedBatchSqls = [];
+
+    const legacyD1 = {
+      prepare(sql) {
+        const s = sql.replace(/\s+/g, ' ').trim();
+        return {
+          sql: s,
+          async all() {
+            if (s.includes('PRAGMA table_info(user_progress)')) {
+              return {
+                results: hasBankIdColumn
+                  ? [{ name: 'user_id' }, { name: 'bank_id' }, { name: 'answers_data' }]
+                  : [{ name: 'user_id' }, { name: 'answers_data' }]
+              };
+            }
+            return { results: [] };
+          }
+        };
+      },
+      async batch(stmts) {
+        for (const st of stmts) {
+          executedBatchSqls.push(st.sql);
+        }
+        hasBankIdColumn = true;
+      }
+    };
+
+    await ensureMultiBankSchema(legacyD1);
+    assert.equal(hasBankIdColumn, true);
+    assert.equal(executedBatchSqls.length, 4);
+    assert.ok(executedBatchSqls[0].includes('CREATE TABLE IF NOT EXISTS user_progress_new'));
+    assert.ok(executedBatchSqls[1].includes("'2027_1000' AS bank_id"));
+
+    // 同一 Isolate 后续调用直接命中内存缓存，不再触发 batch
+    await ensureMultiBankSchema(legacyD1);
+    assert.equal(executedBatchSqls.length, 4);
   });
 });
