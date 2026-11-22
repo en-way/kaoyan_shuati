@@ -31,7 +31,7 @@ winget install --id Git.Git -e --source winget
 5. **不要勾选** "Add a README file"（因为本地已有），直接点击 **Create repository**。
 
 ### 步骤 3：在本地提交并推送代码
-在当前项目根目录（`d:\A16pro\Aing\antigravity\test`）打开终端，依次执行：
+在项目根目录（`<project-root>`）打开终端，若从开源模板克隆，请先将 `wrangler.toml.example` 复制为 `wrangler.toml` 并填入你的 D1 `database_id`（`cp wrangler.toml.example wrangler.toml`），然后依次执行：
 ```bash
 # 1. 初始化 Git 本地仓库
 git init

@@ -9,8 +9,15 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Temp data
+# Cloudflare Wrangler & Local Secrets
+.dev.vars
+.dev.vars.*
+.wrangler/
+
+# Temp & Backup data
 *.tmp
+*.bak
+*.sql.bak
 data/*.tmp
 
 # Node
@@ -20,3 +27,8 @@ package-lock.json
 # Local source reference documents
 *.docx
 *.doc
+*.pdf
+
+# Note: If open-sourcing the repository and binding D1 via Cloudflare Dashboard UI,
+# you may untrack wrangler.toml (`git rm --cached wrangler.toml`) and uncomment below:
+# wrangler.toml
