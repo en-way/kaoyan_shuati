@@ -1,0 +1,12 @@
+{
+  "name": "kaoyan-shuati",
+  "version": "38.0.0",
+  "description": "考研政治 1000 题沉浸式刷题与 Cloudflare D1 跨端云同步系统 (零构建 ES Modules)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/quiz.test.js tests/store.test.js tests/sync.test.js tests/api.test.js",
+    "dev": "npx wrangler pages dev ."
+  },
+  "license": "MIT"
+}
