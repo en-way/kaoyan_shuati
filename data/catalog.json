@@ -1,0 +1,16 @@
+{
+  "defaultBankId": "2027_1000",
+  "banks": [
+    {
+      "id": "2027_1000",
+      "title": "2027 肖秀荣考研政治 1000 题",
+      "shortTitle": "27版肖1000题",
+      "year": 2027,
+      "questionCount": 1148,
+      "version": "20271122_v38",
+      "file": "data/banks/2027_1000.json",
+      "fallbackFile": "data/questions.json",
+      "description": "2027 考研政治 1000 题全量官方解析版（单选 528 题 + 多选 620 题）"
+    }
+  ]
+}

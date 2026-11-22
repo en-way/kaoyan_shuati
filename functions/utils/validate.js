@@ -10,8 +10,12 @@ import {
 } from './constants.js';
 import { HttpError } from './http.js';
 
+export const DEFAULT_BANK_ID = '2027_1000';
+
 // 允许：各语言字母、数字、_ . @ -
 const USERNAME_RE = /^[\p{L}\p{N}_.@-]+$/u;
+// 题库 ID：仅允许字母、数字、下划线、短横线，长度 1~32
+const BANK_ID_RE = /^[a-zA-Z0-9_-]{1,32}$/;
 
 export function normalizeUsername(raw) {
   return typeof raw === 'string' ? raw.trim().toLowerCase() : '';
@@ -41,4 +45,26 @@ export function sanitizeNickname(raw, fallback) {
   let nickname = typeof raw === 'string' ? raw.replace(/[\u0000-\u001f\u007f<>]/g, '').trim() : '';
   if (!nickname) nickname = fallback;
   return nickname.slice(0, MAX_NICKNAME_LENGTH);
+}
+
+/**
+ * 规范化并校验 bankId：
+ * - 未传、null、undefined 或空字符串时，自动回退到 DEFAULT_BANK_ID ('2027_1000')，100% 兼容老客户端；
+ * - 若显式传入非空值，则必须匹配 /^[a-zA-Z0-9_-]{1,32}$/。
+ */
+export function resolveBankId(raw) {
+  if (raw === undefined || raw === null || raw === '') {
+    return DEFAULT_BANK_ID;
+  }
+  if (typeof raw !== 'string') {
+    throw new HttpError(400, '无效的题库标识格式', 'INVALID_BANK_ID');
+  }
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return DEFAULT_BANK_ID;
+  }
+  if (!BANK_ID_RE.test(trimmed) || trimmed === '__proto__' || trimmed === 'constructor') {
+    throw new HttpError(400, '题库标识仅允许字母、数字、下划线与短横线（长度 ≤ 32）', 'INVALID_BANK_ID');
+  }
+  return trimmed;
 }

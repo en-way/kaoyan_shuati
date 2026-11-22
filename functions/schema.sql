@@ -1,4 +1,4 @@
--- 2027 考研政治 1000 题 · Cloudflare D1 数据库架构规范
+-- 考研政治 1000 题 · Cloudflare D1 数据库架构规范 (v38 多题库兼容版)
 
 -- 1. 用户主表。username 的 UNIQUE 约束已自动建立唯一索引，无需再建重复索引
 --    （D1 把索引维护计入「行写入」，重复索引会让每次注册白白多 1 次写入）
@@ -12,14 +12,16 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at INTEGER NOT NULL        -- 最近改密/注册时间戳 (毫秒)，同时用作旧 JWT 吊销基准
 );
 
--- 2. 刷题进度与错题同步表 (单用户 1 行)
+-- 2. 刷题进度与错题同步表 (单用户单题库 1 行，复合主键避免冗余索引写入损耗)
 CREATE TABLE IF NOT EXISTS user_progress (
-    user_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    bank_id TEXT NOT NULL DEFAULT '2027_1000',
     answers_data TEXT NOT NULL,
     mistakes_data TEXT NOT NULL,
     stats_data TEXT,                   -- 保留列（sync.js 冻结，仍写入 '{}'）
     version INTEGER DEFAULT 1,
     updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, bank_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

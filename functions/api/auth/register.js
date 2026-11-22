@@ -1,6 +1,6 @@
 import { generateSalt, hashPassword, signJwt } from '../../utils/auth.js';
 import { jsonResponse, handleError, requireDb, readJsonBody, HttpError } from '../../utils/http.js';
-import { normalizeUsername, assertRegisterUsername, assertPassword, sanitizeNickname } from '../../utils/validate.js';
+import { normalizeUsername, assertRegisterUsername, assertPassword, sanitizeNickname, DEFAULT_BANK_ID } from '../../utils/validate.js';
 import { MAX_AUTH_BODY_BYTES } from '../../utils/constants.js';
 
 export async function onRequestPost({ request, env }) {
@@ -24,15 +24,15 @@ export async function onRequestPost({ request, env }) {
     const userId = crypto.randomUUID();
     const now = Date.now();
 
-    // 原子事务：users + user_progress 初始行，一次往返
+    // 原子事务：users + 默认题库 ('2027_1000') user_progress 初始行，一次往返
     try {
       await db.batch([
         db.prepare(
           'INSERT INTO users (id, username, nickname, password_hash, salt, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
         ).bind(userId, username, nickname, passwordHash, salt, now, now),
         db.prepare(
-          'INSERT INTO user_progress (user_id, answers_data, mistakes_data, stats_data, version, updated_at) VALUES (?, ?, ?, ?, 1, ?)'
-        ).bind(userId, '{}', '{}', '{}', now)
+          'INSERT INTO user_progress (user_id, bank_id, answers_data, mistakes_data, stats_data, version, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)'
+        ).bind(userId, DEFAULT_BANK_ID, '{}', '{}', '{}', now)
       ]);
     } catch (e) {
       // 并发注册同名账号：UNIQUE 约束冲突 => 409，而不是 500
