@@ -131,11 +131,53 @@ Cloudflare 会在 15~30 秒内完成全球边缘节点部署！
 ## 常见问题与后续更新
 
 - **代码有修改如何更新到网站？**
-  只需在本地修改后执行：
+  只需在本地修改并通过 `node --test tests/*.test.js` 测试后执行：
   ```bash
   git add .
   git commit -m "update: 优化题目或更新版本"
   git push
   ```
   Cloudflare Pages 会自动检测到 GitHub 的推送并在几十秒内自动触发全球重新部署，无需手动操作！
+
+---
+
+## 第五阶段：v38 多题库架构生产上线与 D1 无损迁移检查清单
+
+从 `v37` 升级到 `v38`（支持多题库 `bankId` 与复合主键 `PRIMARY KEY (user_id, bank_id)`）时，请严格按以下顺序执行以保障线上用户云存档 100% 零丢失：
+
+### 1. 本地预演与回归检查
+```bash
+# 运行全部 17 项零依赖单元测试（判题、本地旧数据迁移、云端时间戳合并与 409 乐观锁）
+node --test tests/quiz.test.js tests/store.test.js tests/sync.test.js tests/api.test.js
+
+# 本地全栈模拟（测试老数据迁移、年份切换、离线刷新与多端同步）
+npx wrangler pages dev .
+```
+
+### 2. 线上生产发布四步流程
+1. **第一步：备份线上 D1 数据库快照（必做）**
+   ```bash
+   npx wrangler d1 export kaoyan-quiz-db --remote --output=./backup_v37_before_migration.sql
+   ```
+2. **第二步：执行无损表结构升级迁移脚本**
+   将现有 `user_progress` 数据全量保留并自动赋予 `bank_id = '2027_1000'`：
+   ```bash
+   npx wrangler d1 execute kaoyan-quiz-db --remote --file=./functions/migrations/001_add_bank_id.sql
+   ```
+3. **第三步：推送代码触发 Cloudflare Pages 全球部署**
+   ```bash
+   git push origin main
+   ```
+4. **第四步：打版本 Tag 归档**
+   ```bash
+   git tag -a v38.0.0 -m "release(v38): 多题库架构、ES Modules 拆分与零依赖测试套件"
+   git push origin v38.0.0
+   ```
+
+### 3. 应急回滚方案
+若需回滚数据库至 `v37` 单主键结构，只需使用第一步导出的快照文件恢复：
+```bash
+npx wrangler d1 execute kaoyan-quiz-db --remote --file=./backup_v37_before_migration.sql
+```
+
 
