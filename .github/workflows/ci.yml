@@ -20,22 +20,27 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Syntax check all ES Modules & Serverless Functions
+      - name: Syntax check all ES Modules & Serverless Functions (Full Recursive Scan)
         run: |
-          node --check js/config.js
-          node --check js/api.js
-          node --check js/core/quiz.js
-          node --check js/core/exam.js
-          node --check js/core/sync.js
-          node --check js/state/store.js
-          node --check js/ui/views.js
-          node --check js/ui/modals.js
-          node --check js/main.js
-          node --check js/app.js
-          node --check sw.js
-          node --check functions/utils/validate.js
-          node --check functions/api/auth/register.js
-          node --check functions/api/progress/sync.js
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const { execFileSync } = require("child_process");
+            const files = ["sw.js"];
+            const walk = (dir) => {
+              if (!fs.existsSync(dir)) return;
+              for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) walk(full);
+                else if (entry.isFile() && full.endsWith(".js")) files.push(full);
+              }
+            };
+            ["js", "functions", "tests"].forEach(walk);
+            for (const f of files) {
+              execFileSync(process.execPath, ["--check", f], { stdio: "inherit" });
+            }
+            console.log(`[Syntax Check] All ${files.length} JS files passed node --check.`);
+          '
 
       - name: Run zero-dependency node:test suites
         run: node --test tests/quiz.test.js tests/store.test.js tests/sync.test.js tests/api.test.js

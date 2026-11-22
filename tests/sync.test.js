@@ -326,4 +326,75 @@ describe('functions/api/progress/sync.js 多题库云同步、时间戳合并与
     await ensureMultiBankSchema(legacyD1);
     assert.equal(executedBatchSqls.length, 4);
   });
+
+  it('冷启动并发调用 ensureMultiBankSchema 时单飞锁应确保只执行一次迁移批次，且失败后允许重试', async () => {
+    resetMigrationCacheForTest();
+    let hasBankIdColumn = false;
+    let pragmaCallCount = 0;
+    let batchCallCount = 0;
+    let shouldFailFirstBatch = true;
+
+    const concurrentD1 = {
+      prepare(sql) {
+        const s = sql.replace(/\s+/g, ' ').trim();
+        return {
+          sql: s,
+          async all() {
+            if (s.includes('PRAGMA table_info(user_progress)')) {
+              pragmaCallCount++;
+              await new Promise(r => setTimeout(r, 15));
+              return {
+                results: hasBankIdColumn
+                  ? [{ name: 'user_id' }, { name: 'bank_id' }]
+                  : [{ name: 'user_id' }]
+              };
+            }
+            return { results: [] };
+          }
+        };
+      },
+      async batch() {
+        batchCallCount++;
+        await new Promise(r => setTimeout(r, 15));
+        if (shouldFailFirstBatch) {
+          shouldFailFirstBatch = false;
+          throw new Error('Transient D1 lock timeout');
+        }
+        hasBankIdColumn = true;
+      }
+    };
+
+    // 1. 第一波 5 个并发请求同时命中冷启动，首次 batch 模拟瞬时失败
+    await Promise.all([
+      ensureMultiBankSchema(concurrentD1),
+      ensureMultiBankSchema(concurrentD1),
+      ensureMultiBankSchema(concurrentD1),
+      ensureMultiBankSchema(concurrentD1),
+      ensureMultiBankSchema(concurrentD1)
+    ]);
+    // 单飞锁保证第一波 5 个并发请求只触发了 1 次 PRAGMA 和 1 次 batch
+    assert.equal(pragmaCallCount, 1);
+    assert.equal(batchCallCount, 1);
+    assert.equal(hasBankIdColumn, false);
+
+    // 2. 因为第一波失败未置 _schemaVerified = true，第二波 5 个并发请求应自动重试并同样只执行 1 次迁移批次
+    await Promise.all([
+      ensureMultiBankSchema(concurrentD1),
+      ensureMultiBankSchema(concurrentD1),
+      ensureMultiBankSchema(concurrentD1),
+      ensureMultiBankSchema(concurrentD1),
+      ensureMultiBankSchema(concurrentD1)
+    ]);
+    assert.equal(pragmaCallCount, 2);
+    assert.equal(batchCallCount, 2);
+    assert.equal(hasBankIdColumn, true);
+
+    // 3. 迁移成功后，后续并发调用 0 开销直接返回
+    await Promise.all([
+      ensureMultiBankSchema(concurrentD1),
+      ensureMultiBankSchema(concurrentD1)
+    ]);
+    assert.equal(pragmaCallCount, 2);
+    assert.equal(batchCallCount, 2);
+  });
 });
