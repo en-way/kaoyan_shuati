@@ -19,9 +19,9 @@
   <!-- 极端缓存自愈与容错防护：若旧版缓存抛出 SyntaxError 或 App 未定义，自动秒级清理 Service Worker 缓存并恢复 -->
   <script>
     window.addEventListener('error', function(e) {
-      var isAppError = e && e.filename && e.filename.indexOf('app.js') !== -1;
+      var isAppError = e && e.filename && (e.filename.indexOf('app.js') !== -1 || e.filename.indexOf('main.js') !== -1);
       if (isAppError && e.message && (e.message.indexOf('SyntaxError') !== -1 || e.message.indexOf('Unexpected token') !== -1)) {
-        console.warn('[Self-Healing] Detected stale cached script issue in app.js, purging caches...');
+        console.warn('[Self-Healing] Detected stale cached script issue, purging caches...');
         if ('caches' in window) {
           caches.keys().then(function(names) {
             names.forEach(function(n) { if (n.indexOf('ky-quiz') !== -1) caches.delete(n); });
@@ -36,17 +36,18 @@
     });
   </script>
 
-  <link rel="stylesheet" href="css/style.css?v=20271016_v37">
+  <link rel="stylesheet" href="css/style.css?v=20271122_v38">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
   <header class="app-header">
     <div class="header-left">
       <div class="brand" onclick="App.navigateTo('hub')">
-        <span class="brand-badge">2027</span>
+        <span id="brandYearBadge" class="brand-badge">2027</span>
         <span class="brand-title"><span class="desktop-only-inline">考研政治 </span>1000 题</span>
         <span class="brand-sub desktop-only">官方全解析版</span>
       </div>
+      <div id="bankSelectorWrap" class="bank-selector-wrap" style="display:none;"></div>
       <div id="breadcrumb" class="breadcrumb desktop-only">
         <span class="crumb-item" onclick="App.navigateTo('hub')">题库大厅</span>
         <span class="crumb-sep">/</span>
@@ -998,6 +999,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/app.js?v=20271122_v38"></script>
+  <script type="module" src="js/main.js?v=20271122_v38"></script>
 </body>
 </html>

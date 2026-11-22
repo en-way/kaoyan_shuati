@@ -1,52 +1,47 @@
 /**
- * 2027 考研政治 1000 题 · Service Worker (v37)
- * 缓存策略: Network-First (网络优先 + 离线缓存秒级降级)
- * 具备离线可用性，断网时自动启用本地题库与应用代码
+ * 考研政治 1000 题 · Service Worker (v38 多题库 ES Modules 版)
+ * 缓存策略:
+ * - 核心 App Shell 与拆分后的 ES Modules: install 阶段原子预缓存 + Network-First
+ * - 多题库 JSON (`data/banks/*.json`, `data/questions.json`): 运行时按需缓存（避免 install 阶段预下载所有年份题库浪费用户流量）
  */
 
-const VERSION = 'v37';
+const VERSION = 'v38';
+const ASSET_VER = `20271122_${VERSION}`;
 const CACHE_NAME = `ky-quiz-${VERSION}`;
 
-// 核心 App Shell（轻量级，强保证秒级原子安装成功）
+// 核心 App Shell 与全部拆分后的原生 ES Modules
 const CORE_SHELL_ASSETS = [
   './',
   './index.html',
-  `./css/style.css?v=20271016_${VERSION}`,
-  `./js/config.js?v=20271016_${VERSION}`,
-  `./js/api.js?v=20271016_${VERSION}`,
-  `./js/app.js?v=20271016_${VERSION}`,
+  `./css/style.css?v=${ASSET_VER}`,
+  `./js/main.js?v=${ASSET_VER}`,
+  `./js/app.js?v=${ASSET_VER}`,
+  `./js/config.js`,
+  `./js/api.js`,
+  `./js/state/store.js`,
+  `./js/core/quiz.js`,
+  `./js/core/exam.js`,
+  `./js/core/sync.js`,
+  `./js/ui/views.js`,
+  `./js/ui/modals.js`,
+  `./data/catalog.json?v=${ASSET_VER}`,
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png'
 ];
 
-// 题库大数据包（~1.8MB，采用第二阶段异步容错预存，杜绝因网络抖动中断整个 App Shell 安装）
-const LARGE_DATA_ASSETS = [
-  `./data/questions.json?v=20271016_${VERSION}`
-];
-
-// 1. Install: 两阶段渐进式缓存（使用 Promise.allSettled 确保题库预存不被线程休眠中断）
+// 1. Install: 仅预缓存轻量级 App Shell 与目录清单，不强制预下载所有年份题库 JSON
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      console.log(`[ServiceWorker ${VERSION}] Precaching Core App Shell`);
+      console.log(`[ServiceWorker ${VERSION}] Precaching Core App Shell & ES Modules`);
       await cache.addAll(CORE_SHELL_ASSETS);
-
-      // 第二阶段：安全预存大体积题库文件，确保离线刷题可用
-      console.log(`[ServiceWorker ${VERSION}] Precaching Large Data Assets`);
-      await Promise.allSettled(
-        LARGE_DATA_ASSETS.map((asset) =>
-          cache.add(asset).catch((err) => {
-            console.warn(`[ServiceWorker ${VERSION}] Resilient prefetch for data asset failed:`, asset, err);
-          })
-        )
-      );
     }).then(() => self.skipWaiting())
   );
 });
 
-// 2. Activate: Clear Old Caches (限定只清理以 ky-quiz- 开头的本应用旧版本缓存)
+// 2. Activate: 清理旧版本 ky-quiz-* 缓存
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -62,14 +57,15 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Fetch: Network-First with Offline Fallback
+// 3. Fetch:
+// - /api/ 接口：在线直通，离线返回结构化 503 JSON
+// - data/banks/*.json 与 data/questions.json：运行时按需缓存 (Stale-While-Revalidate / Cache-First 带后台更新)
+// - 其余 App Shell GET 请求：Network-First 带离线缓存回退
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Skip browser-extension or chrome-extension requests
   if (!url.protocol.startsWith('http')) return;
 
-  // 离线 API 拦截降级：如果是 /api/ 接口请求且断网，返回结构化 JSON 503 避免客户端 res.json() 语法崩溃
   if (url.pathname.includes('/api/')) {
     event.respondWith(
       fetch(event.request).catch(() => {
@@ -87,13 +83,42 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 只对 GET 静态资源执行网络优先/缓存降级
   if (event.request.method !== 'GET') return;
+
+  const isBankJson = url.pathname.includes('/data/banks/') || url.pathname.endsWith('/data/questions.json');
+
+  if (isBankJson) {
+    // 题库大文件按需缓存：优先读缓存秒开（并在后台静默校验更新），若未缓存则拉取并写入缓存
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        const networkFetch = fetch(event.request)
+          .then((res) => {
+            if (res && res.status === 200) {
+              cache.put(event.request, res.clone());
+            }
+            return res;
+          })
+          .catch(() => null);
+
+        if (cached) {
+          return cached;
+        }
+        const netRes = await networkFetch;
+        if (netRes) return netRes;
+
+        return new Response(JSON.stringify({ error: '离线状态且该年份题库尚未在本地缓存' }), {
+          status: 503,
+          headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' })
+        });
+      })
+    );
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        // If network request succeeded, cache a copy for offline use
         if (networkResponse && networkResponse.status === 200) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -103,13 +128,12 @@ self.addEventListener('fetch', (event) => {
         return networkResponse;
       })
       .catch(async () => {
-        // Network failed (offline / weak connection), fallback to cache
-        const cachedResponse = await caches.match(event.request);
+        const cachedResponse = await caches.match(event.request)
+          || await caches.match(url.pathname);
         if (cachedResponse) {
           return cachedResponse;
         }
 
-        // If navigation request (page refresh/open), fallback to index.html
         if (event.request.mode === 'navigate') {
           const fallbackPage = await caches.match('./index.html');
           if (fallbackPage) return fallbackPage;
