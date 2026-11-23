@@ -35,11 +35,13 @@ export const App = {
     mistakesList: [],
     filterPart: '',
     filterChapter: '',
-    fontSize: 'md'
+    fontSize: 'md',
+    theme: 'dark'
   },
 
   async init() {
     try {
+      this.initTheme();
       this.initFontSize();
       this.startSessionTimer();
       this.bindGlobalKeys();

@@ -51,7 +51,7 @@
       <div id="breadcrumb" class="breadcrumb desktop-only">
         <span class="crumb-item" onclick="App.navigateTo('hub')">题库大厅</span>
         <span class="crumb-sep">/</span>
-        <span id="crumbSubject" class="crumb-active">马原</span>
+        <span id="crumbSubject" class="crumb-active" title="马原">马原</span>
       </div>
     </div>
 
@@ -85,6 +85,9 @@
       </nav>
 
       <div class="desktop-only header-tools">
+        <button id="btnThemeToggle" class="icon-btn" onclick="App.toggleTheme()" title="切换浅色护眼 / 柔和暗黑主题">
+          <span id="themeToggleIcon">☀️</span> <span id="themeToggleText" class="desktop-only-inline">护眼</span>
+        </button>
         <button class="icon-btn color-coral" onclick="App.resetLocalData()" title="彻底清空本机所有刷题记录与错题本">
           🧹 清空
         </button>
@@ -611,6 +614,18 @@
                 <span>下载云端</span>
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- 双主题视觉切换面板 (移动端设置菜单) -->
+        <div class="font-size-setting-card theme-setting-card">
+          <div class="font-setting-header">
+            <span class="font-setting-title"><span class="font-aa-badge">🎨</span> 界面视觉主题</span>
+            <span class="font-setting-cur m-theme-cur-label">柔和暗黑 (默认)</span>
+          </div>
+          <div class="theme-segmented" role="group" aria-label="界面视觉主题切换">
+            <button type="button" class="theme-seg-btn active" data-theme-opt="dark" onclick="App.setTheme('dark')">🌙 柔和暗黑</button>
+            <button type="button" class="theme-seg-btn" data-theme-opt="light" onclick="App.setTheme('light')">☀️ 浅色护眼</button>
           </div>
         </div>
 

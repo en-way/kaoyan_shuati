@@ -121,6 +121,14 @@ export const viewMethods = {
   },
 
   // ================== NAVIGATION ==================
+  updateBreadcrumb(text) {
+    const crumbEl = document.getElementById('crumbSubject');
+    if (crumbEl && text) {
+      crumbEl.textContent = text;
+      crumbEl.setAttribute('title', text);
+    }
+  },
+
   navigateTo(viewName) {
     if (viewName !== 'practice' && this.state.questionTimerTimer) {
       clearInterval(this.state.questionTimerTimer);
@@ -137,6 +145,9 @@ export const viewMethods = {
       const mBtn = document.getElementById('mNavHubBtn');
       if (mBtn) mBtn.classList.add('active');
       this.loadOverview();
+      if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } else if (viewName === 'practice') {
       document.getElementById('viewPractice').classList.add('active');
       document.getElementById('navPracticeBtn').classList.add('active');
@@ -148,6 +159,11 @@ export const viewMethods = {
         const defaultCh = (firstSub && firstSub.chapters && firstSub.chapters[0]) ? firstSub.chapters[0].name : '导论';
         this.startPractice(defaultPart, defaultCh, '', 'instant');
       } else {
+        const currentQ = this.getCurrentQuestion();
+        if (currentQ) {
+          const shortSub = this.getSubjectShortName(currentQ.part);
+          this.updateBreadcrumb(`${shortSub} · ${currentQ.chapter}`);
+        }
         this.renderQuestion();
       }
     } else if (viewName === 'mistakes') {
@@ -155,6 +171,7 @@ export const viewMethods = {
       document.getElementById('navMistakesBtn').classList.add('active');
       const mBtn = document.getElementById('mNavMistakesBtn');
       if (mBtn) mBtn.classList.add('active');
+      this.updateBreadcrumb('错题攻坚集');
       this.loadMistakes();
     }
   },
@@ -174,6 +191,11 @@ export const viewMethods = {
     const mBadge = document.getElementById('mGlobalMistakeBadge');
     if (mBadge) mBadge.textContent = data.total_mistakes;
 
+    if (this.state.currentView === 'hub' && data.subjects && data.subjects[this.state.activeSubjectIndex]) {
+      const curSub = data.subjects[this.state.activeSubjectIndex];
+      this.updateBreadcrumb(this.getSubjectShortName(curSub.name) || curSub.name);
+    }
+
     this.renderBankSelector();
     this.renderSubjectTabs();
     this.renderChaptersGrid();
@@ -185,11 +207,13 @@ export const viewMethods = {
 
     container.innerHTML = this.state.overview.subjects.map((sub, idx) => {
       const active = idx === this.state.activeSubjectIndex ? 'active' : '';
-      const shortName = sub.name.replace(/^第[一二三四五]部分\s*/, '');
+      const fullName = sub.name.replace(/^第[一二三四五]部分\s*/, '');
+      const shortName = this.getSubjectShortName(sub.name);
       return `
-        <button class="subject-tab ${active}" onclick="App.selectSubjectTab(${idx})">
-          <span>${shortName}</span>
-          <span style="font-size: 11px; opacity: 0.7;">(${sub.answered}/${sub.total})</span>
+        <button class="subject-tab ${active}" onclick="App.selectSubjectTab(${idx})" title="${fullName} (${sub.answered}/${sub.total})">
+          <span class="sub-tab-name-full">${fullName}</span>
+          <span class="sub-tab-name-short">${shortName}</span>
+          <span class="sub-tab-count">(${sub.answered}/${sub.total})</span>
         </button>
       `;
     }).join('');
@@ -197,6 +221,10 @@ export const viewMethods = {
 
   selectSubjectTab(idx) {
     this.state.activeSubjectIndex = idx;
+    if (this.state.overview && this.state.overview.subjects && this.state.overview.subjects[idx]) {
+      const sub = this.state.overview.subjects[idx];
+      this.updateBreadcrumb(this.getSubjectShortName(sub.name) || sub.name);
+    }
     this.renderSubjectTabs();
     this.renderChaptersGrid();
   },
@@ -279,8 +307,7 @@ export const viewMethods = {
 
     const shortSub = part ? this.getSubjectShortName(part) : '全科错题';
     const chTitle = chapter || (mode === 'mistakes_only' ? '专项特训' : '全部章节');
-    const crumbEl = document.getElementById('crumbSubject');
-    if (crumbEl) crumbEl.textContent = `${shortSub} · ${chTitle}`;
+    this.updateBreadcrumb(`${shortSub} · ${chTitle}`);
 
     const data = DB.getQuestions(part, chapter, type, mode);
     this.state.questions = data.questions || [];
@@ -1176,8 +1203,7 @@ export const viewMethods = {
     this.state.explanationVisible = true;
 
     const shortSub = this.getSubjectShortName(q.part);
-    const crumbEl = document.getElementById('crumbSubject');
-    if (crumbEl) crumbEl.textContent = `${shortSub} · 错题精练`;
+    this.updateBreadcrumb(`${shortSub} · 错题精练`);
 
     const qCopy = { ...q, user_selected: [], user_time: 0, is_flagged: false, is_correct: null, in_mistakes: true };
     this.state.questions = [qCopy];

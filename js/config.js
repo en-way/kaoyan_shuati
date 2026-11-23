@@ -15,6 +15,7 @@ export const STORAGE_KEYS = Object.freeze({
   IS_DIRTY: 'kaoyan_is_dirty_2027',
   LAST_SESSION_CHECK: 'kaoyan_last_session_check_2027',
   FONT_SIZE: 'kaoyan_font_size_2027',
+  THEME: 'kaoyan_theme_2027',
   CURRENT_BANK_ID: 'kaoyan_current_bank_id',
   MIGRATED_V38: 'kaoyan_migrated_v38_2027_1000'
 });

@@ -5,6 +5,58 @@ import { KY_CONFIG } from '../config.js';
 import { DB } from '../state/store.js';
 
 export const modalMethods = {
+  // ================== 双主题（柔和暗黑 + 浅色护眼纸感）切换与持久化引擎 ==================
+  initTheme() {
+    const saved = (typeof localStorage !== 'undefined' && localStorage.getItem(KY_CONFIG.STORAGE_KEYS.THEME)) || 'dark';
+    this.setTheme(saved, true);
+  },
+
+  setTheme(theme, silent = false) {
+    const target = theme === 'light' ? 'light' : 'dark';
+    this.state.theme = target;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(KY_CONFIG.STORAGE_KEYS.THEME, target);
+    }
+
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-theme', target);
+      if (document.body) {
+        document.body.setAttribute('data-theme', target);
+        document.body.classList.toggle('theme-light', target === 'light');
+        document.body.classList.toggle('theme-dark', target === 'dark');
+      }
+
+      const metaTheme = document.querySelector('meta[name="theme-color"]');
+      if (metaTheme) {
+        metaTheme.setAttribute('content', target === 'light' ? '#f4f3ee' : '#0b111e');
+      }
+
+      const iconEl = document.getElementById('themeToggleIcon');
+      const textEl = document.getElementById('themeToggleText');
+      if (iconEl) iconEl.textContent = target === 'light' ? '🌙' : '☀️';
+      if (textEl) textEl.textContent = target === 'light' ? '暗黑' : '护眼';
+
+      const curLabel = target === 'light' ? '浅色护眼 (纸感)' : '柔和暗黑 (默认)';
+      document.querySelectorAll('.m-theme-cur-label').forEach(el => {
+        el.textContent = curLabel;
+      });
+
+      document.querySelectorAll('.theme-seg-btn').forEach(btn => {
+        const opt = btn.getAttribute('data-theme-opt');
+        btn.classList.toggle('active', opt === target);
+      });
+    }
+
+    if (!silent && typeof this.showToast === 'function') {
+      this.showToast(target === 'light' ? '☀️ 已切换为「浅色护眼纸感」主题' : '🌙 已切换为「柔和暗黑」主题');
+    }
+  },
+
+  toggleTheme() {
+    const next = this.state.theme === 'light' ? 'dark' : 'light';
+    this.setTheme(next, false);
+  },
+
   // ================== 四档阅读字号自适应与记忆引擎 ==================
   initFontSize() {
     const saved = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.FONT_SIZE) || 'md';
