@@ -1,19 +1,17 @@
-/*
-  X-Content-Type-Options: nosniff
-  X-Frame-Options: DENY
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Strict-Transport-Security: max-age=31536000
+/
+  Cache-Control: no-cache, no-store, must-revalidate
 
-/data/questions.json
-  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
-/icons/*
-  Cache-Control: public, max-age=31536000, immutable
-/css/*
-  Cache-Control: no-cache, must-revalidate
-/js/*
-  Cache-Control: no-cache, must-revalidate
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
-/index.html
-  Cache-Control: no-cache, must-revalidate
+
+/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/css/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/data/catalog.json
+  Cache-Control: public, max-age=0, must-revalidate

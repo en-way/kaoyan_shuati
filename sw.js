@@ -1,12 +1,14 @@
 /**
- * 考研政治 1000 题 · Service Worker (v38 多题库 ES Modules 版)
+ * 考研政治 1000 题 · Service Worker (v38 多题库 ES Modules 加固版)
  * 缓存策略:
- * - 核心 App Shell 与拆分后的 ES Modules: install 阶段原子预缓存 + Network-First
- * - 多题库 JSON (`data/banks/*.json`, `data/questions.json`): 运行时按需缓存（避免 install 阶段预下载所有年份题库浪费用户流量）
+ * - 核心 App Shell 与拆分后的 ES Modules (/js/*.js, /css/*.css, /data/catalog.json, 页面导航):
+ *   install 阶段以 cache: 'no-cache' 原子预缓存 + Network-First (fetch(..., { cache: 'no-cache' }))，断网回退缓存
+ * - 多题库 JSON (`data/banks/*.json`, `data/questions.json`): 运行时按需缓存
+ * - `/api/*` 与非 GET 请求: 严禁缓存，直接跳过走网络
  */
 
 const VERSION = 'v38';
-const ASSET_VER = `20271123_${VERSION}_2`;
+const ASSET_VER = `20271123_${VERSION}_3`;
 const CACHE_NAME = `ky-quiz-${ASSET_VER}`;
 
 // 核心 App Shell 与全部拆分后的原生 ES Modules & 模块化 CSS
@@ -22,18 +24,18 @@ const CORE_SHELL_ASSETS = [
   `./css/style.css?v=${ASSET_VER}`,
   `./js/main.js?v=${ASSET_VER}`,
   `./js/app.js?v=${ASSET_VER}`,
-  `./js/config.js`,
-  `./js/api.js`,
-  `./js/state/store.js`,
-  `./js/core/quiz.js`,
-  `./js/core/exam.js`,
-  `./js/core/sync.js`,
-  `./js/ui/views.js`,
-  `./js/ui/hub-view.js`,
-  `./js/ui/practice-view.js`,
-  `./js/ui/mistakes-view.js`,
-  `./js/ui/explanation-renderer.js`,
-  `./js/ui/modals.js`,
+  './js/config.js',
+  './js/api.js',
+  './js/state/store.js',
+  './js/core/quiz.js',
+  './js/core/exam.js',
+  './js/core/sync.js',
+  './js/ui/views.js',
+  './js/ui/hub-view.js',
+  './js/ui/practice-view.js',
+  './js/ui/mistakes-view.js',
+  './js/ui/explanation-renderer.js',
+  './js/ui/modals.js',
   `./data/catalog.json?v=${ASSET_VER}`,
   './manifest.json',
   './icons/icon-192.png',
@@ -41,79 +43,63 @@ const CORE_SHELL_ASSETS = [
   './icons/apple-touch-icon.png'
 ];
 
-// 1. Install: 仅预缓存轻量级 App Shell 与目录清单，不强制预下载所有年份题库 JSON
+// 1. Install: 以 no-cache 绕过 HTTP 缓存预缓存 App Shell，并立即 skipWaiting()
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      console.log(`[ServiceWorker ${VERSION}] Precaching Core App Shell & ES Modules`);
-      await cache.addAll(CORE_SHELL_ASSETS);
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(async (cache) => {
+        console.log(`[ServiceWorker ${ASSET_VER}] Precaching Core App Shell & ES Modules`);
+        const requests = CORE_SHELL_ASSETS.map((asset) => new Request(asset, { cache: 'no-cache' }));
+        await cache.addAll(requests);
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
-// 2. Activate: 清理旧版本 ky-quiz-* 缓存
+// 2. Activate: 清理所有非当前 CACHE_NAME 的旧缓存并立即接管页面 clients.claim()
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    caches.keys()
+      .then((cacheNames) => Promise.all(
         cacheNames.map((name) => {
-          if (name.startsWith('ky-quiz-') && name !== CACHE_NAME) {
-            console.log(`[ServiceWorker ${VERSION}] Removing old cache:`, name);
+          if (name !== CACHE_NAME) {
+            console.log(`[ServiceWorker ${ASSET_VER}] Removing old cache:`, name);
             return caches.delete(name);
           }
         })
-      );
-    }).then(() => self.clients.claim())
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
 // 3. Fetch:
-// - /api/ 接口：在线直通，离线返回结构化 503 JSON
-// - data/banks/*.json 与 data/questions.json：运行时按需缓存 (Stale-While-Revalidate / Cache-First 带后台更新)
-// - 其余 App Shell GET 请求：Network-First 带离线缓存回退
+// - 非 GET、非同源、/api/* 路径：严禁缓存，直接走网络
+// - data/banks/*.json 与 data/questions.json：运行时按需缓存
+// - 页面导航、/js/*.js、/css/*.css、/data/catalog.json 等同源静态资源：Network-First (cache: 'no-cache') + 离线回退
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+  const { request } = event;
+  const url = new URL(request.url);
 
   if (!url.protocol.startsWith('http')) return;
-
-  if (url.pathname.includes('/api/')) {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(JSON.stringify({
-          success: false,
-          offline: true,
-          error: '当前处于离线离网状态，网络请求失败（本地进度仍完好保存）'
-        }), {
-          status: 503,
-          statusText: 'Service Unavailable (Offline)',
-          headers: new Headers({ 'Content-Type': 'application/json; charset=utf-8' })
-        });
-      })
-    );
-    return;
-  }
-
-  if (event.request.method !== 'GET') return;
+  if (url.origin !== self.location.origin) return;
+  if (request.method !== 'GET') return;
+  if (url.pathname.startsWith('/api/') || url.pathname.includes('/api/')) return;
 
   const isBankJson = url.pathname.includes('/data/banks/') || url.pathname.endsWith('/data/questions.json');
-
   if (isBankJson) {
-    // 题库大文件按需缓存：优先读缓存秒开（并在后台静默校验更新），若未缓存则拉取并写入缓存
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
-        const cached = await cache.match(event.request);
-        const networkFetch = fetch(event.request)
+        const cached = await cache.match(request);
+        const networkFetch = fetch(request)
           .then((res) => {
             if (res && res.status === 200) {
-              cache.put(event.request, res.clone());
+              cache.put(request, res.clone());
             }
             return res;
           })
           .catch(() => null);
 
-        if (cached) {
-          return cached;
-        }
+        if (cached) return cached;
         const netRes = await networkFetch;
         if (netRes) return netRes;
 
@@ -126,25 +112,27 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-First: 联网时强制校验最新版本并写回缓存，断网时回退缓存
+  const fetchTarget = request.mode === 'navigate' ? request.url : request;
   event.respondWith(
-    fetch(event.request)
+    fetch(fetchTarget, { cache: 'no-cache' })
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
+            cache.put(request, responseClone);
           });
         }
         return networkResponse;
       })
       .catch(async () => {
-        const cachedResponse = await caches.match(event.request)
+        const cachedResponse = await caches.match(request)
           || await caches.match(url.pathname);
         if (cachedResponse) {
           return cachedResponse;
         }
 
-        if (event.request.mode === 'navigate') {
+        if (request.mode === 'navigate') {
           const fallbackPage = await caches.match('./index.html');
           if (fallbackPage) return fallbackPage;
         }

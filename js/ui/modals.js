@@ -317,7 +317,7 @@ export const modalMethods = {
   registerServiceWorker() {
     if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       const doRegister = () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' })
+        navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
           .then((reg) => {
             console.log('[PWA] Service Worker registered with scope:', reg.scope);
             reg.update().catch(() => {});
