@@ -184,8 +184,8 @@ export const DB = {
 
     if (!loadedData || !Array.isArray(loadedData.questions)) {
       console.error('Failed to load question bank:', bankId, lastErr);
-      if (typeof globalThis.alert === 'function') {
-        globalThis.alert(`未能加载题库文件 (${meta.file})，请检查网络或部署路径！`);
+      if (globalThis.App && typeof globalThis.App.showToast === 'function') {
+        globalThis.App.showToast(`未能加载题库文件 (${meta.file})，请检查网络或部署路径！`, 'error', 4500);
       }
       return false;
     }
@@ -280,8 +280,8 @@ export const DB = {
       return true;
     } catch (e) {
       console.error('Failed to save user data to localStorage:', e);
-      if (e && e.name === 'QuotaExceededError' && typeof globalThis.alert === 'function') {
-        globalThis.alert('⚠️ 本地存储空间已满，无法保存新答题记录。请尝试清理浏览器缓存或保存到云端。');
+      if (e && e.name === 'QuotaExceededError' && globalThis.App && typeof globalThis.App.showToast === 'function') {
+        globalThis.App.showToast('⚠️ 本地存储空间已满，无法保存新答题记录，请清理缓存或上传云端', 'warning', 4500);
       }
       return false;
     }

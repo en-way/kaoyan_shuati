@@ -1,5 +1,5 @@
 /* ==========================================================================
-   css/base.css - 全局重置、吸顶导航栏、云同步状态栏与全局 Toast
+   css/base.css - 全局重置、克制吸顶导航栏、云同步状态栏与全局 Toast
    ========================================================================== */
 * {
   box-sizing: border-box;
@@ -26,6 +26,7 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* 等宽数字对齐 (防止计时器、题号、统计跳动) */
@@ -54,11 +55,11 @@ body.modal-open {
 
 /* ================== HEADER ================== */
 .app-header {
-  height: 64px;
-  min-height: 64px;
+  height: 60px;
+  min-height: 60px;
   background: var(--bg-header);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
@@ -91,25 +92,29 @@ body.modal-open {
 }
 
 .brand-badge {
-  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  background: var(--accent-cyan);
   color: var(--accent-on-primary);
-  font-weight: 900;
+  font-weight: 800;
   font-size: 11px;
   padding: 2px 7px;
   border-radius: var(--radius-sm);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
 }
 
 .brand-title {
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--text-primary);
 }
 
 .brand-sub {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--accent-cyan);
+  background: var(--accent-cyan-soft);
+  border: 1px solid var(--accent-cyan-border);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
   font-weight: 600;
 }
 
@@ -125,7 +130,7 @@ body.modal-open {
   white-space: nowrap;
 }
 
-.crumb-item { cursor: pointer; transition: color 0.2s; flex-shrink: 0; }
+.crumb-item { cursor: pointer; transition: color 0.18s; flex-shrink: 0; }
 .crumb-item:hover { color: var(--accent-cyan); }
 .crumb-active {
   color: var(--text-secondary);
@@ -137,12 +142,12 @@ body.modal-open {
   white-space: nowrap;
   vertical-align: bottom;
 }
-.crumb-sep { color: var(--border-color); flex-shrink: 0; }
+.crumb-sep { color: var(--border-strong); flex-shrink: 0; }
 
 .header-center {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -150,18 +155,18 @@ body.modal-open {
   background: var(--bg-subtle);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-full);
-  padding: 4px 12px;
+  padding: 4px 11px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 5px;
+  font-size: 12.5px;
   white-space: nowrap;
 }
 
 .timer-icon { font-size: 12px; }
 .timer-label { color: var(--text-muted); font-size: 11px; }
 .timer-val {
-  font-family: 'Consolas', 'Courier New', monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
   color: var(--accent-cyan);
 }
@@ -198,7 +203,7 @@ body.modal-open {
   gap: 6px;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: all 0.2s;
+  transition: all 0.18s ease;
 }
 
 .nav-btn:hover { color: var(--text-primary); }
@@ -235,15 +240,17 @@ body.modal-open {
   padding: 6px 11px;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12.5px;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   white-space: nowrap;
-  transition: all 0.2s;
+  transition: all 0.18s ease;
 }
 .icon-btn:hover {
-  border-color: var(--accent-cyan);
+  border-color: var(--accent-cyan-border);
+  background: var(--accent-cyan-soft);
   color: var(--accent-cyan);
 }
 
@@ -266,31 +273,29 @@ body.modal-open {
   flex-direction: column;
 }
 
-
 /* ================== CLOUD AUTH & SYNC MODULE ================== */
 .user-profile-area {
   display: inline-flex;
   align-items: center;
   position: relative;
-  margin-left: 6px;
+  margin-left: 4px;
 }
 
 .btn-auth-login {
-  background: rgba(0, 240, 255, 0.08);
-  border: 1px solid rgba(0, 240, 255, 0.4);
+  background: var(--accent-cyan-soft);
+  border: 1px solid var(--accent-cyan-border);
   color: var(--accent-cyan);
   padding: 6px 14px;
   border-radius: var(--radius-full);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
 }
 
 .btn-auth-login:hover {
-  background: rgba(0, 240, 255, 0.16);
+  background: var(--accent-cyan-soft-hover);
   border-color: var(--accent-cyan);
-  transform: translateY(-1px);
 }
 
 .user-logged-in-block {
@@ -300,8 +305,8 @@ body.modal-open {
 }
 
 .btn-sync-pill {
-  background: rgba(0, 255, 136, 0.08);
-  border: 1px solid rgba(0, 255, 136, 0.35);
+  background: var(--accent-green-soft);
+  border: 1px solid var(--accent-green-border);
   color: var(--accent-green);
   padding: 5px 12px;
   border-radius: var(--radius-full);
@@ -311,47 +316,46 @@ body.modal-open {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
 }
 
 .btn-sync-pill:hover {
-  background: rgba(0, 255, 136, 0.16);
   border-color: var(--accent-green);
+  filter: brightness(1.06);
 }
 
 .btn-download-pill {
-  background: rgba(0, 240, 255, 0.08);
-  border-color: rgba(0, 240, 255, 0.35);
+  background: var(--accent-cyan-soft);
+  border-color: var(--accent-cyan-border);
   color: var(--accent-cyan);
 }
 
 .btn-download-pill:hover {
-  background: rgba(0, 240, 255, 0.16);
+  background: var(--accent-cyan-soft-hover);
   border-color: var(--accent-cyan);
 }
 
 .btn-sync-pill.dirty {
-  background: rgba(255, 204, 0, 0.12);
-  border-color: rgba(255, 204, 0, 0.5);
-  color: var(--accent-gold);
+  background: var(--accent-amber-soft);
+  border-color: var(--accent-amber-border);
+  color: var(--accent-amber);
   animation: pulse-sync 2s infinite ease-in-out;
 }
 
 .btn-sync-pill.network-weak {
-  background: rgba(245, 158, 11, 0.16) !important;
-  border-color: rgba(245, 158, 11, 0.75) !important;
-  color: #f59e0b !important;
+  background: var(--accent-amber-soft) !important;
+  border-color: var(--accent-amber) !important;
+  color: var(--accent-amber) !important;
   animation: pulse-sync 1.8s infinite ease-in-out;
 }
 
 .btn-sync-pill.network-weak:hover {
-  background: rgba(245, 158, 11, 0.25) !important;
-  border-color: #f59e0b !important;
+  border-color: var(--accent-amber) !important;
 }
 
 @keyframes pulse-sync {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.03); }
+  50% { transform: scale(1.02); }
 }
 
 .btn-sync-pill.syncing .sync-icon {
@@ -368,30 +372,29 @@ body.modal-open {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-subtle);
   border: 1px solid var(--border-color);
   padding: 5px 10px;
   border-radius: var(--radius-full);
   cursor: pointer;
   user-select: none;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
 }
 
 .user-badge:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--bg-subtle-hover);
+  border-color: var(--border-strong);
 }
 
 .user-avatar-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #00ff88;
-  box-shadow: 0 0 8px rgba(0, 255, 136, 0.8);
+  background: var(--accent-green);
 }
 
 .user-nickname {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-primary);
   max-width: 90px;
@@ -413,10 +416,10 @@ body.modal-open {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  min-width: 190px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  min-width: 196px;
+  box-shadow: var(--shadow-modal);
   z-index: 1000;
-  padding: 8px;
+  padding: 6px;
 }
 
 .user-menu-header {
@@ -443,10 +446,10 @@ body.modal-open {
   align-items: center;
   padding: 1.5px 8px;
   border-radius: var(--radius-full);
-  background: rgba(0, 240, 255, 0.1);
-  border: 1px solid rgba(0, 240, 255, 0.28);
+  background: var(--accent-cyan-soft);
+  border: 1px solid var(--accent-cyan-border);
   color: var(--accent-cyan);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
@@ -460,7 +463,7 @@ body.modal-open {
 
 .user-account-pill:hover,
 .user-account-pill:active {
-  background: rgba(0, 240, 255, 0.22);
+  background: var(--accent-cyan-soft-hover);
   border-color: var(--accent-cyan);
 }
 
@@ -472,7 +475,7 @@ body.modal-open {
 .user-menu-divider {
   height: 1px;
   background: var(--border-color);
-  margin: 6px 0;
+  margin: 5px 0;
 }
 
 .user-menu-item {
@@ -491,15 +494,14 @@ body.modal-open {
 }
 
 .user-menu-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-subtle-hover);
   color: var(--text-primary);
 }
 
 .user-menu-item.color-coral:hover {
-  background: rgba(255, 99, 132, 0.12);
+  background: var(--accent-coral-soft);
   color: var(--accent-coral);
 }
-
 
 /* ================== APP TOAST NOTIFICATIONS ================== */
 .app-toast-container {
@@ -518,14 +520,14 @@ body.modal-open {
 
 .app-toast {
   pointer-events: auto;
-  padding: 8px 18px;
-  border-radius: 24px;
+  padding: 9px 18px;
+  border-radius: var(--radius-full);
   font-size: 13.5px;
   font-weight: 600;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-card-hover);
   opacity: 0;
   transform: translateY(-8px) scale(0.96);
-  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   word-break: break-word;
   text-align: center;
   backdrop-filter: blur(12px);
@@ -543,25 +545,25 @@ body.modal-open {
 }
 
 .app-toast.toast-info {
-  background: rgba(26, 32, 44, 0.92);
-  color: #f7fafc;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
 }
 
 .app-toast.toast-success {
-  background: rgba(16, 185, 129, 0.94);
+  background: var(--accent-green);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .app-toast.toast-warning {
-  background: rgba(245, 158, 11, 0.95);
+  background: var(--accent-amber);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .app-toast.toast-error {
-  background: rgba(239, 68, 68, 0.95);
+  background: var(--accent-coral);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }

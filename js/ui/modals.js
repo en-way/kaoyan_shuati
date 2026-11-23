@@ -36,10 +36,75 @@ export const modalMethods = {
     document.querySelectorAll('.modal-backdrop, .drawer-backdrop').forEach(el => {
       el.classList.remove('is-open');
     });
+    if (typeof this.resolveConfirm === 'function') {
+      this.resolveConfirm(false);
+    }
     if (this.auth && typeof this.auth.showNotice === 'function') {
       this.auth.showNotice('', 'none');
     }
     this.updateBodyScrollLock();
+  },
+
+  _confirmResolver: null,
+
+  /**
+   * 全局统一自定义确认弹窗（替代浏览器原生阻塞 confirm()）
+   * @returns {Promise<boolean>}
+   */
+  showConfirm({
+    title = '操作确认',
+    message = '',
+    confirmText = '确认',
+    cancelText = '取消',
+    danger = false
+  } = {}) {
+    if (typeof document === 'undefined') return Promise.resolve(true);
+    const modal = document.getElementById('confirmDialogModal');
+    const titleEl = document.getElementById('confirmDialogTitle');
+    const msgEl = document.getElementById('confirmDialogMessage');
+    const cancelBtn = document.getElementById('confirmDialogCancelBtn');
+    const okBtn = document.getElementById('confirmDialogOkBtn');
+
+    if (!modal || !okBtn) {
+      return Promise.resolve(true);
+    }
+
+    if (this._confirmResolver) {
+      const prev = this._confirmResolver;
+      this._confirmResolver = null;
+      prev(false);
+    }
+
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.textContent = message;
+    if (cancelBtn) cancelBtn.textContent = cancelText;
+    okBtn.textContent = confirmText;
+    okBtn.className = danger ? 'btn-danger' : 'btn-primary';
+
+    return new Promise((resolve) => {
+      this._confirmResolver = resolve;
+      this.openModal('confirmDialogModal');
+    });
+  },
+
+  resolveConfirm(result = false, event = null) {
+    if (event && event.target) {
+      const isBackdrop = event.target.id === 'confirmDialogModal';
+      const isCloseBtn = typeof event.target.closest === 'function'
+        ? Boolean(event.target.closest('.modal-close, #confirmDialogCancelBtn'))
+        : (event.target.classList.contains('modal-close') || event.target.id === 'confirmDialogCancelBtn');
+      const isOkBtn = event.target.id === 'confirmDialogOkBtn';
+      if (!isBackdrop && !isCloseBtn && !isOkBtn) return false;
+    }
+    const modal = document.getElementById('confirmDialogModal');
+    if (modal) modal.classList.remove('is-open');
+    this.updateBodyScrollLock();
+    const resolver = this._confirmResolver;
+    this._confirmResolver = null;
+    if (typeof resolver === 'function') {
+      resolver(Boolean(result));
+    }
+    return true;
   },
 
   updateBodyScrollLock() {
@@ -75,7 +140,7 @@ export const modalMethods = {
 
       const metaTheme = document.querySelector('meta[name="theme-color"]');
       if (metaTheme) {
-        metaTheme.setAttribute('content', target === 'light' ? '#f4f3ee' : '#0b111e');
+        metaTheme.setAttribute('content', target === 'light' ? '#f6f4ef' : '#0c1017');
       }
 
       const iconEl = document.getElementById('themeToggleIcon');

@@ -17,6 +17,7 @@
   /* Compact Header with Safe Area for Notch/Dynamic Island */
   .app-header {
     height: calc(46px + env(safe-area-inset-top, 0px));
+    min-height: calc(46px + env(safe-area-inset-top, 0px));
     padding-top: env(safe-area-inset-top, 0px);
     padding-left: max(12px, env(safe-area-inset-left, 0px));
     padding-right: max(12px, env(safe-area-inset-right, 0px));
@@ -43,7 +44,7 @@
 
   .brand-badge {
     font-size: 9.5px;
-    padding: 1px 4px;
+    padding: 1px 5px;
   }
 
   .mobile-header-actions {
@@ -53,10 +54,10 @@
   }
 
   .m-icon-btn {
-    background: rgba(32, 43, 63, 0.5);
+    background: var(--surface-control);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
-    padding: 4px 8px;
+    padding: 4px 9px;
     border-radius: var(--radius-full);
     font-size: 11px;
     font-weight: 700;
@@ -92,14 +93,14 @@
   }
 
   .stat-number {
-    font-size: 18px;
+    font-size: 19px;
   }
 
   .subject-tabs {
     display: flex;
     overflow-x: auto;
     gap: 6px;
-    padding-bottom: 6px;
+    padding: 4px;
     margin-bottom: 16px;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
@@ -141,7 +142,7 @@
   }
 
   .question-card {
-    padding: 14px 13px;
+    padding: 15px 14px;
     gap: 13px;
     border-radius: 12px;
   }
@@ -198,9 +199,9 @@
     gap: 8px;
     position: sticky;
     bottom: calc(56px + env(safe-area-inset-bottom, 0px));
-    background: rgba(10, 14, 23, 0.9);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: var(--bg-header);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     padding: 8px 0;
     z-index: 50;
   }
@@ -241,7 +242,7 @@
     right: 0;
     height: calc(54px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: rgba(18, 24, 38, 0.95);
+    background: var(--bg-header);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border-top: 1px solid var(--border-color);
@@ -352,7 +353,7 @@
   }
 
   .sheet-btn {
-    background: rgba(32, 43, 63, 0.4);
+    background: var(--bg-subtle);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 14px;
@@ -380,8 +381,8 @@
   }
 
   .sheet-btn.active {
-    background: rgba(0, 240, 255, 0.12);
-    border-color: rgba(0, 240, 255, 0.4);
+    background: var(--accent-cyan-soft);
+    border-color: var(--accent-cyan-border);
   }
 
   .sheet-btn.active .sheet-btn-title {
@@ -397,7 +398,7 @@
   }
 
   .sheet-timer-item {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--bg-subtle);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 10px 12px;
@@ -414,13 +415,13 @@
   .sheet-timer-val {
     font-size: 16px;
     font-weight: 800;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     letter-spacing: 0.5px;
   }
 
   .mobile-app-tip-box {
-    background: rgba(0, 240, 255, 0.06);
-    border: 1px dashed rgba(0, 240, 255, 0.3);
+    background: var(--accent-cyan-soft);
+    border: 1px dashed var(--accent-cyan-border);
     border-radius: var(--radius-md);
     padding: 12px;
     font-size: 12px;
@@ -548,7 +549,7 @@
     flex-direction: row;
     gap: 8px;
     padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    border-top: 1px solid var(--border-color);
   }
 
   .m-item-footer button {
@@ -609,7 +610,6 @@
 
 /* ================== EXTRA SMALL MOBILE (<480px) ================== */
 @media (max-width: 480px) {
-  /* 模考成绩单弹窗移动端自适应垂直布局 */
   .exam-summary-card {
     flex-direction: column;
     padding: 16px 14px;
@@ -640,7 +640,6 @@
 
 /* ================== TABLET TRANSITION BREAKPOINT (769px ~ 1024px) ================== */
 @media (min-width: 769px) and (max-width: 1024px) {
-  /* 隐藏桌面次要工具与面包屑，确保关键的登录同步与导航留存 */
   .breadcrumb,
   .brand-sub,
   .timer-label {
@@ -705,13 +704,10 @@
   }
 }
 
-
 /* ==========================================================================
    PC 桌面端与大显示器深度适配体系 (>= 1024px & >= 1280px)
-   包含：做题页双栏响应式工效学布局、右侧专属答案解析面板、题库大厅多列排布、错题本双列网格
    ========================================================================== */
 @media (min-width: 1024px) {
-  /* 题库大厅宽屏拓宽与卡片 2~3 列自适应 */
   #viewHub {
     max-width: 1400px;
     padding: 32px 24px 56px;
@@ -728,8 +724,8 @@
   }
 
   .chapter-card:hover {
-    border-color: rgba(0, 240, 255, 0.45);
-    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 240, 255, 0.08);
+    border-color: var(--accent-cyan-border);
+    box-shadow: var(--shadow-card-hover);
   }
 
   /* 做题页 PC 双栏自适应布局 (左侧题目卡片 + 右侧专属答案解析面板) */
@@ -755,7 +751,7 @@
     gap: 14px;
   }
 
-  /* 在 PC 桌面端下，左侧题目卡片下方的解析面板隐藏，由右侧专属面板展示，防止冗余重复 */
+  /* PC 双栏下左侧内嵌解析面板隐藏，统一在右侧专属粘性面板呈现 */
   .question-card .explanation-panel {
     display: none !important;
   }
@@ -777,7 +773,7 @@
     }
     #viewHub .chapters-grid {
       grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-      gap: 22px;
+      gap: 20px;
     }
     #viewPractice {
       padding: 24px 32px 48px;
@@ -796,9 +792,9 @@
     flex-direction: column;
     height: 100%;
     padding: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-card);
     overflow: hidden;
-    transition: all 0.25s ease;
+    transition: all 0.2s ease;
   }
 
   /* 状态 1: 待作答占位引导卡 */
@@ -817,24 +813,23 @@
   }
 
   .placeholder-icon-wrap {
-    width: 60px;
-    height: 60px;
+    width: 58px;
+    height: 58px;
     border-radius: 50%;
-    background: rgba(0, 240, 255, 0.08);
-    border: 1px solid rgba(0, 240, 255, 0.25);
+    background: var(--accent-cyan-soft);
+    border: 1px solid var(--accent-cyan-border);
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: 16px;
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
   }
 
   .placeholder-icon {
-    font-size: 28px;
+    font-size: 26px;
   }
 
   .placeholder-title {
-    font-size: 17px;
+    font-size: 16.5px;
     font-weight: 700;
     color: var(--text-primary);
     margin-bottom: 8px;
@@ -880,15 +875,15 @@
     font-weight: 700;
     padding: 3px 8px;
     border-radius: var(--radius-sm);
-    background: rgba(0, 240, 255, 0.12);
+    background: var(--accent-cyan-soft);
     color: var(--accent-cyan);
-    border: 1px solid rgba(0, 240, 255, 0.25);
+    border: 1px solid var(--accent-cyan-border);
   }
 
   .badge-exam {
-    background: rgba(251, 191, 36, 0.12);
-    color: #fbbf24;
-    border-color: rgba(251, 191, 36, 0.3);
+    background: var(--accent-amber-soft);
+    color: var(--accent-amber);
+    border-color: var(--accent-amber-border);
   }
 
   .side-expl-ans-tag {
@@ -905,13 +900,13 @@
 
   .side-ans-val {
     font-size: 16px;
-    font-weight: 900;
+    font-weight: 800;
     color: var(--accent-green);
-    background: rgba(16, 185, 129, 0.15);
-    border: 1px solid rgba(16, 185, 129, 0.35);
+    background: var(--accent-green-soft);
+    border: 1px solid var(--accent-green-border);
     padding: 1px 8px;
     border-radius: 4px;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
   }
 
   .side-expl-scroll-body {
@@ -932,11 +927,11 @@
     background: transparent;
   }
   .side-expl-scroll-body::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--border-strong);
     border-radius: 4px;
   }
   .side-expl-scroll-body::-webkit-scrollbar-thumb:hover {
-    background: rgba(0, 240, 255, 0.4);
+    background: var(--accent-cyan-border);
   }
 
   /* 作答正误结果横幅 */
@@ -944,19 +939,19 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 9px 12px;
     border-radius: var(--radius-md);
     font-size: 13px;
     font-weight: 700;
   }
   .side-result-banner.is-correct {
-    background: rgba(16, 185, 129, 0.15);
-    border: 1px solid rgba(16, 185, 129, 0.4);
+    background: var(--accent-green-soft);
+    border: 1px solid var(--accent-green-border);
     color: var(--accent-green);
   }
   .side-result-banner.is-wrong {
-    background: rgba(255, 71, 87, 0.15);
-    border: 1px solid rgba(255, 71, 87, 0.4);
+    background: var(--accent-coral-soft);
+    border: 1px solid var(--accent-coral-border);
     color: var(--accent-coral);
   }
 
@@ -968,7 +963,7 @@
 
   .side-section-title {
     font-size: 13px;
-    font-weight: 800;
+    font-weight: 700;
     color: var(--accent-cyan);
     letter-spacing: 0.2px;
   }
@@ -977,7 +972,7 @@
     font-size: var(--fs-expl);
     color: var(--text-primary);
     line-height: 1.78;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.015em;
     white-space: pre-wrap;
     word-break: break-word;
     background: var(--bg-elevated);
@@ -1003,7 +998,7 @@
   }
 
   .btn-icon-sub {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--surface-control);
     border: 1px solid var(--border-color);
     color: var(--text-secondary);
     padding: 6px 12px;
@@ -1018,8 +1013,8 @@
   }
   .btn-icon-sub:hover {
     color: var(--accent-cyan);
-    border-color: rgba(0, 240, 255, 0.4);
-    background: rgba(0, 240, 255, 0.08);
+    border-color: var(--accent-cyan-border);
+    background: var(--accent-cyan-soft);
   }
 
   /* 状态 3: 模考进行中卡片 */
@@ -1042,7 +1037,7 @@
 
   .side-exam-time {
     font-size: 14px;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     color: var(--accent-amber);
     font-weight: 700;
   }
@@ -1057,14 +1052,14 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    scrollbar-color: var(--border-strong) transparent;
   }
 
   .side-exam-body::-webkit-scrollbar {
     width: 5px;
   }
   .side-exam-body::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--border-strong);
     border-radius: 4px;
   }
 
@@ -1082,7 +1077,7 @@
 
   .exam-stats-box {
     display: flex;
-    background: rgba(10, 14, 23, 0.5);
+    background: var(--bg-elevated);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 12px 16px;
@@ -1102,7 +1097,7 @@
   .exam-stat-item .val {
     font-size: 16px;
     font-weight: 800;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     color: var(--text-primary);
   }
 
@@ -1193,4 +1188,3 @@
     grid-template-columns: repeat(4, 1fr);
   }
 }
-

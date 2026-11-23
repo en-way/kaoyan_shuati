@@ -270,16 +270,25 @@ export const hubViewMethods = {
     }).join('');
   },
 
-  resetChapter(part, chapter) {
-    if (!confirm(`确定要重置【${chapter}】的作答记录吗？该章节的历史答题数据将被清空。`)) {
-      return;
-    }
+  async resetChapter(part, chapter) {
+    const confirmed = await this.showConfirm({
+      title: '重置章节进度',
+      message: `确定要重置【${chapter}】的作答记录吗？该章节的历史答题数据将被清空。`,
+      confirmText: '确定重置',
+      cancelText: '取消',
+      danger: true
+    });
+    if (!confirmed) return;
+
     DB.resetChapter(part, chapter);
     if (this.state.currentPart === part && this.state.currentChapter === chapter) {
       this.state.questions = [];
       this.state.currentIndex = 0;
     }
     this.loadOverview();
+    if (typeof this.showToast === 'function') {
+      this.showToast(`🔄 已清空【${chapter}】作答记录`, 'info');
+    }
   },
 
   getSubjectShortName(part) {

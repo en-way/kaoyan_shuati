@@ -1,45 +1,69 @@
 /* ==========================================================================
-   css/tokens.css - 双主题色彩 Token、流体字号变量与关键帧动画
+   css/tokens.css - 现代学术沉浸风双主题 Token、流体字号引擎与关键帧动画
    ========================================================================== */
 :root,
 html[data-theme="dark"],
 body.theme-dark {
-  --bg-main: #0b111e;
-  --bg-card: #131b2e;
-  --bg-card-hover: #19243b;
-  --bg-card-active: #202e4a;
-  --bg-elevated: #0f1626;
-  --bg-header: rgba(19, 27, 46, 0.92);
-  --bg-subtle: rgba(255, 255, 255, 0.04);
-  --bg-input: rgba(15, 23, 42, 0.65);
-  --border-color: #223049;
-  --border-focus: #22d3ee;
+  --bg-main: #0c1017;
+  --bg-card: #141923;
+  --bg-card-hover: #1a2130;
+  --bg-card-active: #20293b;
+  --bg-elevated: #10151f;
+  --bg-header: rgba(12, 16, 23, 0.86);
+  --bg-backdrop: rgba(6, 9, 15, 0.72);
+  --bg-subtle: rgba(255, 255, 255, 0.035);
+  --bg-subtle-hover: rgba(255, 255, 255, 0.07);
+  --bg-input: #0e131c;
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #7e92ab;
+  --border-color: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-focus: #38bdf8;
 
-  /* 柔化暗黑主色：降低纯青霓虹 #00f0ff 刺眼感，适合长时间文字阅读 */
-  --accent-cyan: #22d3ee;
+  --text-primary: #eef2f6;
+  --text-secondary: #9aa7b8;
+  --text-muted: #6e7d91;
+
+  /* 现代学术主色：克制天青蓝（零刺眼霓虹发光） */
+  --accent-cyan: #38bdf8;
+  --accent-cyan-hover: #7dd3fc;
+  --accent-cyan-soft: rgba(56, 189, 248, 0.11);
+  --accent-cyan-soft-hover: rgba(56, 189, 248, 0.18);
+  --accent-cyan-border: rgba(56, 189, 248, 0.34);
   --accent-on-primary: #06131f;
-  --accent-blue: #38bdf8;
-  --accent-green: #10b981;
-  --accent-coral: #f43f5e;
-  --accent-amber: #f59e0b;
-  --accent-gold: #eab308;
-  --accent-purple: #a855f7;
 
-  --glow-cyan: 0 4px 14px rgba(34, 211, 238, 0.22);
-  --glow-green: 0 4px 14px rgba(16, 185, 129, 0.22);
-  --glow-coral: 0 4px 14px rgba(244, 63, 94, 0.22);
-  --glow-amber: 0 4px 14px rgba(245, 158, 11, 0.22);
-  --shadow-card: 0 10px 28px rgba(0, 0, 0, 0.32);
+  --accent-blue: #60a5fa;
+  --accent-green: #10b981;
+  --accent-green-soft: rgba(16, 185, 129, 0.12);
+  --accent-green-border: rgba(16, 185, 129, 0.34);
+  --accent-coral: #f43f5e;
+  --accent-coral-soft: rgba(244, 63, 94, 0.12);
+  --accent-coral-border: rgba(244, 63, 94, 0.34);
+  --accent-amber: #f59e0b;
+  --accent-amber-soft: rgba(245, 158, 11, 0.12);
+  --accent-amber-border: rgba(245, 158, 11, 0.34);
+  --accent-gold: #eab308;
+  --accent-purple: #a78bfa;
+  --accent-purple-soft: rgba(167, 139, 250, 0.12);
+  --accent-purple-border: rgba(167, 139, 250, 0.32);
+
+  --surface-control: rgba(255, 255, 255, 0.045);
+  --surface-keycap: linear-gradient(180deg, #212a3b 0%, #151c29 100%);
+  --surface-keycap-border: rgba(255, 255, 255, 0.14);
+  --surface-keycap-bottom: rgba(0, 0, 0, 0.6);
+
+  --glow-cyan: 0 2px 10px rgba(56, 189, 248, 0.18);
+  --glow-green: 0 2px 10px rgba(16, 185, 129, 0.2);
+  --glow-coral: 0 2px 10px rgba(244, 63, 94, 0.2);
+  --glow-amber: 0 2px 10px rgba(245, 158, 11, 0.2);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.28), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover: 0 12px 28px rgba(0, 0, 0, 0.36);
+  --shadow-modal: 0 24px 56px rgba(0, 0, 0, 0.55);
 
   --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-lg: 14px;
   --radius-full: 9999px;
 
   /* 流体自适应字号引擎 (Fluid Typography + 4档手动缩放倍率) */
@@ -53,38 +77,62 @@ body.theme-dark {
   --fs-mistake-expl: calc(clamp(13px, 0.25vw + 12px, 14.6px) * var(--font-scale, 1));
 }
 
-/* 浅色护眼纸感主题 (data-theme="light") */
+/* 温润纸感浅色护眼主题 (data-theme="light") */
 html[data-theme="light"],
 body.theme-light {
-  --bg-main: #f4f3ee;
+  --bg-main: #f6f4ef;
   --bg-card: #ffffff;
-  --bg-card-hover: #f8fafc;
-  --bg-card-active: #eef2f6;
-  --bg-elevated: #f8f7f2;
-  --bg-header: rgba(255, 255, 255, 0.92);
-  --bg-subtle: rgba(15, 23, 42, 0.04);
+  --bg-card-hover: #fbfaf7;
+  --bg-card-active: #f1efe9;
+  --bg-elevated: #f2efe8;
+  --bg-header: rgba(246, 244, 239, 0.88);
+  --bg-backdrop: rgba(15, 23, 42, 0.45);
+  --bg-subtle: rgba(15, 23, 42, 0.035);
+  --bg-subtle-hover: rgba(15, 23, 42, 0.065);
   --bg-input: #ffffff;
-  --border-color: #d8dee9;
-  --border-focus: #0284c7;
 
-  --text-primary: #1e293b;
+  --border-color: rgba(15, 23, 42, 0.1);
+  --border-strong: rgba(15, 23, 42, 0.18);
+  --border-focus: #0369a1;
+
+  --text-primary: #1a2230;
   --text-secondary: #475569;
   --text-muted: #64748b;
 
-  --accent-cyan: #0284c7;
+  --accent-cyan: #0369a1;
+  --accent-cyan-hover: #0284c7;
+  --accent-cyan-soft: rgba(3, 105, 161, 0.09);
+  --accent-cyan-soft-hover: rgba(3, 105, 161, 0.15);
+  --accent-cyan-border: rgba(3, 105, 161, 0.32);
   --accent-on-primary: #ffffff;
+
   --accent-blue: #2563eb;
   --accent-green: #059669;
+  --accent-green-soft: rgba(5, 150, 105, 0.1);
+  --accent-green-border: rgba(5, 150, 105, 0.32);
   --accent-coral: #e11d48;
+  --accent-coral-soft: rgba(225, 29, 72, 0.09);
+  --accent-coral-border: rgba(225, 29, 72, 0.32);
   --accent-amber: #d97706;
+  --accent-amber-soft: rgba(217, 119, 6, 0.1);
+  --accent-amber-border: rgba(217, 119, 6, 0.32);
   --accent-gold: #ca8a04;
   --accent-purple: #7c3aed;
+  --accent-purple-soft: rgba(124, 58, 237, 0.09);
+  --accent-purple-border: rgba(124, 58, 237, 0.28);
 
-  --glow-cyan: 0 4px 12px rgba(2, 132, 199, 0.18);
-  --glow-green: 0 4px 12px rgba(5, 150, 105, 0.18);
-  --glow-coral: 0 4px 12px rgba(225, 29, 72, 0.18);
-  --glow-amber: 0 4px 12px rgba(217, 119, 6, 0.18);
-  --shadow-card: 0 6px 20px rgba(15, 23, 42, 0.06);
+  --surface-control: rgba(15, 23, 42, 0.04);
+  --surface-keycap: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  --surface-keycap-border: #cbd5e1;
+  --surface-keycap-bottom: #94a3b8;
+
+  --glow-cyan: 0 2px 8px rgba(3, 105, 161, 0.16);
+  --glow-green: 0 2px 8px rgba(5, 150, 105, 0.16);
+  --glow-coral: 0 2px 8px rgba(225, 29, 72, 0.16);
+  --glow-amber: 0 2px 8px rgba(217, 119, 6, 0.16);
+  --shadow-card: 0 1px 3px rgba(15, 23, 42, 0.05), 0 6px 18px rgba(15, 23, 42, 0.04);
+  --shadow-card-hover: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-modal: 0 20px 44px rgba(15, 23, 42, 0.18);
 }
 
 html[data-font-size="sm"],
@@ -107,14 +155,13 @@ body[data-font-size="xl"] {
   --font-scale: 1.25;
 }
 
-
 /* ==========================================================================
    Micro-Animations (极速灵动动效 180ms ~ 220ms GPU 加速)
    ========================================================================== */
 @keyframes cardSlideLeft {
   0% {
-    opacity: 0.1;
-    transform: translate3d(24px, 0, 0);
+    opacity: 0.15;
+    transform: translate3d(20px, 0, 0);
   }
   100% {
     opacity: 1;
@@ -124,8 +171,8 @@ body[data-font-size="xl"] {
 
 @keyframes cardSlideRight {
   0% {
-    opacity: 0.1;
-    transform: translate3d(-24px, 0, 0);
+    opacity: 0.15;
+    transform: translate3d(-20px, 0, 0);
   }
   100% {
     opacity: 1;
@@ -143,7 +190,7 @@ body[data-font-size="xl"] {
 
 @keyframes correctPulse {
   0% { transform: scale(1); }
-  50% { transform: scale(1.015); box-shadow: 0 0 16px rgba(16, 185, 129, 0.35); }
+  50% { transform: scale(1.01); box-shadow: 0 0 0 3px var(--accent-green-soft); }
   100% { transform: scale(1); }
 }
 
@@ -152,4 +199,3 @@ body[data-font-size="xl"] {
   25% { transform: translateX(-3px); }
   75% { transform: translateX(3px); }
 }
-
