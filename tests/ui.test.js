@@ -101,9 +101,15 @@ test('UI 模块静态契约与防回归校验', async (t) => {
     assert.ok(match, 'sw.js 应定义 CORE_SHELL_ASSETS');
     const entries = [...match[1].matchAll(/['"`]([^'"`]+)['"`]/g)].map((m) => m[1]);
     assert.ok(entries.length >= 20, 'CORE_SHELL_ASSETS 清单应完整');
+    assert.equal(entries.includes('/'), true, 'sw.js 预缓存清单应包含根路径 /');
+    assert.equal(
+      entries.some((entry) => /(^|\/)index\.html(\?|$)/.test(entry)),
+      false,
+      'sw.js 不应预缓存 ./index.html，防止触发 Cloudflare 308 重定向响应拦截'
+    );
     const cleanedPaths = [];
     for (const raw of entries) {
-      const clean = raw.replace(/\?.*$/, '').replace(/^\.\//, '');
+      const clean = raw.replace(/\?.*$/, '').replace(/^\.?\/+/, '');
       if (!clean) continue;
       cleanedPaths.push(clean);
       assert.equal(fs.existsSync(path.resolve(clean)), true, `sw.js 预缓存资源缺失: ${raw}`);
@@ -116,5 +122,13 @@ test('UI 模块静态契约与防回归校验', async (t) => {
     ]) {
       assert.ok(cleanedPaths.includes(splitMod), `sw.js 预缓存应包含拆分模块 ${splitMod}`);
     }
+  });
+
+  await t.test('manifest.json 应为合法 JSON 且采用根路径 id / start_url / scope', () => {
+    const raw = fs.readFileSync(path.resolve('manifest.json'), 'utf8');
+    const manifest = JSON.parse(raw);
+    assert.equal(manifest.id, '/');
+    assert.equal(manifest.start_url, '/');
+    assert.equal(manifest.scope, '/');
   });
 });

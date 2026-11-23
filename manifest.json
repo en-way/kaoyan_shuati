@@ -1,9 +1,10 @@
 {
+  "id": "/",
   "name": "2027 考研政治 1000 题 · 官方全解析版",
   "short_name": "考研政治",
   "description": "肖秀荣《2027 考研政治 1000 题》全真题库与官方全解析沉浸式做题系统",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0e17",

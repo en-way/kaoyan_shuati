@@ -8,13 +8,22 @@
  */
 
 const VERSION = 'v38';
-const ASSET_VER = `20271123_${VERSION}_5`;
+const ASSET_VER = `20271123_${VERSION}_6`;
 const CACHE_NAME = `ky-quiz-${ASSET_VER}`;
+
+// 移除 Cloudflare Pages 重定向产生的 redirected: true 标记，防止 Chromium/Edge PWA 拦截加载
+function cleanResponse(res) {
+  if (!res || !res.redirected) return res;
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: new Headers(res.headers)
+  });
+}
 
 // 核心 App Shell 与全部拆分后的原生 ES Modules & 模块化 CSS
 const CORE_SHELL_ASSETS = [
-  './',
-  './index.html',
+  '/',
   `./css/tokens.css?v=${ASSET_VER}`,
   `./css/base.css?v=${ASSET_VER}`,
   `./css/hub.css?v=${ASSET_VER}`,
@@ -54,8 +63,16 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then(async (cache) => {
         console.log(`[ServiceWorker ${ASSET_VER}] Precaching Core App Shell & ES Modules`);
-        const requests = CORE_SHELL_ASSETS.map((asset) => new Request(asset, { cache: 'no-cache' }));
-        await cache.addAll(requests);
+        await Promise.all(
+          CORE_SHELL_ASSETS.map(async (asset) => {
+            const req = new Request(asset, { cache: 'no-cache' });
+            const res = await fetch(req);
+            if (!res.ok) {
+              throw new Error(`Precache failed (${res.status}) for ${asset}`);
+            }
+            await cache.put(asset, cleanResponse(res));
+          })
+        );
       })
       .then(() => self.skipWaiting())
   );
@@ -117,29 +134,56 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-First: 联网时强制校验最新版本并写回缓存，断网时回退缓存
-  const fetchTarget = request.mode === 'navigate' ? request.url : request;
-  event.respondWith(
-    fetch(fetchTarget, { cache: 'no-cache' })
-      .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
+  // 页面导航统一请求根路径 '/'，并剥离任何 redirected 标记以防 Chromium/Edge PWA 拦截
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch('/', { cache: 'no-cache' })
+        .then(async (networkResponse) => {
+          const cleaned = cleanResponse(networkResponse);
+          if (cleaned && cleaned.status === 200) {
+            const responseClone = cleaned.clone();
+            try {
+              const cache = await caches.open(CACHE_NAME);
+              await cache.put('/', responseClone);
+            } catch (_) {}
+          }
+          return cleaned;
+        })
+        .catch(async () => {
+          const cachedRoot = await caches.match('/');
+          if (cachedRoot) {
+            return cleanResponse(cachedRoot);
+          }
+
+          return new Response('离线状态且无对应本地缓存', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: new Headers({ 'Content-Type': 'text/plain; charset=utf-8' })
           });
+        })
+    );
+    return;
+  }
+
+  // Network-First: 联网时强制校验最新版本并写回缓存，断网时回退缓存
+  event.respondWith(
+    fetch(request, { cache: 'no-cache' })
+      .then(async (networkResponse) => {
+        const cleaned = cleanResponse(networkResponse);
+        if (cleaned && cleaned.status === 200) {
+          const responseClone = cleaned.clone();
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, responseClone);
+          } catch (_) {}
         }
-        return networkResponse;
+        return cleaned;
       })
       .catch(async () => {
         const cachedResponse = await caches.match(request)
           || await caches.match(url.pathname);
         if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        if (request.mode === 'navigate') {
-          const fallbackPage = await caches.match('./index.html');
-          if (fallbackPage) return fallbackPage;
+          return cleanResponse(cachedResponse);
         }
 
         return new Response('离线状态且无对应本地缓存', {
