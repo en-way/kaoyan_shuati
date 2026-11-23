@@ -556,7 +556,7 @@ export const practiceViewMethods = {
 
   updateDrawerIfOpen() {
     const drawer = document.getElementById('questionDrawer');
-    if (drawer && (drawer.classList.contains('is-open') || drawer.style.display === 'flex')) {
+    if (drawer && drawer.classList.contains('is-open')) {
       const drawerContainer = document.getElementById('drawerGridContainer');
       if (drawerContainer) {
         drawerContainer.innerHTML = this.generatePaletteGridHtml();
@@ -633,7 +633,7 @@ export const practiceViewMethods = {
       }
 
       const anyBackdrop = Array.from(document.querySelectorAll('.modal-backdrop, .drawer-backdrop')).find(el => {
-        return el.classList.contains('is-open') || (el.style.display && el.style.display !== 'none');
+        return el.classList.contains('is-open');
       });
       if (anyBackdrop) {
         return;
@@ -669,7 +669,7 @@ export const practiceViewMethods = {
         if (key === 'M' || e.key === 'Tab') {
           e.preventDefault();
           const drawer = document.getElementById('questionDrawer');
-          if (drawer && (drawer.classList.contains('is-open') || drawer.style.display === 'flex')) {
+          if (drawer && drawer.classList.contains('is-open')) {
             this.closeDrawer();
           } else {
             this.openDrawer();

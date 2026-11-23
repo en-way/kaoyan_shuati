@@ -11,25 +11,22 @@ export const modalMethods = {
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.add('is-open');
-    el.style.display = 'flex';
     this.updateBodyScrollLock();
   },
 
   closeModal(id, event) {
-    if (
-      event &&
-      event.target &&
-      event.target.id !== id &&
-      !event.target.classList.contains('modal-close') &&
-      !event.target.classList.contains('drawer-close') &&
-      !event.target.classList.contains('btn-secondary')
-    ) {
-      return false;
+    if (event && event.target) {
+      const isBackdropClick = event.target.id === id;
+      const isCloseBtn = typeof event.target.closest === 'function'
+        ? Boolean(event.target.closest('.modal-close, .drawer-close, .btn-secondary'))
+        : (event.target.classList.contains('modal-close') || event.target.classList.contains('drawer-close') || event.target.classList.contains('btn-secondary'));
+      if (!isBackdropClick && !isCloseBtn) {
+        return false;
+      }
     }
     const el = document.getElementById(id);
     if (!el) return false;
     el.classList.remove('is-open');
-    el.style.display = 'none';
     this.updateBodyScrollLock();
     return true;
   },
@@ -38,7 +35,6 @@ export const modalMethods = {
     if (typeof document === 'undefined') return;
     document.querySelectorAll('.modal-backdrop, .drawer-backdrop').forEach(el => {
       el.classList.remove('is-open');
-      el.style.display = 'none';
     });
     if (this.auth && typeof this.auth.showNotice === 'function') {
       this.auth.showNotice('', 'none');
@@ -49,7 +45,7 @@ export const modalMethods = {
   updateBodyScrollLock() {
     if (typeof document === 'undefined') return;
     const isAnyOpen = Array.from(document.querySelectorAll('.modal-backdrop, .drawer-backdrop')).some(el => {
-      return el.classList.contains('is-open') || (el.style.display && el.style.display !== 'none');
+      return el.classList.contains('is-open');
     });
     if (document.body) {
       document.body.classList.toggle('modal-open', isAnyOpen);

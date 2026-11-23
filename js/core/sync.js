@@ -232,25 +232,27 @@ export function createAuthController(getApp) {
     openAuthModal(tab = 'login') {
       const App = getApp();
       this.closeUserMenu();
-      const modal = document.getElementById('authModal');
-      if (modal) {
-        modal.style.display = 'flex';
-        this.switchTab(tab);
-        if (App && typeof App.updateBodyScrollLock === 'function') {
-          App.updateBodyScrollLock();
-        }
+      this.switchTab(tab);
+      if (App && typeof App.openModal === 'function') {
+        App.openModal('authModal');
+      } else {
+        const modal = document.getElementById('authModal');
+        if (modal) modal.classList.add('is-open');
       }
     },
 
     closeAuthModal(e) {
       const App = getApp();
+      if (App && typeof App.closeModal === 'function') {
+        if (App.closeModal('authModal', e)) {
+          this.showNotice('', 'none');
+        }
+        return;
+      }
       if (e && e.target && e.target !== e.currentTarget) return;
       const modal = document.getElementById('authModal');
-      if (modal) modal.style.display = 'none';
+      if (modal) modal.classList.remove('is-open');
       this.showNotice('', 'none');
-      if (App && typeof App.updateBodyScrollLock === 'function') {
-        App.updateBodyScrollLock();
-      }
     },
 
     switchTab(tab) {
@@ -438,17 +440,18 @@ export function createAuthController(getApp) {
     openAdminModal() {
       const App = getApp();
       this.closeAuthModal();
-      const modal = document.getElementById('adminModal');
       const resultBox = document.getElementById('adminResultBox');
       const notice = document.getElementById('adminNotice');
       const secretInput = document.getElementById('adminSecretKey');
       const clearLink = document.getElementById('adminClearSecretLink');
 
-      if (modal) modal.style.display = 'flex';
       if (resultBox) resultBox.style.display = 'none';
       if (notice) notice.style.display = 'none';
-      if (App && typeof App.updateBodyScrollLock === 'function') {
-        App.updateBodyScrollLock();
+      if (App && typeof App.openModal === 'function') {
+        App.openModal('adminModal');
+      } else {
+        const modal = document.getElementById('adminModal');
+        if (modal) modal.classList.add('is-open');
       }
 
       const savedSecret = localStorage.getItem('kaoyan_admin_secret_saved') || '';
@@ -462,12 +465,13 @@ export function createAuthController(getApp) {
 
     closeAdminModal(e) {
       const App = getApp();
+      if (App && typeof App.closeModal === 'function') {
+        App.closeModal('adminModal', e);
+        return;
+      }
       if (e && e.target && e.target !== e.currentTarget) return;
       const modal = document.getElementById('adminModal');
-      if (modal) modal.style.display = 'none';
-      if (App && typeof App.updateBodyScrollLock === 'function') {
-        App.updateBodyScrollLock();
-      }
+      if (modal) modal.classList.remove('is-open');
     },
 
     async verifyAdminSecret() {
