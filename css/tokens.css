@@ -79,6 +79,7 @@ body.theme-dark {
 
 /* 温润纸感浅色护眼主题 (data-theme="light") */
 html[data-theme="light"],
+html[data-theme="light"] body,
 body.theme-light {
   --bg-main: #f6f4ef;
   --bg-card: #ffffff;

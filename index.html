@@ -13,7 +13,16 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="考研政治">
   <meta name="theme-color" content="#0c1017">
-  
+  <script>
+    try {
+      if (localStorage.getItem('kaoyan_theme_2027') === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', '#f6f4ef');
+      }
+    } catch (e) {}
+  </script>
+
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
 
   <!-- 极端缓存自愈与容错防护：若旧版缓存抛出 SyntaxError，自动秒级清理 Service Worker 缓存并恢复 -->
@@ -36,12 +45,12 @@
     });
   </script>
 
-  <link rel="stylesheet" href="css/tokens.css?v=20271123_v38_6">
-  <link rel="stylesheet" href="css/base.css?v=20271123_v38_6">
-  <link rel="stylesheet" href="css/hub.css?v=20271123_v38_6">
-  <link rel="stylesheet" href="css/practice.css?v=20271123_v38_6">
-  <link rel="stylesheet" href="css/modals.css?v=20271123_v38_6">
-  <link rel="stylesheet" href="css/responsive.css?v=20271123_v38_6">
+  <link rel="stylesheet" href="css/tokens.css?v=20271123_v38_7">
+  <link rel="stylesheet" href="css/base.css?v=20271123_v38_7">
+  <link rel="stylesheet" href="css/hub.css?v=20271123_v38_7">
+  <link rel="stylesheet" href="css/practice.css?v=20271123_v38_7">
+  <link rel="stylesheet" href="css/modals.css?v=20271123_v38_7">
+  <link rel="stylesheet" href="css/responsive.css?v=20271123_v38_7">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -998,6 +1007,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=20271123_v38_6"></script>
+  <script type="module" src="js/main.js?v=20271123_v38_7"></script>
 </body>
 </html>

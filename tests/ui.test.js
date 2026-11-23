@@ -131,4 +131,18 @@ test('UI 模块静态契约与防回归校验', async (t) => {
     assert.equal(manifest.start_url, '/');
     assert.equal(manifest.scope, '/');
   });
+
+  await t.test('index.html 与 css/tokens.css 应具备浅色护眼首屏防闪屏机制', () => {
+    const html = fs.readFileSync(path.resolve('index.html'), 'utf8');
+    const scriptMatch = html.match(/<meta\s+name="theme-color"[^>]*>\s*<script>([\s\S]*?)<\/script>[\s\S]*?<link\s+rel="stylesheet"\s+href="css\/tokens\.css/);
+    assert.ok(scriptMatch, 'index.html 应在 <meta name="theme-color"> 之后、tokens.css 之前内联同步主题脚本');
+    const inlineCode = scriptMatch[1];
+    assert.match(inlineCode, /try\s*\{[\s\S]*\}\s*catch\s*\(/);
+    assert.match(inlineCode, /kaoyan_theme_2027/);
+    assert.match(inlineCode, /data-theme['"],\s*['"]light['"]/);
+    assert.match(inlineCode, /#f6f4ef/i);
+
+    const tokensCss = fs.readFileSync(path.resolve('css/tokens.css'), 'utf8');
+    assert.match(tokensCss, /html\[data-theme="light"\]\s+body/);
+  });
 });

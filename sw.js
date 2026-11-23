@@ -8,7 +8,7 @@
  */
 
 const VERSION = 'v38';
-const ASSET_VER = `20271123_${VERSION}_6`;
+const ASSET_VER = `20271123_${VERSION}_7`;
 const CACHE_NAME = `ky-quiz-${ASSET_VER}`;
 
 // 移除 Cloudflare Pages 重定向产生的 redirected: true 标记，防止 Chromium/Edge PWA 拦截加载
