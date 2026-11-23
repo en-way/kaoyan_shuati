@@ -267,14 +267,14 @@ export const modalMethods = {
     window.addEventListener('appinstalled', () => {
       this.deferredInstallPrompt = null;
       console.log('[PWA] App successfully installed to desktop/home screen.');
-      alert('🎉 恭喜！应用已成功添加到手机桌面，后续可直接从桌面全屏启动刷题！');
+      this.showToast('🎉 应用已成功添加到手机桌面，后续可直接从主屏幕全屏启动！', 'success', 4500);
     });
   },
 
   async triggerPwaInstall() {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     if (isStandalone) {
-      alert('💡 应用当前已经在手机桌面 App 独立全屏模式中运行！');
+      this.showToast('💡 应用当前已经在手机桌面 App 独立全屏模式中运行！', 'info', 3500);
       return;
     }
 
@@ -282,7 +282,7 @@ export const modalMethods = {
     const isWeChat = /micromessenger/.test(ua);
     const isQQ = /qq\//.test(ua);
     if (isWeChat || isQQ) {
-      alert('⚠️ 微信/QQ 内置浏览器受安全限制无法直接添加到桌面。\n\n请点击右上角「⋯」，选择「在浏览器打开」（如 Safari 或 Chrome），即可一键下载到手机桌面！');
+      this.showToast('⚠️ 微信/QQ 内置浏览器受限，请点击右上角「⋯」选择「在浏览器打开」以添加到桌面', 'warning', 5000);
       return;
     }
 
@@ -300,9 +300,9 @@ export const modalMethods = {
 
     const isIOS = /iphone|ipad|ipod/.test(ua);
     if (isIOS) {
-      alert('🍎 iPhone / iPad 添加到桌面只需 2 步：\n\n1. 点击 Safari 底部中间的【分享 📤】按钮\n2. 在弹出菜单中下滑找到并点击【添加到主屏幕 ➕】\n\n即可直接在手机桌面生成专属 App 图标！');
+      this.showToast('🍎 iPhone/iPad：请点击 Safari 底部「分享 📤」-> 选择「添加到主屏幕 ➕」', 'info', 5200);
     } else {
-      alert('📱 添加到手机桌面方式：\n\n请点击浏览器右上角菜单【⋮】，在菜单中选择【安装应用】或【添加到主屏幕】，即可直接下载到桌面！');
+      this.showToast('📱 请点击浏览器右上角菜单「⋮」-> 选择「安装应用 / 添加到主屏幕」', 'info', 4800);
     }
   },
 

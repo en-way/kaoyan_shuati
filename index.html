@@ -47,7 +47,6 @@
         <span class="brand-title"><span class="desktop-only-inline">考研政治 </span>1000 题</span>
         <span class="brand-sub desktop-only">官方全解析版</span>
       </div>
-      <div id="bankSelectorWrap" class="bank-selector-wrap" style="display:none;"></div>
       <div id="breadcrumb" class="breadcrumb desktop-only">
         <span class="crumb-item" onclick="App.navigateTo('hub')">题库大厅</span>
         <span class="crumb-sep">/</span>
@@ -156,9 +155,13 @@
     <!-- VIEW 1: CHAPTER HUB (题库目录大厅) -->
     <section id="viewHub" class="view-section active">
       <div class="hub-header">
-        <div class="hub-welcome">
-          <h2>考研政治 1000 题 · 官方全真题库</h2>
-          <p class="hub-desc">肖秀荣《2027 考研政治 1000 题》全收录 · 配备全部 1,148 道官方标准答案、出处定位、详细简析与名师点拨</p>
+        <div class="hub-top-bar">
+          <div class="hub-welcome">
+            <h2 id="hubWelcomeTitle">考研政治 1000 题 · 官方全真题库</h2>
+            <p class="hub-desc" id="hubWelcomeDesc">肖秀荣《2027 考研政治 1000 题》全收录 · 配备全部 1,148 道官方标准答案、出处定位、详细简析与名师点拨</p>
+          </div>
+          <!-- 多题库/年份卡片胶囊切换栏（桌面端与移动端统一入口） -->
+          <div id="hubBankSwitcher" class="hub-bank-switcher" aria-label="题库版本切换栏"></div>
         </div>
 
         <div class="hub-stats-bar">

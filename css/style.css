@@ -383,6 +383,134 @@ body.modal-open {
   margin-bottom: 24px;
 }
 
+.hub-top-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hub-welcome {
+  flex: 1 1 480px;
+  min-width: 0;
+}
+
+.hub-bank-switcher {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bank-active-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  font-size: 12.5px;
+  box-shadow: var(--shadow-card);
+}
+
+.bank-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.bank-badge-year {
+  background: rgba(34, 211, 238, 0.14);
+  color: var(--accent-cyan);
+  font-weight: 800;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+}
+
+.bank-badge-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.bank-badge-count {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border-color);
+}
+
+.bank-pills-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  padding: 6px 10px;
+  border-radius: var(--radius-lg);
+  flex-wrap: wrap;
+  box-shadow: var(--shadow-card);
+}
+
+.bank-switcher-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-left: 4px;
+  white-space: nowrap;
+}
+
+.bank-pills-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bank-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.bank-pill-btn:hover {
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}
+
+.bank-pill-btn.active {
+  background: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  color: var(--accent-on-primary);
+  box-shadow: var(--glow-cyan);
+}
+
+.bank-pill-year {
+  font-weight: 800;
+  font-size: 11px;
+  opacity: 0.9;
+}
+
+.bank-pill-cnt {
+  font-size: 11px;
+  opacity: 0.75;
+  font-family: var(--font-mono);
+}
+
 .hub-welcome h2 {
   font-size: 26px;
   font-weight: 800;
@@ -687,15 +815,16 @@ body.modal-open {
   display: none;
 }
 
-/* Practice Toolbar */
+/* Practice Toolbar: 轻量化工具栏，弱化次要边框对题干阅读的视觉干扰 */
 .practice-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 10px 16px;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
 
 .p-toolbar-top-row {
@@ -1086,9 +1215,10 @@ body.modal-open {
 .q-stem {
   font-size: var(--fs-stem);
   font-weight: 600;
-  line-height: 1.72;
+  line-height: 1.78;
   color: var(--text-primary);
   letter-spacing: 0.02em;
+  max-width: 72ch;
   word-break: break-word;
   overflow-wrap: break-word;
 }

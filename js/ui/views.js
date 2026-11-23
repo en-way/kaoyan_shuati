@@ -5,7 +5,7 @@
 import { DB } from '../state/store.js';
 
 export const viewMethods = {
-  // ================== 多题库/年份动态切换 UI ==================
+  // ================== 多题库/年份动态切换 UI（大厅卡片/胶囊切换栏） ==================
   renderBankSelector() {
     const meta = DB.getBankMeta(DB.currentBankId);
     const yearBadge = document.getElementById('brandYearBadge');
@@ -13,31 +13,55 @@ export const viewMethods = {
       yearBadge.textContent = String(meta.year);
     }
 
-    const wrap = document.getElementById('bankSelectorWrap');
-    if (!wrap) return;
+    const titleEl = document.getElementById('hubWelcomeTitle');
+    if (titleEl && meta && meta.title) {
+      titleEl.textContent = `${meta.title} · 官方全真题库`;
+    }
+    const descEl = document.getElementById('hubWelcomeDesc');
+    if (descEl && meta && meta.description) {
+      descEl.textContent = meta.description;
+    }
+
+    const switcher = document.getElementById('hubBankSwitcher');
+    if (!switcher) return;
 
     const banks = (DB.catalog && Array.isArray(DB.catalog.banks)) ? DB.catalog.banks : [];
     if (banks.length <= 1) {
-      // 单题库时保持顶部简洁不突兀
-      wrap.style.display = 'none';
-      wrap.innerHTML = '';
+      const b = banks[0] || meta;
+      const qCount = (b && b.questionCount) ? `${b.questionCount.toLocaleString()} 题` : '全量解析';
+      switcher.innerHTML = `
+        <div class="bank-active-badge" title="当前题库进度与错题本已独立存档">
+          <span class="bank-badge-dot"></span>
+          <span class="bank-badge-year">${b.year || 2027}版</span>
+          <span class="bank-badge-name">${b.shortTitle || b.title || '肖1000题'}</span>
+          <span class="bank-badge-count">${qCount}</span>
+        </div>
+      `;
       return;
     }
 
-    wrap.style.display = 'inline-flex';
-    const optionsHtml = banks.map(b => {
-      const sel = b.id === DB.currentBankId ? 'selected' : '';
+    const pillsHtml = banks.map(b => {
+      const isAct = b.id === DB.currentBankId;
+      const activeClass = isAct ? 'active' : '';
       const label = b.shortTitle || `${b.year}版1000题`;
-      return `<option value="${b.id}" ${sel}>${label}</option>`;
+      const qCount = b.questionCount ? `${b.questionCount}题` : '';
+      return `
+        <button type="button"
+                class="bank-pill-btn ${activeClass}"
+                onclick="App.switchQuestionBank('${b.id}')"
+                title="${b.title || label}（做题进度与错题本按题库独立保存）">
+          <span class="bank-pill-year">${b.year || ''}</span>
+          <span class="bank-pill-title">${label}</span>
+          ${qCount ? `<span class="bank-pill-cnt">${qCount}</span>` : ''}
+        </button>
+      `;
     }).join('');
 
-    wrap.innerHTML = `
-      <select id="bankSelectorSelect" class="bank-selector-select"
-              onchange="App.switchQuestionBank(this.value)"
-              title="切换不同年份/专项题库（进度独立保存）"
-              style="background:rgba(255,255,255,0.08);color:var(--text-primary);border:1px solid rgba(255,255,255,0.16);border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer;margin-left:8px;">
-        ${optionsHtml}
-      </select>
+    switcher.innerHTML = `
+      <div class="bank-pills-group" role="tablist" aria-label="切换年份题库">
+        <span class="bank-switcher-label">📚 题库切换:</span>
+        <div class="bank-pills-list">${pillsHtml}</div>
+      </div>
     `;
   },
 
@@ -744,7 +768,7 @@ export const viewMethods = {
     if (!q) return;
 
     if (this.state.selectedOptions.length === 0) {
-      alert('请先选择选项！');
+      this.showToast('⚠️ 请先至少勾选一个选项后再提交！', 'warning', 2600);
       return;
     }
     this.submitAnswerNow(true);
@@ -808,7 +832,7 @@ export const viewMethods = {
       if (mode === 'exam') {
         this.submitExam();
       } else {
-        alert('🎉 恭喜！你已完成本章节的所有题目！');
+        this.showToast('🎉 恭喜！你已完成本章节的所有题目！', 'success', 3200);
         this.navigateTo('hub');
       }
     }
@@ -1221,7 +1245,7 @@ export const viewMethods = {
 
   startMistakesTraining() {
     if (!this.state.mistakesList.length) {
-      alert('当前筛选条件下暂无待攻克错题！');
+      this.showToast('🎉 当前筛选条件下暂无待攻克错题！', 'info', 2800);
       return;
     }
     const part = this.state.filterPart || '';
