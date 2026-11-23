@@ -1,10 +1,61 @@
 /**
- * 弹窗、设置、字号控制、本地备份导入导出与 PWA 安装交互层 (js/ui/modals.js)
+ * 弹窗、设置、字号控制、双主题切换、本地备份导入导出与 PWA 安装交互层 (js/ui/modals.js)
+ * 统一通过 .is-open 类名管理弹窗与抽屉显隐状态及滚动穿透锁定，消除硬编码弹窗 ID 列表。
  */
 import { KY_CONFIG } from '../config.js';
 import { DB } from '../state/store.js';
 
 export const modalMethods = {
+  // ================== 统一弹窗/抽屉控制器 (.is-open + 滚动锁管理) ==================
+  openModal(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('is-open');
+    el.style.display = 'flex';
+    this.updateBodyScrollLock();
+  },
+
+  closeModal(id, event) {
+    if (
+      event &&
+      event.target &&
+      event.target.id !== id &&
+      !event.target.classList.contains('modal-close') &&
+      !event.target.classList.contains('drawer-close') &&
+      !event.target.classList.contains('btn-secondary')
+    ) {
+      return false;
+    }
+    const el = document.getElementById(id);
+    if (!el) return false;
+    el.classList.remove('is-open');
+    el.style.display = 'none';
+    this.updateBodyScrollLock();
+    return true;
+  },
+
+  closeAllModals() {
+    if (typeof document === 'undefined') return;
+    document.querySelectorAll('.modal-backdrop, .drawer-backdrop').forEach(el => {
+      el.classList.remove('is-open');
+      el.style.display = 'none';
+    });
+    if (this.auth && typeof this.auth.showNotice === 'function') {
+      this.auth.showNotice('', 'none');
+    }
+    this.updateBodyScrollLock();
+  },
+
+  updateBodyScrollLock() {
+    if (typeof document === 'undefined') return;
+    const isAnyOpen = Array.from(document.querySelectorAll('.modal-backdrop, .drawer-backdrop')).some(el => {
+      return el.classList.contains('is-open') || (el.style.display && el.style.display !== 'none');
+    });
+    if (document.body) {
+      document.body.classList.toggle('modal-open', isAnyOpen);
+    }
+  },
+
   // ================== 双主题（柔和暗黑 + 浅色护眼纸感）切换与持久化引擎 ==================
   initTheme() {
     const saved = (typeof localStorage !== 'undefined' && localStorage.getItem(KY_CONFIG.STORAGE_KEYS.THEME)) || 'dark';
@@ -161,34 +212,20 @@ export const modalMethods = {
 
   // ================== MOBILE MORE MENU ==================
   openMoreMenu() {
-    const modal = document.getElementById('moreMenuModal');
-    if (modal) modal.style.display = 'flex';
-    this.updateBodyScrollLock();
+    this.openModal('moreMenuModal');
   },
 
   closeMoreMenu(event) {
-    if (event && event.target && event.target.id !== 'moreMenuModal' && !event.target.classList.contains('modal-close')) {
-      return;
-    }
-    const modal = document.getElementById('moreMenuModal');
-    if (modal) modal.style.display = 'none';
-    this.updateBodyScrollLock();
+    this.closeModal('moreMenuModal', event);
   },
 
   // ================== MOBILE MODE SELECTOR ==================
   openModeSelect() {
-    const modal = document.getElementById('modeSelectModal');
-    if (modal) modal.style.display = 'flex';
-    this.updateBodyScrollLock();
+    this.openModal('modeSelectModal');
   },
 
   closeModeSelect(event) {
-    if (event && event.target && event.target.id !== 'modeSelectModal' && !event.target.classList.contains('modal-close')) {
-      return;
-    }
-    const modal = document.getElementById('modeSelectModal');
-    if (modal) modal.style.display = 'none';
-    this.updateBodyScrollLock();
+    this.closeModal('modeSelectModal', event);
   },
 
   selectModeFromSheet(mode) {
@@ -220,36 +257,11 @@ export const modalMethods = {
       submitBtn.style.display = (mode === 'exam') ? 'flex' : 'none';
     }
 
-    modal.style.display = 'flex';
-    this.updateBodyScrollLock();
+    this.openModal('questionMoreModal');
   },
 
   closeQuestionMoreMenu(event) {
-    if (event && event.target && event.target.id !== 'questionMoreModal' && !event.target.classList.contains('modal-close')) {
-      return;
-    }
-    const modal = document.getElementById('questionMoreModal');
-    if (modal) modal.style.display = 'none';
-    this.updateBodyScrollLock();
-  },
-
-  updateBodyScrollLock() {
-    const modalIds = [
-      'authModal',
-      'adminModal',
-      'moreMenuModal',
-      'modeSelectModal',
-      'questionMoreModal',
-      'questionDrawer',
-      'examReportModal'
-    ];
-    const isAnyOpen = modalIds.some(id => {
-      const el = document.getElementById(id);
-      return el && el.style.display && el.style.display !== 'none';
-    });
-    if (document.body) {
-      document.body.classList.toggle('modal-open', isAnyOpen);
-    }
+    this.closeModal('questionMoreModal', event);
   },
 
   // ================== PWA & SERVICE WORKER ==================

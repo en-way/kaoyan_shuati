@@ -43,6 +43,7 @@ export const App = {
     try {
       this.initTheme();
       this.initFontSize();
+      this.bindViewEvents();
       this.startSessionTimer();
       this.bindGlobalKeys();
       this.bindTouchGestures();

@@ -6,13 +6,19 @@
  */
 
 const VERSION = 'v38';
-const ASSET_VER = `20271122_${VERSION}`;
-const CACHE_NAME = `ky-quiz-${VERSION}`;
+const ASSET_VER = `20271123_${VERSION}`;
+const CACHE_NAME = `ky-quiz-${ASSET_VER}`;
 
-// 核心 App Shell 与全部拆分后的原生 ES Modules
+// 核心 App Shell 与全部拆分后的原生 ES Modules & 模块化 CSS
 const CORE_SHELL_ASSETS = [
   './',
   './index.html',
+  `./css/tokens.css?v=${ASSET_VER}`,
+  `./css/base.css?v=${ASSET_VER}`,
+  `./css/hub.css?v=${ASSET_VER}`,
+  `./css/practice.css?v=${ASSET_VER}`,
+  `./css/modals.css?v=${ASSET_VER}`,
+  `./css/responsive.css?v=${ASSET_VER}`,
   `./css/style.css?v=${ASSET_VER}`,
   `./js/main.js?v=${ASSET_VER}`,
   `./js/app.js?v=${ASSET_VER}`,
@@ -23,6 +29,10 @@ const CORE_SHELL_ASSETS = [
   `./js/core/exam.js`,
   `./js/core/sync.js`,
   `./js/ui/views.js`,
+  `./js/ui/hub-view.js`,
+  `./js/ui/practice-view.js`,
+  `./js/ui/mistakes-view.js`,
+  `./js/ui/explanation-renderer.js`,
   `./js/ui/modals.js`,
   `./data/catalog.json?v=${ASSET_VER}`,
   './manifest.json',
