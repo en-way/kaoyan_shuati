@@ -6,7 +6,7 @@
  */
 
 const VERSION = 'v38';
-const ASSET_VER = `20271123_${VERSION}_1`;
+const ASSET_VER = `20271123_${VERSION}_2`;
 const CACHE_NAME = `ky-quiz-${ASSET_VER}`;
 
 // 核心 App Shell 与全部拆分后的原生 ES Modules & 模块化 CSS

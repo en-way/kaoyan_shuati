@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { DB } from '../js/state/store.js';
+import { viewMethods } from '../js/ui/views.js';
+import { modalMethods } from '../js/ui/modals.js';
+
+const UI_DIR = path.resolve('js/ui');
+
+test('UI 模块静态契约与防回归校验', async (t) => {
+  const uiFiles = fs.readdirSync(UI_DIR).filter(f => f.endsWith('.js'));
+
+  await t.test('js/ui/*.js 中所有 DB.<method>() 调用必须真实存在于 DB 对象上', () => {
+    const missing = [];
+    for (const file of uiFiles) {
+      const content = fs.readFileSync(path.join(UI_DIR, file), 'utf8');
+      const lines = content.split(/\r?\n/);
+      lines.forEach((line, idx) => {
+        for (const match of line.matchAll(/\bDB\.([a-zA-Z0-9_]+)\s*\(/g)) {
+          const method = match[1];
+          if (typeof DB[method] !== 'function') {
+            missing.push(`${file}:${idx + 1} -> DB.${method}()`);
+          }
+        }
+      });
+    }
+    assert.deepEqual(missing, [], `发现未定义的 DB 方法调用:\n${missing.join('\n')}`);
+  });
+
+  await t.test('js/ui/*.js 中所有 this.<method>() 调用必须已正确挂载到 App', () => {
+    const appMethods = new Set([
+      ...Object.keys(viewMethods),
+      ...Object.keys(modalMethods),
+      'init'
+    ]);
+    const missing = [];
+    for (const file of uiFiles) {
+      const content = fs.readFileSync(path.join(UI_DIR, file), 'utf8');
+      const lines = content.split(/\r?\n/);
+      lines.forEach((line, idx) => {
+        for (const match of line.matchAll(/\bthis\.([a-zA-Z0-9_]+)\s*\(/g)) {
+          const method = match[1];
+          if (!appMethods.has(method)) {
+            missing.push(`${file}:${idx + 1} -> this.${method}()`);
+          }
+        }
+      });
+    }
+    assert.deepEqual(missing, [], `发现未挂载到 App 的 this 方法调用:\n${missing.join('\n')}`);
+  });
+
+  await t.test('css/modals.css 中 .modal-backdrop 与 .drawer-backdrop 默认隐藏且仅 .is-open 时显示', () => {
+    const modalsCss = fs.readFileSync(path.resolve('css/modals.css'), 'utf8');
+    assert.match(modalsCss, /\.modal-backdrop,\s*\.drawer-backdrop\s*\{\s*display:\s*none;\s*\}/);
+    assert.match(modalsCss, /\.modal-backdrop\.is-open,\s*\.drawer-backdrop\.is-open\s*\{\s*display:\s*flex;\s*\}/);
+  });
+});

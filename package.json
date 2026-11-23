@@ -5,7 +5,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node --test tests/quiz.test.js tests/store.test.js tests/sync.test.js tests/api.test.js",
+    "test": "node --test tests/quiz.test.js tests/store.test.js tests/sync.test.js tests/api.test.js tests/ui.test.js",
     "dev": "npx wrangler pages dev ."
   },
   "license": "MIT"
