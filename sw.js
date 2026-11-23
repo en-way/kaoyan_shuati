@@ -8,7 +8,7 @@
  */
 
 const VERSION = 'v38';
-const ASSET_VER = `20271123_${VERSION}_3`;
+const ASSET_VER = `20271123_${VERSION}_4`;
 const CACHE_NAME = `ky-quiz-${ASSET_VER}`;
 
 // 核心 App Shell 与全部拆分后的原生 ES Modules & 模块化 CSS
@@ -35,6 +35,7 @@ const CORE_SHELL_ASSETS = [
   './js/ui/practice-view.js',
   './js/ui/mistakes-view.js',
   './js/ui/explanation-renderer.js',
+  './js/ui/sanitize.js',
   './js/ui/modals.js',
   `./data/catalog.json?v=${ASSET_VER}`,
   './manifest.json',

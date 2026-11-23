@@ -3,6 +3,7 @@
  * 负责做题主界面、做题模式切换、选项判题、答题卡抽屉、模考交卷成绩单、计时器与快捷键/手势。
  */
 import { DB } from '../state/store.js';
+import { escapeHtml } from './sanitize.js';
 
 export const practiceViewMethods = {
   // ================== TIMERS ==================
@@ -258,7 +259,7 @@ export const practiceViewMethods = {
     const subItemsContainer = document.getElementById('qSubItems');
     if (q.sub_items && q.sub_items.length > 0) {
       subItemsContainer.style.display = 'flex';
-      subItemsContainer.innerHTML = q.sub_items.map(s => `<div class="sub-item-line">${s}</div>`).join('');
+      subItemsContainer.innerHTML = q.sub_items.map(s => `<div class="sub-item-line">${escapeHtml(s)}</div>`).join('');
     } else {
       subItemsContainer.style.display = 'none';
     }
@@ -288,10 +289,11 @@ export const practiceViewMethods = {
         }
       }
 
+      const safeKey = escapeHtml(opt.key);
       return `
-        <div class="option-item ${extraClass}" data-action="select-option" data-key="${opt.key}">
-          <div class="option-key-badge">${opt.key}</div>
-          <div class="option-text">${opt.text}</div>
+        <div class="option-item ${extraClass}" data-action="select-option" data-key="${safeKey}">
+          <div class="option-key-badge">${safeKey}</div>
+          <div class="option-text">${escapeHtml(opt.text)}</div>
         </div>
       `;
     }).join('');
@@ -500,9 +502,9 @@ export const practiceViewMethods = {
           : `<span style="color:var(--accent-coral);font-size:12px;margin-left:6px;">+0分</span>`;
         return `
           <div class="report-row ${rowClass}">
-            <span>${icon} <strong>第 ${r.num} 题</strong> (${r.type} ${r.max_score}分) ${scoreTag}</span>
-            <span>你的选择: <code>${r.user_ans}</code></span>
-            <span>正确答案: <strong style="color:var(--accent-green)">${r.standard_ans}</strong></span>
+            <span>${icon} <strong>第 ${escapeHtml(r.num)} 题</strong> (${escapeHtml(r.type)} ${escapeHtml(r.max_score)}分) ${scoreTag}</span>
+            <span>你的选择: <code>${escapeHtml(r.user_ans)}</code></span>
+            <span>正确答案: <strong style="color:var(--accent-green)">${escapeHtml(r.standard_ans)}</strong></span>
           </div>
         `;
       }).join('');
@@ -546,9 +548,10 @@ export const practiceViewMethods = {
         }
       }
 
+      const safeNum = escapeHtml(q.num);
       return `
-        <button type="button" class="grid-q-btn ${stateClass}" data-action="jump-question" data-index="${idx}" title="第 ${q.num} 题">
-          ${q.num}
+        <button type="button" class="grid-q-btn ${stateClass}" data-action="jump-question" data-index="${idx}" title="第 ${safeNum} 题">
+          ${safeNum}
         </button>
       `;
     }).join('');

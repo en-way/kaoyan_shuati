@@ -3,10 +3,19 @@ import {
   jsonResponse,
   errorResponse
 } from '../../utils/auth.js';
-import { readJsonBody, handleError } from '../../utils/http.js';
-import { MAX_SYNC_BODY_BYTES } from '../../utils/constants.js';
+import { readJsonBody, handleError, ErrorCode } from '../../utils/http.js';
+import { MAX_SYNC_BODY_BYTES, JWT_CLOCK_SKEW_MS } from '../../utils/constants.js';
 import { resolveBankId } from '../../utils/validate.js';
 import { ensureMultiBankSchema } from '../../utils/db-migrate.js';
+
+function isTokenRevoked(authUser, userUpdatedAt) {
+  return Boolean(
+    authUser &&
+    authUser.iat &&
+    userUpdatedAt &&
+    authUser.iat * 1000 + JWT_CLOCK_SKEW_MS < userUpdatedAt
+  );
+}
 
 export async function onRequestOptions() {
   return jsonResponse({}, 200);
@@ -88,9 +97,9 @@ export async function onRequestGet(context) {
     const clientTimeParam = url.searchParams.get('clientTime');
     const clientTime = clientTimeParam ? parseInt(clientTimeParam, 10) : 0;
 
-    // 单次 LEFT JOIN 合并查询：同时检查用户存在性与获取该题库进度，节省 50% D1 读取操作
+    // 单次 LEFT JOIN 合并查询：同时检查用户存在性、Token 吊销时间点与该题库进度
     const row = await env.DB.prepare(`
-      SELECT u.id AS uid, p.answers_data, p.mistakes_data, p.version, p.updated_at
+      SELECT u.id AS uid, u.updated_at AS user_updated_at, p.answers_data, p.mistakes_data, p.version, p.updated_at
       FROM users u
       LEFT JOIN user_progress p ON u.id = p.user_id AND p.bank_id = ?
       WHERE u.id = ?
@@ -102,6 +111,10 @@ export async function onRequestGet(context) {
         code: 'USER_DELETED',
         error: '账号在云端已被删除'
       }, 404);
+    }
+
+    if (isTokenRevoked(authUser, row.user_updated_at)) {
+      return errorResponse('密码已变更，请重新登录', 401, ErrorCode.TOKEN_REVOKED);
     }
 
     const updatedAt = row.updated_at || 0;
@@ -185,9 +198,9 @@ export async function onRequestPost(context) {
     const hasExpectedVersion = expectedVersionRaw !== undefined && expectedVersionRaw !== null && expectedVersionRaw !== '';
     const expectedVersion = hasExpectedVersion ? parseInt(expectedVersionRaw, 10) : null;
 
-    // 单次 LEFT JOIN 查询：确认用户存活并获取该题库现有进度
+    // 单次 LEFT JOIN 查询：确认用户存活、Token 未吊销并获取该题库现有进度
     const existing = await env.DB.prepare(`
-      SELECT u.id AS uid, p.version, p.updated_at, p.answers_data, p.mistakes_data
+      SELECT u.id AS uid, u.updated_at AS user_updated_at, p.version, p.updated_at, p.answers_data, p.mistakes_data
       FROM users u
       LEFT JOIN user_progress p ON u.id = p.user_id AND p.bank_id = ?
       WHERE u.id = ?
@@ -201,7 +214,13 @@ export async function onRequestPost(context) {
       }, 404);
     }
 
-    const hasCloudRow = existing.updated_at !== null && existing.updated_at !== undefined;
+    if (isTokenRevoked(authUser, existing.user_updated_at)) {
+      return errorResponse('密码已变更，请重新登录', 401, ErrorCode.TOKEN_REVOKED);
+    }
+
+    const hasCloudRow =
+      (existing.updated_at !== null && existing.updated_at !== undefined) ||
+      (existing.version !== null && existing.version !== undefined);
     const cloudVersion = hasCloudRow && Number.isFinite(existing.version) && existing.version > 0 ? existing.version : 1;
 
     let cloudAnswers = {};
@@ -298,16 +317,43 @@ export async function onRequestPost(context) {
     const now = Date.now();
     const nextVersion = hasCloudRow ? cloudVersion + 1 : 1;
 
-    // 写入 D1：单行原子 UPSERT，按 (user_id, bank_id) 隔离
-    await env.DB.prepare(
-      `INSERT INTO user_progress (user_id, bank_id, answers_data, mistakes_data, stats_data, version, updated_at)
-       VALUES (?, ?, ?, ?, '{}', ?, ?)
-       ON CONFLICT(user_id, bank_id) DO UPDATE SET
-         answers_data = excluded.answers_data,
-         mistakes_data = excluded.mistakes_data,
-         version = excluded.version,
-         updated_at = excluded.updated_at`
-    ).bind(authUser.id, bankId, answersJson, mistakesJson, nextVersion, now).run();
+    // 写入 D1：原子 CAS 乐观锁更新 / 首次互斥插入，防止高并发下静默覆盖
+    const writeRes = hasCloudRow
+      ? await env.DB.prepare(
+          `UPDATE user_progress
+           SET answers_data = ?, mistakes_data = ?, version = ?, updated_at = ?
+           WHERE user_id = ? AND bank_id = ? AND version = ?`
+        ).bind(answersJson, mistakesJson, nextVersion, now, authUser.id, bankId, cloudVersion).run()
+      : await env.DB.prepare(
+          `INSERT OR IGNORE INTO user_progress (user_id, bank_id, answers_data, mistakes_data, stats_data, version, updated_at)
+           VALUES (?, ?, ?, ?, '{}', ?, ?)`
+        ).bind(authUser.id, bankId, answersJson, mistakesJson, 1, now).run();
+
+    if (writeRes && writeRes.meta && writeRes.meta.changes === 0) {
+      const latest = await env.DB.prepare(
+        `SELECT version, updated_at, answers_data, mistakes_data
+         FROM user_progress
+         WHERE user_id = ? AND bank_id = ?`
+      ).bind(authUser.id, bankId).first();
+
+      let latestAnswers = {};
+      let latestMistakes = {};
+      if (latest) {
+        try { latestAnswers = JSON.parse(latest.answers_data || '{}'); } catch (e) {}
+        try { latestMistakes = JSON.parse(latest.mistakes_data || '{}'); } catch (e) {}
+      }
+
+      return jsonResponse({
+        success: false,
+        code: 'VERSION_CONFLICT',
+        error: '云端进度已在其他设备更新，请合并后重试',
+        bankId,
+        version: latest && Number.isFinite(latest.version) && latest.version > 0 ? latest.version : cloudVersion,
+        updatedAt: (latest && latest.updated_at) || 0,
+        answers: latestAnswers,
+        mistakes: latestMistakes
+      }, 409);
+    }
 
     return jsonResponse({
       success: true,

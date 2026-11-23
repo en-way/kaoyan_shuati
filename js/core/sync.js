@@ -31,6 +31,30 @@ export function createAuthController(getApp) {
       return DB.getActiveKeys(bankId);
     },
 
+    _getSavedAdminSecret() {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('kaoyan_admin_secret_saved');
+        }
+        if (typeof sessionStorage !== 'undefined') {
+          return sessionStorage.getItem('kaoyan_admin_secret_saved') || '';
+        }
+      } catch (_) {}
+      return '';
+    },
+
+    _setSavedAdminSecret(secret) {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('kaoyan_admin_secret_saved');
+        }
+        if (typeof sessionStorage !== 'undefined') {
+          if (secret) sessionStorage.setItem('kaoyan_admin_secret_saved', secret);
+          else sessionStorage.removeItem('kaoyan_admin_secret_saved');
+        }
+      } catch (_) {}
+    },
+
     refreshBankSyncState(bankId = DB.currentBankId) {
       const keys = this.getActiveSyncKeys(bankId);
       const rawTime = localStorage.getItem(keys.LAST_SYNC_TIME);
@@ -454,7 +478,7 @@ export function createAuthController(getApp) {
         if (modal) modal.classList.add('is-open');
       }
 
-      const savedSecret = localStorage.getItem('kaoyan_admin_secret_saved') || '';
+      const savedSecret = this._getSavedAdminSecret();
       if (secretInput && savedSecret) {
         secretInput.value = savedSecret;
         if (clearLink) clearLink.style.display = 'inline';
@@ -511,7 +535,7 @@ export function createAuthController(getApp) {
           throw new Error(data.error || '密钥校验失败');
         }
 
-        localStorage.setItem('kaoyan_admin_secret_saved', secret);
+        this._setSavedAdminSecret(secret);
         if (clearLink) clearLink.style.display = 'inline';
 
         if (notice) {
@@ -529,14 +553,14 @@ export function createAuthController(getApp) {
     },
 
     clearSavedAdminSecret() {
-      localStorage.removeItem('kaoyan_admin_secret_saved');
+      this._setSavedAdminSecret('');
       const secretInput = document.getElementById('adminSecretKey');
       const clearLink = document.getElementById('adminClearSecretLink');
       const notice = document.getElementById('adminNotice');
       if (secretInput) secretInput.value = '';
       if (clearLink) clearLink.style.display = 'none';
       if (notice) {
-        notice.textContent = '已清除本浏览器记住的管理员密钥';
+        notice.textContent = '已清除当前会话记住的管理员密钥';
         notice.className = 'auth-notice';
         notice.style.display = 'block';
       }
@@ -578,7 +602,7 @@ export function createAuthController(getApp) {
           throw new Error(data.error || '生成重置码失败');
         }
 
-        localStorage.setItem('kaoyan_admin_secret_saved', adminSecret);
+        this._setSavedAdminSecret(adminSecret);
         if (clearLink) clearLink.style.display = 'inline';
 
         codeDisplay.textContent = data.code;
@@ -619,14 +643,38 @@ export function createAuthController(getApp) {
 
     purgeAllUserData(reason) {
       const App = getApp();
-      const keys = this.getActiveSyncKeys();
-      localStorage.removeItem(keys.PROGRESS);
-      if (keys.LEGACY_PROGRESS) localStorage.removeItem(keys.LEGACY_PROGRESS);
-      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.TOKEN);
-      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_INFO);
-      localStorage.removeItem(keys.LAST_SYNC_TIME);
-      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK);
-      localStorage.removeItem(keys.LAST_UPLOAD_HASH);
+      const exactKeys = new Set([
+        KY_CONFIG.STORAGE_KEYS.TOKEN,
+        KY_CONFIG.STORAGE_KEYS.USER_INFO,
+        KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK,
+        KY_CONFIG.STORAGE_KEYS.USER_DATA,
+        KY_CONFIG.STORAGE_KEYS.CURRENT_BANK_ID,
+        KY_CONFIG.STORAGE_KEYS.MIGRATED_V38,
+        'kaoyan_admin_secret_saved'
+      ]);
+      const bankPrefixes = [
+        'kaoyan_progress_',
+        'kaoyan_last_sync_time_',
+        'kaoyan_last_upload_hash_',
+        'kaoyan_is_dirty_',
+        'kaoyan_cloud_version_',
+        'kaoyan_pending_overwrite_'
+      ];
+
+      try {
+        const allKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k) allKeys.push(k);
+        }
+        for (const k of allKeys) {
+          if (exactKeys.has(k) || bankPrefixes.some(p => k.startsWith(p))) {
+            localStorage.removeItem(k);
+          }
+        }
+      } catch (_) {}
+
+      this._setSavedAdminSecret('');
 
       this.token = null;
       this.currentUser = null;

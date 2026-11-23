@@ -37,7 +37,7 @@ function createMockD1() {
             const [uid] = this._args;
             return users.get(uid) || null;
           }
-          // 2. sync.js LEFT JOIN 查询
+          // 2. sync.js LEFT JOIN 查询（包含 u.updated_at AS user_updated_at）
           if (normalizedSql.includes('FROM users u LEFT JOIN user_progress p')) {
             const [bankId, uid] = this._args;
             const u = users.get(uid);
@@ -45,18 +45,53 @@ function createMockD1() {
             const p = progress.get(`${uid}::${bankId}`);
             return {
               uid: u.id,
+              user_updated_at: u.updated_at,
               answers_data: p ? p.answers_data : null,
               mistakes_data: p ? p.mistakes_data : null,
               version: p ? p.version : null,
               updated_at: p ? p.updated_at : null
             };
           }
+          // 3. CAS 冲突后回查最新行
+          if (normalizedSql.includes('FROM user_progress WHERE user_id = ? AND bank_id = ?')) {
+            const [userId, bankId] = this._args;
+            const p = progress.get(`${userId}::${bankId}`);
+            if (!p) return null;
+            return {
+              version: p.version,
+              updated_at: p.updated_at,
+              answers_data: p.answers_data,
+              mistakes_data: p.mistakes_data
+            };
+          }
           return null;
         },
         async run() {
-          if (normalizedSql.includes('INSERT INTO user_progress')) {
+          if (normalizedSql.includes('UPDATE user_progress')) {
+            const [answersJson, mistakesJson, nextVersion, updatedAt, userId, bankId, expectedVersion] = this._args;
+            const key = `${userId}::${bankId}`;
+            const cur = progress.get(key);
+            if (!cur || cur.version !== expectedVersion) {
+              return { success: true, meta: { changes: 0 } };
+            }
+            progress.set(key, {
+              user_id: userId,
+              bank_id: bankId,
+              answers_data: answersJson,
+              mistakes_data: mistakesJson,
+              version: nextVersion,
+              updated_at: updatedAt
+            });
+            self.writeCount++;
+            return { success: true, meta: { changes: 1 } };
+          }
+          if (normalizedSql.includes('INSERT') && normalizedSql.includes('INTO user_progress')) {
             const [userId, bankId, answersJson, mistakesJson, version, updatedAt] = this._args;
-            progress.set(`${userId}::${bankId}`, {
+            const key = `${userId}::${bankId}`;
+            if (normalizedSql.includes('INSERT OR IGNORE') && progress.has(key)) {
+              return { success: true, meta: { changes: 0 } };
+            }
+            progress.set(key, {
               user_id: userId,
               bank_id: bankId,
               answers_data: answersJson,
@@ -65,9 +100,9 @@ function createMockD1() {
               updated_at: updatedAt
             });
             self.writeCount++;
-            return { success: true };
+            return { success: true, meta: { changes: 1 } };
           }
-          return { success: true };
+          return { success: true, meta: { changes: 0 } };
         }
       };
     }
@@ -396,5 +431,100 @@ describe('functions/api/progress/sync.js 多题库云同步、时间戳合并与
     ]);
     assert.equal(pragmaCallCount, 2);
     assert.equal(batchCallCount, 2);
+  });
+
+  it('改密后已吊销的旧 JWT 请求 GET / POST /api/progress/sync 均应返回 401 TOKEN_REVOKED', async () => {
+    // 模拟用户在签发 token 后重设了密码（users.updated_at 晚于 token.iat + 容差）
+    db.users.get('u_1001').updated_at = Date.now() + 60_000;
+
+    const getRes = await onRequestGet({
+      request: new Request('https://kaoyan.test/api/progress/sync', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      env
+    });
+    assert.equal(getRes.status, 401);
+    const getBody = await getRes.json();
+    assert.equal(getBody.code, 'TOKEN_REVOKED');
+
+    const postRes = await onRequestPost({
+      request: new Request('https://kaoyan.test/api/progress/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          bankId: '2027_1000',
+          overwrite: true,
+          answers: {},
+          mistakes: {}
+        })
+      }),
+      env
+    });
+    assert.equal(postRes.status, 401);
+    const postBody = await postRes.json();
+    assert.equal(postBody.code, 'TOKEN_REVOKED');
+  });
+
+  it('原子 CAS 乐观锁：SELECT 与 UPDATE 之间发生并发写入时返回 409 且不静默覆盖最新进度', async () => {
+    // 1. 初始写入 version = 1
+    await onRequestPost({
+      request: new Request('https://kaoyan.test/api/progress/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          bankId: '2027_1000',
+          answers: { Q_0001: ['A', 1, 1000, 0] },
+          mistakes: {}
+        })
+      }),
+      env
+    });
+
+    // 2. 注入并发窗口：当请求 A 即将执行条件 UPDATE ... WHERE version = 1 时，并发请求 B 抢先升至 version = 2
+    let injectedRace = false;
+    const origPrepare = db.prepare.bind(db);
+    db.prepare = (sql) => {
+      const stmt = origPrepare(sql);
+      if (!injectedRace && sql.replace(/\s+/g, ' ').includes('UPDATE user_progress')) {
+        injectedRace = true;
+        db.progress.set('u_1001::2027_1000', {
+          user_id: 'u_1001',
+          bank_id: '2027_1000',
+          answers_data: JSON.stringify({ Q_0999: ['D', 1, 9000, 0] }),
+          mistakes_data: '{}',
+          version: 2,
+          updated_at: 9000
+        });
+      }
+      return stmt;
+    };
+
+    const raceRes = await onRequestPost({
+      request: new Request('https://kaoyan.test/api/progress/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          bankId: '2027_1000',
+          expectedVersion: 1,
+          answers: { Q_0002: ['B', 1, 2000, 0] },
+          mistakes: {}
+        })
+      }),
+      env
+    });
+
+    assert.equal(raceRes.status, 409);
+    const raceBody = await raceRes.json();
+    assert.equal(raceBody.code, 'VERSION_CONFLICT');
+    assert.equal(raceBody.version, 2);
+    assert.deepEqual(raceBody.answers.Q_0999, ['D', 1, 9000, 0]);
+    // 确认云端 Q_0999 未被请求 A 覆盖
+    const stored = JSON.parse(db.progress.get('u_1001::2027_1000').answers_data);
+    assert.deepEqual(stored.Q_0999, ['D', 1, 9000, 0]);
+    assert.equal(stored.Q_0002, undefined);
   });
 });

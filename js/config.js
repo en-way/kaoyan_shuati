@@ -2,7 +2,7 @@
  * 前端统一配置模块 (ES Module + 全局 window.KY_CONFIG 双向兼容)
  */
 export const APP_VERSION = 'v38';
-export const ASSET_VERSION = `20271123_${APP_VERSION}_3`;
+export const ASSET_VERSION = `20271123_${APP_VERSION}_4`;
 export const DEFAULT_BANK_ID = '2027_1000';
 
 export const STORAGE_KEYS = Object.freeze({

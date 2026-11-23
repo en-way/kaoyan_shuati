@@ -5,6 +5,7 @@ import path from 'node:path';
 import { DB } from '../js/state/store.js';
 import { viewMethods } from '../js/ui/views.js';
 import { modalMethods } from '../js/ui/modals.js';
+import { escapeHtml } from '../js/ui/sanitize.js';
 
 const UI_DIR = path.resolve('js/ui');
 
@@ -54,5 +55,23 @@ test('UI 模块静态契约与防回归校验', async (t) => {
     const modalsCss = fs.readFileSync(path.resolve('css/modals.css'), 'utf8');
     assert.match(modalsCss, /\.modal-backdrop,\s*\.drawer-backdrop\s*\{\s*display:\s*none;\s*\}/);
     assert.match(modalsCss, /\.modal-backdrop\.is-open,\s*\.drawer-backdrop\.is-open\s*\{\s*display:\s*flex;\s*\}/);
+  });
+
+  await t.test('escapeHtml 应完整转义危险 HTML 与属性字符', () => {
+    const dirty = `<img src="x" onerror='alert(1)'>&`;
+    assert.equal(
+      escapeHtml(dirty),
+      '&lt;img src=&quot;x&quot; onerror=&#39;alert(1)&#39;&gt;&amp;'
+    );
+    assert.equal(escapeHtml(null), '');
+    assert.equal(escapeHtml(undefined), '');
+  });
+
+  await t.test('_headers 应配置全局安全响应头与 SW/HTML 不缓存策略', () => {
+    const headersFile = fs.readFileSync(path.resolve('_headers'), 'utf8');
+    assert.match(headersFile, /X-Content-Type-Options:\s*nosniff/);
+    assert.match(headersFile, /X-Frame-Options:\s*DENY/);
+    assert.match(headersFile, /Referrer-Policy:\s*strict-origin-when-cross-origin/);
+    assert.match(headersFile, /\/sw\.js[\s\S]*Cache-Control:\s*no-cache,\s*no-store,\s*must-revalidate/);
   });
 });

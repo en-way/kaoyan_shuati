@@ -3,6 +3,7 @@
  * 负责错题本加载、科目/章节二级联动筛选、错题卡片渲染、单题重刷与标为已攻克。
  */
 import { DB } from '../state/store.js';
+import { escapeHtml } from './sanitize.js';
 
 export const mistakesViewMethods = {
   // ================== VIEW 3: MISTAKES VAULT ==================
@@ -51,13 +52,13 @@ export const mistakesViewMethods = {
           const count = statsByPart[s.name] ? statsByPart[s.name].count : 0;
           const shortName = this.getSubjectShortName(s.name);
           const sel = s.name === currentPart ? 'selected' : '';
-          partHtml += `<option value="${s.name}" ${sel}>${shortName} (${count}题)</option>`;
+          partHtml += `<option value="${escapeHtml(s.name)}" ${sel}>${escapeHtml(shortName)} (${count}题)</option>`;
         });
       } else {
         Object.entries(statsByPart).forEach(([pName, pStat]) => {
           const shortName = this.getSubjectShortName(pName);
           const sel = pName === currentPart ? 'selected' : '';
-          partHtml += `<option value="${pName}" ${sel}>${shortName} (${pStat.count}题)</option>`;
+          partHtml += `<option value="${escapeHtml(pName)}" ${sel}>${escapeHtml(shortName)} (${pStat.count}题)</option>`;
         });
       }
       pSelect.innerHTML = partHtml;
@@ -80,7 +81,7 @@ export const mistakesViewMethods = {
       chHtml += `<option value="">全部章节 (${pStat.count}题)</option>`;
       Object.entries(pStat.chapters).forEach(([chName, count]) => {
         const sel = chName === currentChapter ? 'selected' : '';
-        chHtml += `<option value="${chName}" ${sel}>${chName} (${count}题)</option>`;
+        chHtml += `<option value="${escapeHtml(chName)}" ${sel}>${escapeHtml(chName)} (${count}题)</option>`;
       });
     } else {
       chHtml += `<option value="">全部章节 (${totalAllCount}题)</option>`;
@@ -89,7 +90,7 @@ export const mistakesViewMethods = {
           const shortPart = this.getSubjectShortName(pName);
           Object.entries(pStat.chapters).forEach(([chName, count]) => {
             const sel = chName === currentChapter ? 'selected' : '';
-            chHtml += `<option value="${chName}" ${sel}>${shortPart} · ${chName} (${count}题)</option>`;
+            chHtml += `<option value="${escapeHtml(chName)}" ${sel}>${escapeHtml(shortPart)} · ${escapeHtml(chName)} (${count}题)</option>`;
           });
         });
       }
@@ -124,12 +125,12 @@ export const mistakesViewMethods = {
     if (part && chapter) {
       const shortPart = this.getSubjectShortName(part);
       const shortCh = chapter.length > 10 ? chapter.slice(0, 9) + '…' : chapter;
-      btn.innerHTML = `⚡ 专项特训【${shortPart}·${shortCh}】(${count}题)`;
+      btn.textContent = `⚡ 专项特训【${shortPart}·${shortCh}】(${count}题)`;
     } else if (part) {
       const shortPart = this.getSubjectShortName(part);
-      btn.innerHTML = `⚡ 专项特训【${shortPart}】(${count}题)`;
+      btn.textContent = `⚡ 专项特训【${shortPart}】(${count}题)`;
     } else {
-      btn.innerHTML = `⚡ 立即全部错题特训 (${count}题)`;
+      btn.textContent = `⚡ 立即全部错题特训 (${count}题)`;
     }
 
     btn.disabled = (count === 0);
@@ -156,28 +157,29 @@ export const mistakesViewMethods = {
       const stdAns = m.answer || '—';
       const snippet = m.analysis ? m.analysis.slice(0, 120) + '...' : '';
 
+      const safeQid = escapeHtml(m.id);
       return `
         <div class="mistake-card-item">
           <div class="m-item-meta">
-            <span class="p-subject-tag">${this.getSubjectShortName(m.part)}</span>
-            <span class="p-chapter-tag">${m.chapter}</span>
-            <span class="q-badge">第 ${m.num} 题</span>
-            <span class="p-type-tag ${m.type === '单项选择题' ? 'type-single' : 'type-multi'}">${m.type}</span>
-            ${m.source ? `<span style="font-size:11px; color:var(--accent-cyan);">${m.source}</span>` : ''}
+            <span class="p-subject-tag">${escapeHtml(this.getSubjectShortName(m.part))}</span>
+            <span class="p-chapter-tag">${escapeHtml(m.chapter)}</span>
+            <span class="q-badge">第 ${escapeHtml(m.num)} 题</span>
+            <span class="p-type-tag ${m.type === '单项选择题' ? 'type-single' : 'type-multi'}">${escapeHtml(m.type)}</span>
+            ${m.source ? `<span style="font-size:11px; color:var(--accent-cyan);">${escapeHtml(m.source)}</span>` : ''}
           </div>
 
-          <div class="m-item-stem">${m.stem}</div>
+          <div class="m-item-stem">${escapeHtml(m.stem)}</div>
 
           <div class="m-item-answers">
-            <span>你的作答: <strong style="color:var(--accent-coral)">${userAns}</strong></span>
-            <span>标准答案: <strong style="color:var(--accent-green)">${stdAns}</strong></span>
+            <span>你的作答: <strong style="color:var(--accent-coral)">${escapeHtml(userAns)}</strong></span>
+            <span>标准答案: <strong style="color:var(--accent-green)">${escapeHtml(stdAns)}</strong></span>
           </div>
 
-          ${snippet ? `<div class="m-item-expl-snippet"><strong>【简析要点】</strong> ${snippet}</div>` : ''}
+          ${snippet ? `<div class="m-item-expl-snippet"><strong>【简析要点】</strong> ${escapeHtml(snippet)}</div>` : ''}
 
           <div class="m-item-footer">
-            <button type="button" class="btn-sm-action" data-action="master-mistake" data-qid="${m.id}">✓ 标为已攻克</button>
-            <button type="button" class="btn-primary" style="font-size:12px; padding: 6px 14px;" data-action="retry-mistake" data-qid="${m.id}">
+            <button type="button" class="btn-sm-action" data-action="master-mistake" data-qid="${safeQid}">✓ 标为已攻克</button>
+            <button type="button" class="btn-primary" style="font-size:12px; padding: 6px 14px;" data-action="retry-mistake" data-qid="${safeQid}">
               ⚡ 重刷这道题
             </button>
           </div>
