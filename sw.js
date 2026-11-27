@@ -8,8 +8,9 @@
  */
 
 const VERSION = 'v38';
-const ASSET_VER = `20271123_${VERSION}_10`;
+const ASSET_VER = `20271123_${VERSION}_11`;
 const CACHE_NAME = `ky-quiz-${ASSET_VER}`;
+const BANK_CACHE_NAME = 'ky-quiz-banks-v1';
 
 // 移除 Cloudflare Pages 重定向产生的 redirected: true 标记，防止 Chromium/Edge PWA 拦截加载
 function cleanResponse(res) {
@@ -78,13 +79,13 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// 2. Activate: 清理所有非当前 CACHE_NAME 的旧缓存并立即接管页面 clients.claim()
+// 2. Activate: 清理所有非当前 CACHE_NAME 与独立题库缓存 BANK_CACHE_NAME 的旧缓存并立即接管页面 clients.claim()
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((cacheNames) => Promise.all(
         cacheNames.map((name) => {
-          if (name !== CACHE_NAME) {
+          if (name !== CACHE_NAME && name !== BANK_CACHE_NAME) {
             console.log(`[ServiceWorker ${ASSET_VER}] Removing old cache:`, name);
             return caches.delete(name);
           }
@@ -110,14 +111,15 @@ self.addEventListener('fetch', (event) => {
   const isBankJson = url.pathname.includes('/data/banks/') || url.pathname.endsWith('/data/questions.json');
   if (isBankJson) {
     event.respondWith(
-      caches.open(CACHE_NAME).then(async (cache) => {
+      caches.open(BANK_CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(request);
-        const networkFetch = fetch(request)
+        const networkFetch = fetch(request, { cache: 'no-cache' })
           .then((res) => {
-            if (res && res.status === 200) {
-              cache.put(request, res.clone());
+            const cleaned = cleanResponse(res);
+            if (cleaned && cleaned.status === 200) {
+              cache.put(request, cleaned.clone());
             }
-            return res;
+            return cleaned;
           })
           .catch(() => null);
 

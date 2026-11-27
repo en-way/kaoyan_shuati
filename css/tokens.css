@@ -22,7 +22,11 @@ body.theme-dark {
 
   --text-primary: #eef2f6;
   --text-secondary: #9aa7b8;
-  --text-muted: #6e7d91;
+  --text-muted: #8a99ad;
+
+  --btn-solid-green-bg: #047857;
+  --btn-solid-amber-bg: #b45309;
+  --btn-solid-coral-bg: #be123c;
 
   /* 现代学术主色：克制天青蓝（零刺眼霓虹发光） */
   --accent-cyan: #38bdf8;
@@ -100,7 +104,11 @@ body.theme-light {
 
   --text-primary: #1a2230;
   --text-secondary: #475569;
-  --text-muted: #64748b;
+  --text-muted: #556579;
+
+  --btn-solid-green-bg: #047857;
+  --btn-solid-amber-bg: #b45309;
+  --btn-solid-coral-bg: #be123c;
 
   --accent-cyan: #0369a1;
   --accent-cyan-hover: #0284c7;

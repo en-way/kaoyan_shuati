@@ -43,7 +43,7 @@ jobs:
           '
 
       - name: Run zero-dependency node:test suites
-        run: node --test tests/quiz.test.js tests/store.test.js tests/sync.test.js tests/api.test.js tests/ui.test.js
+        run: node --test tests/quiz.test.js tests/store.test.js tests/sync.test.js tests/api.test.js tests/auth.test.js tests/client-sync.test.js tests/ui.test.js
 
       - name: Validate data/catalog.json & Question Bank JSON Schema
         run: |

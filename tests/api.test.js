@@ -86,4 +86,27 @@ describe('js/api.js 网络重试、4xx 快速失败与超时控制', () => {
     );
     assert.equal(calls, 2); // 初始 1 次 + 重试 1 次
   });
+
+  it('parseResponse 对非 JSON 500 HTML 错误页安全降级且 maxRetries:0 时不重试', async () => {
+    let calls = 0;
+    const mockFetch = async () => {
+      calls++;
+      return new Response('<html>500 Internal Server Error</html>', {
+        status: 500,
+        headers: { 'Content-Type': 'text/html' }
+      });
+    };
+
+    const res = await fetchWithRetry('https://kaoyan.test/api/auth/login', {}, {
+      maxRetries: 0,
+      timeoutMs: 1000,
+      fetchImpl: mockFetch
+    });
+    assert.equal(calls, 1);
+    const parsed = await parseResponse(res);
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.status, 500);
+    assert.equal(parsed.code, null);
+    assert.match(parsed.error, /500/);
+  });
 });

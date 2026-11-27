@@ -27,12 +27,54 @@ export const DB = {
   questionsData: null,
   questionsMap: {},
   _storageWriteBlocked: false,
+  _lastSaveOk: true,
 
   /**
    * 获取当前使用的 storage 对象（支持在 Node.js 测试中注入 mockStorage）
    */
   _getStorage() {
-    return this._customStorage || globalThis.localStorage;
+    try {
+      return this._customStorage || globalThis.localStorage;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  _lsGet(key) {
+    try {
+      const storage = this._getStorage();
+      return storage ? storage.getItem(key) : null;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  _lsSet(key, val) {
+    try {
+      const storage = this._getStorage();
+      if (!storage) return false;
+      storage.setItem(key, String(val));
+      return true;
+    } catch (e) {
+      if (e && e.name === 'QuotaExceededError' && globalThis.App && typeof globalThis.App.showToast === 'function') {
+        globalThis.App.showToast('⚠️ 本地存储空间已满，无法保存新记录，请清理缓存或上传云端', 'warning', 4500);
+      }
+      return false;
+    }
+  },
+
+  _lsRemove(key) {
+    try {
+      const storage = this._getStorage();
+      if (storage) storage.removeItem(key);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  },
+
+  wasLastSaveOk() {
+    return this._lastSaveOk !== false;
   },
 
   /**
@@ -46,22 +88,20 @@ export const DB = {
    * 一次性无损迁移老版本 v37 本地存档 (`quiz_user_data_2027` -> `kaoyan_progress_2027_1000`)
    */
   migrateLegacyStorageIfNeeded() {
-    const storage = this._getStorage();
-    if (!storage) return false;
-
     const defaultKeys = getBankStorageKeys(DEFAULT_BANK_ID);
-    const newRaw = storage.getItem(defaultKeys.PROGRESS);
-    const legacyRaw = storage.getItem(KY_CONFIG.STORAGE_KEYS.USER_DATA);
+    const newRaw = this._lsGet(defaultKeys.PROGRESS);
+    const legacyRaw = this._lsGet(KY_CONFIG.STORAGE_KEYS.USER_DATA);
 
     if (!newRaw && legacyRaw) {
       try {
         const parsed = JSON.parse(legacyRaw);
-        if (parsed && typeof parsed === 'object') {
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
           if (!parsed.answers) parsed.answers = {};
           if (!parsed.mistakes) parsed.mistakes = {};
-          storage.setItem(defaultKeys.PROGRESS, JSON.stringify(parsed));
-          storage.setItem(KY_CONFIG.STORAGE_KEYS.MIGRATED_V38, String(Date.now()));
-          return true;
+          if (this._lsSet(defaultKeys.PROGRESS, JSON.stringify(parsed))) {
+            this._lsSet(KY_CONFIG.STORAGE_KEYS.MIGRATED_V38, String(Date.now()));
+            return true;
+          }
         }
       } catch (e) {
         // 即使旧数据损坏也绝不直接抹除，交由 getUserData 的容灾隔离处理
@@ -137,8 +177,7 @@ export const DB = {
       await this.loadCatalog(fetchImpl);
     }
 
-    const storage = this._getStorage();
-    const savedBankId = storage ? storage.getItem(KY_CONFIG.STORAGE_KEYS.CURRENT_BANK_ID) : null;
+    const savedBankId = this._lsGet(KY_CONFIG.STORAGE_KEYS.CURRENT_BANK_ID);
     const desiredBankId = targetBankId || savedBankId || (this.catalog && this.catalog.defaultBankId) || DEFAULT_BANK_ID;
 
     // 校验 desiredBankId 是否在 catalog 中存在
@@ -221,30 +260,27 @@ export const DB = {
    * 读取指定题库（默认当前题库）的用户做题与错题记录
    */
   getUserData(bankId = this.currentBankId) {
-    const storage = this._getStorage();
-    if (!storage) return { answers: {}, mistakes: {} };
+    if (!this._getStorage()) return { answers: {}, mistakes: {} };
 
     this.migrateLegacyStorageIfNeeded();
     const keys = this.getActiveKeys(bankId);
 
-    const raw = storage.getItem(keys.PROGRESS)
-      || (keys.LEGACY_PROGRESS ? storage.getItem(keys.LEGACY_PROGRESS) : null);
+    const raw = this._lsGet(keys.PROGRESS)
+      || (keys.LEGACY_PROGRESS ? this._lsGet(keys.LEGACY_PROGRESS) : null);
 
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          if (!parsed.answers || typeof parsed.answers !== 'object') parsed.answers = {};
-          if (!parsed.mistakes || typeof parsed.mistakes !== 'object') parsed.mistakes = {};
+          if (!parsed.answers || typeof parsed.answers !== 'object' || Array.isArray(parsed.answers)) parsed.answers = {};
+          if (!parsed.mistakes || typeof parsed.mistakes !== 'object' || Array.isArray(parsed.mistakes)) parsed.mistakes = {};
           this._storageWriteBlocked = false;
           return parsed;
         }
       } catch (e) {
         console.error('Critical: LocalStorage corrupted, isolating bad data:', e);
-        try {
-          storage.setItem(`kaoyan_corrupt_bak_${keys.bankId}_${Date.now()}`, raw);
-          this._storageWriteBlocked = true;
-        } catch (_) {}
+        this._lsSet(`kaoyan_corrupt_bak_${keys.bankId}_${Date.now()}`, raw);
+        this._storageWriteBlocked = true;
       }
     }
     return { answers: {}, mistakes: {} };
@@ -256,75 +292,102 @@ export const DB = {
   saveUserData(data, bankId = this.currentBankId) {
     if (this._storageWriteBlocked) {
       console.warn('Storage write blocked due to corrupted data isolation protection.');
+      this._lastSaveOk = false;
       return false;
     }
-    const storage = this._getStorage();
-    if (!storage) return false;
+    if (!this._getStorage()) {
+      this._lastSaveOk = false;
+      return false;
+    }
 
     const keys = this.getActiveKeys(bankId);
     const normalized = {
-      answers: (data && data.answers && typeof data.answers === 'object') ? data.answers : {},
-      mistakes: (data && data.mistakes && typeof data.mistakes === 'object') ? data.mistakes : {}
+      answers: (data && data.answers && typeof data.answers === 'object' && !Array.isArray(data.answers)) ? data.answers : {},
+      mistakes: (data && data.mistakes && typeof data.mistakes === 'object' && !Array.isArray(data.mistakes)) ? data.mistakes : {}
     };
     const serialized = JSON.stringify(normalized);
 
-    try {
-      storage.setItem(keys.PROGRESS, serialized);
-      // 当操作默认题库 2027_1000 时，同步更新旧键 quiz_user_data_2027 镜像，确保 100% 双向兼容
-      if (keys.LEGACY_PROGRESS) {
-        storage.setItem(keys.LEGACY_PROGRESS, serialized);
-      }
-      if (globalThis.App && globalThis.App.auth && typeof globalThis.App.auth.markDirty === 'function') {
-        globalThis.App.auth.markDirty(keys.bankId);
-      }
-      return true;
-    } catch (e) {
-      console.error('Failed to save user data to localStorage:', e);
-      if (e && e.name === 'QuotaExceededError' && globalThis.App && typeof globalThis.App.showToast === 'function') {
-        globalThis.App.showToast('⚠️ 本地存储空间已满，无法保存新答题记录，请清理缓存或上传云端', 'warning', 4500);
-      }
-      return false;
+    const ok = this._lsSet(keys.PROGRESS, serialized);
+    this._lastSaveOk = ok;
+    if (!ok) return false;
+
+    if (keys.LEGACY_PROGRESS) {
+      this._lsSet(keys.LEGACY_PROGRESS, serialized);
     }
+    if (globalThis.App && globalThis.App.auth && typeof globalThis.App.auth.markDirty === 'function') {
+      globalThis.App.auth.markDirty(keys.bankId);
+    }
+    return true;
   },
 
   /**
-   * 记录/读取当前题库是否需要在下次同步时执行 overwrite 快照覆盖（用于重置章节或清空本地后）
+   * 记录/读取当前题库是否需要在下次同步时执行整库 overwrite 快照覆盖（仅用于清空本地后）
    */
   setPendingOverwrite(flag, bankId = this.currentBankId) {
-    const storage = this._getStorage();
-    if (!storage) return;
     const keys = this.getActiveKeys(bankId);
     if (flag) {
-      storage.setItem(keys.PENDING_OVERWRITE, 'true');
+      this._lsSet(keys.PENDING_OVERWRITE, 'true');
     } else {
-      storage.removeItem(keys.PENDING_OVERWRITE);
+      this._lsRemove(keys.PENDING_OVERWRITE);
     }
   },
 
   hasPendingOverwrite(bankId = this.currentBankId) {
-    const storage = this._getStorage();
-    if (!storage) return false;
     const keys = this.getActiveKeys(bankId);
-    return storage.getItem(keys.PENDING_OVERWRITE) === 'true';
+    return this._lsGet(keys.PENDING_OVERWRITE) === 'true';
+  },
+
+  /**
+   * 记录/读取章节局部重置范围（防止 409 冲突时覆盖他端其他章节进度）
+   */
+  getPendingChapterReset(bankId = this.currentBankId) {
+    const keys = this.getActiveKeys(bankId);
+    const raw = this._lsGet(keys.PENDING_CHAPTER_RESET);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.qids) && parsed.qids.length > 0) {
+        return {
+          qids: parsed.qids,
+          resetAt: Number.isFinite(parsed.resetAt) ? parsed.resetAt : Date.now()
+        };
+      }
+    } catch (_) {}
+    return null;
+  },
+
+  addPendingChapterReset(qids, bankId = this.currentBankId, resetAt = Date.now()) {
+    if (!Array.isArray(qids) || qids.length === 0) return;
+    const keys = this.getActiveKeys(bankId);
+    const existing = this.getPendingChapterReset(bankId);
+    const mergedSet = new Set(existing ? existing.qids : []);
+    for (const qid of qids) {
+      if (typeof qid === 'string' && qid) mergedSet.add(qid);
+    }
+    this._lsSet(keys.PENDING_CHAPTER_RESET, JSON.stringify({
+      qids: Array.from(mergedSet),
+      resetAt
+    }));
+  },
+
+  clearPendingChapterReset(bankId = this.currentBankId) {
+    const keys = this.getActiveKeys(bankId);
+    this._lsRemove(keys.PENDING_CHAPTER_RESET);
   },
 
   /**
    * 记录/读取云端乐观锁版本号 version
    */
   getCloudVersion(bankId = this.currentBankId) {
-    const storage = this._getStorage();
-    if (!storage) return null;
     const keys = this.getActiveKeys(bankId);
-    const v = parseInt(storage.getItem(keys.CLOUD_VERSION) || '', 10);
+    const v = parseInt(this._lsGet(keys.CLOUD_VERSION) || '', 10);
     return Number.isFinite(v) && v > 0 ? v : null;
   },
 
   setCloudVersion(version, bankId = this.currentBankId) {
-    const storage = this._getStorage();
-    if (!storage) return;
     const keys = this.getActiveKeys(bankId);
     if (Number.isFinite(version) && version > 0) {
-      storage.setItem(keys.CLOUD_VERSION, String(version));
+      this._lsSet(keys.CLOUD_VERSION, String(version));
     }
   },
 
@@ -336,12 +399,12 @@ export const DB = {
     const current = this.getUserData(bankId);
     const merged = mergeFromCompactPayload(current, cloudData);
     this._storageWriteBlocked = false;
-    const storage = this._getStorage();
     const keys = this.getActiveKeys(bankId);
-    if (storage) {
+    if (this._getStorage()) {
       const s = JSON.stringify(merged);
-      storage.setItem(keys.PROGRESS, s);
-      if (keys.LEGACY_PROGRESS) storage.setItem(keys.LEGACY_PROGRESS, s);
+      const ok = this._lsSet(keys.PROGRESS, s);
+      this._lastSaveOk = ok;
+      if (ok && keys.LEGACY_PROGRESS) this._lsSet(keys.LEGACY_PROGRESS, s);
     }
     if (cloudData && Number.isFinite(cloudData.version)) {
       this.setCloudVersion(cloudData.version, bankId);
@@ -352,12 +415,12 @@ export const DB = {
   setFromCloud(cloudData, bankId = this.currentBankId) {
     const newUserData = snapshotFromCompactPayload(cloudData);
     this._storageWriteBlocked = false;
-    const storage = this._getStorage();
     const keys = this.getActiveKeys(bankId);
-    if (storage) {
+    if (this._getStorage()) {
       const s = JSON.stringify(newUserData);
-      storage.setItem(keys.PROGRESS, s);
-      if (keys.LEGACY_PROGRESS) storage.setItem(keys.LEGACY_PROGRESS, s);
+      const ok = this._lsSet(keys.PROGRESS, s);
+      this._lastSaveOk = ok;
+      if (ok && keys.LEGACY_PROGRESS) this._lsSet(keys.LEGACY_PROGRESS, s);
     }
     if (cloudData && Number.isFinite(cloudData.version)) {
       this.setCloudVersion(cloudData.version, bankId);
@@ -405,6 +468,7 @@ export const DB = {
         userData.mistakes[qid].last_wrong_time = nowIso;
       } else if (isCorrect && userData.mistakes[qid]) {
         userData.mistakes[qid].mastered = true;
+        userData.mistakes[qid].last_wrong_time = nowIso;
       }
     }
 
@@ -472,9 +536,11 @@ export const DB = {
         last_wrong_time: gradedMis.last_wrong_time
       };
     }
+    const submitIso = new Date().toISOString();
     for (const r of report.results) {
       if (r.is_correct && userData.mistakes[r.id]) {
         userData.mistakes[r.id].mastered = true;
+        userData.mistakes[r.id].last_wrong_time = submitIso;
       }
     }
 
@@ -484,6 +550,9 @@ export const DB = {
 
   resetChapter(part, chapter) {
     const userData = this.getUserData();
+    if (this._storageWriteBlocked) {
+      return { success: false, cleared_count: 0 };
+    }
     const allQuestions = (this.questionsData && this.questionsData.questions) || [];
     const chQIds = allQuestions
       .filter(q => q.part === part && q.chapter === chapter)
@@ -497,8 +566,10 @@ export const DB = {
         delete userData.mistakes[qid];
       }
     }
-    this.setPendingOverwrite(true);
-    this.saveUserData(userData);
+    if (!this.saveUserData(userData)) {
+      return { success: false, cleared_count: 0 };
+    }
+    this.addPendingChapterReset(chQIds, this.currentBankId, Date.now());
     return { success: true, cleared_count: chQIds.length };
   },
 

@@ -162,4 +162,31 @@ describe('js/core/quiz.js & js/core/exam.js 纯函数判题与统计引擎', () 
     const fp2 = computeDataFingerprint(toCompactPayload(userData));
     assert.equal(fp1, fp2);
   });
+
+  it('computeOverview 仅统计有效题 ID 与已判分记录，toCompactPayload 过滤原型污染键', () => {
+    const sampleBank = JSON.parse(fs.readFileSync(new URL('../data/questions.sample.json', import.meta.url), 'utf8'));
+    const dirtyData = {
+      answers: {
+        __proto__: { selected: ['A'], is_correct: true },
+        constructor: { selected: ['B'], is_correct: false },
+        Q_DELETED: { selected: ['A'], is_correct: true },
+        // 草稿：未提交多选不应计入已答与正确率分母
+        Q_0001: { selected: ['A'], is_correct: null, is_flagged: true },
+        Q_0002: { selected: ['A', 'B', 'D'], is_correct: true }
+      },
+      mistakes: {
+        Q_DELETED: { question_id: 'Q_DELETED', wrong_count: 1, mastered: false }
+      }
+    };
+
+    const compact = toCompactPayload(dirtyData);
+    assert.equal(Object.prototype.hasOwnProperty.call(compact.answers, '__proto__'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(compact.answers, 'constructor'), false);
+
+    const overview = computeOverview(sampleBank, dirtyData);
+    assert.equal(overview.total_questions, sampleBank.total);
+    assert.equal(overview.total_answered, 2);
+    assert.equal(overview.total_mistakes, 0);
+    assert.equal(overview.overall_accuracy, 100);
+  });
 });

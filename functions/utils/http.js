@@ -79,16 +79,45 @@ export function requireDb(env) {
   return env.DB;
 }
 
-// 读取并校验 JSON 请求体：限制大小，且必须是对象
-export async function readJsonBody(request, maxBytes) {
+// 读取并校验 JSON 请求体：流式限制字节上限，且必须是普通 JSON 对象
+export async function readJsonBody(request, maxBytes, { allowEmpty = false } = {}) {
   const declared = parseInt(request.headers.get('content-length') || '0', 10);
   if (declared > maxBytes) {
     throw new HttpError(413, '请求体过大', ErrorCode.PAYLOAD_TOO_LARGE);
   }
-  const text = await request.text();
-  if (new TextEncoder().encode(text).length > maxBytes) {
-    throw new HttpError(413, '请求体过大', ErrorCode.PAYLOAD_TOO_LARGE);
+
+  let text = '';
+  if (request.body && typeof request.body.getReader === 'function') {
+    const reader = request.body.getReader();
+    const decoder = new TextDecoder();
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalBytes += value ? value.byteLength : 0;
+        if (totalBytes > maxBytes) {
+          try { await reader.cancel(); } catch (_) {}
+          throw new HttpError(413, '请求体过大', ErrorCode.PAYLOAD_TOO_LARGE);
+        }
+        if (value) text += decoder.decode(value, { stream: true });
+      }
+      text += decoder.decode();
+    } catch (err) {
+      if (err instanceof HttpError) throw err;
+      throw new HttpError(400, '请求体读取失败', ErrorCode.BAD_REQUEST);
+    }
+  } else {
+    text = await request.text();
+    if (new TextEncoder().encode(text).length > maxBytes) {
+      throw new HttpError(413, '请求体过大', ErrorCode.PAYLOAD_TOO_LARGE);
+    }
   }
+
+  if (allowEmpty && !text.trim()) {
+    return {};
+  }
+
   let parsed;
   try {
     parsed = JSON.parse(text);

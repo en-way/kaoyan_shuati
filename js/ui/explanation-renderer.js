@@ -10,7 +10,7 @@
  */
 export function computeExplanationVisibility(state) {
   const mode = state.practiceMode;
-  if (mode === 'recite') {
+  if (mode === 'recite' || mode === 'exam_review') {
     return Boolean(state.explanationVisible);
   }
   if (mode === 'instant' || mode === 'mistakes_only') {

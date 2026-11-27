@@ -46,6 +46,7 @@ function createMockD1() {
             return {
               uid: u.id,
               user_updated_at: u.updated_at,
+              user_token_version: u.token_version,
               answers_data: p ? p.answers_data : null,
               mistakes_data: p ? p.mistakes_data : null,
               version: p ? p.version : null,
@@ -526,5 +527,92 @@ describe('functions/api/progress/sync.js 多题库云同步、时间戳合并与
     const stored = JSON.parse(db.progress.get('u_1001::2027_1000').answers_data);
     assert.deepEqual(stored.Q_0999, ['D', 1, 9000, 0]);
     assert.equal(stored.Q_0002, undefined);
+  });
+
+  it('安全防线扩展校验：updated_at=0 可读、非法 expectedVersion 返回 400、过滤原型污染键、未来时间限幅与部分章节重置', async () => {
+    const uid = 'u_1001';
+    // 1. updated_at = 0 记录不应被误判为无进度行
+    db.progress.set(`${uid}::2027_1000`, {
+      user_id: uid,
+      bank_id: '2027_1000',
+      answers_data: JSON.stringify({ Q_0001: ['A', 1, 0, 0] }),
+      mistakes_data: '{}',
+      stats_data: '{}',
+      version: 1,
+      updated_at: 0
+    });
+    const getZero = await onRequestGet({
+      request: new Request('https://kaoyan.test/api/progress/sync?bankId=2027_1000&clientTime=0', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      env
+    });
+    assert.equal(getZero.status, 200);
+    const getZeroBody = await getZero.json();
+    assert.equal(getZeroBody.updatedAt, 0);
+    assert.deepEqual(getZeroBody.answers.Q_0001, ['A', 1, 0, 0]);
+
+    // 2. 非法 expectedVersion 返回 400 INVALID_VERSION
+    const badVerRes = await onRequestPost({
+      request: new Request('https://kaoyan.test/api/progress/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ bankId: '2027_1000', expectedVersion: 'abc', answers: {}, mistakes: {} })
+      }),
+      env
+    });
+    assert.equal(badVerRes.status, 400);
+
+    // 3. 原型污染键 (__proto__ / constructor) 与超大未来时间戳应被过滤/限幅
+    const farFuture = Date.now() + 10 * 24 * 3600 * 1000;
+    const postSafe = await onRequestPost({
+      request: new Request('https://kaoyan.test/api/progress/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: `{"bankId":"2027_1000","answers":{"__proto__":["A",1,9999999999999,0],"constructor":["B",0,1000,0],"Q_0002":["ABD",1,${farFuture},0],"Q_0003":["C",1,2000,0]},"mistakes":{}}`
+      }),
+      env
+    });
+    assert.equal(postSafe.status, 200);
+    const postSafeBody = await postSafe.json();
+    assert.equal(Object.prototype.hasOwnProperty.call(postSafeBody.answers, '__proto__'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(postSafeBody.answers, 'constructor'), false);
+    assert.ok(postSafeBody.answers.Q_0002[2] < farFuture);
+    assert.deepEqual(postSafeBody.answers.Q_0003, ['C', 1, 2000, 0]);
+
+    // 4. 部分章节 resetQids + resetAt 仅删除目标旧题，不误删较新其它章节题
+    const now = Date.now();
+    const partialResetRes = await onRequestPost({
+      request: new Request('https://kaoyan.test/api/progress/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          bankId: '2027_1000',
+          answers: {},
+          mistakes: {},
+          resetQids: ['Q_0001'],
+          resetAt: now
+        })
+      }),
+      env
+    });
+    assert.equal(partialResetRes.status, 200);
+    const partialBody = await partialResetRes.json();
+    assert.equal(partialBody.answers.Q_0001, undefined);
+    assert.deepEqual(partialBody.answers.Q_0003, ['C', 1, 2000, 0]);
+
+    // 5. 同秒旧 tv JWT 吊销校验
+    const uRow = db.users.get(uid);
+    uRow.token_version = 2;
+    const oldTvToken = await signJwt({ id: uid, username: 'sync_tester', nickname: 'Tester', tv: 1 }, env);
+    const revokedRes = await onRequestGet({
+      request: new Request('https://kaoyan.test/api/progress/sync?bankId=2027_1000', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${oldTvToken}` }
+      }),
+      env
+    });
+    assert.equal(revokedRes.status, 401);
   });
 });

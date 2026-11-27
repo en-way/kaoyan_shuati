@@ -2,6 +2,7 @@
  * 管理员密码重置码面板与会话级密钥管理模块 (js/core/admin-ui.js)
  */
 import { KyApi } from '../api.js';
+import { KY_CONFIG } from '../config.js';
 
 const ADMIN_SECRET_KEY = 'kaoyan_admin_secret_saved';
 
@@ -91,14 +92,18 @@ export function createAdminUiMethods(getApp) {
           notice.style.display = 'block';
         }
 
-        const res = await fetch(this.getApiUrl('/api/admin/verify-secret'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-secret': secret
+        const res = await KyApi.fetchWithRetry(
+          this.getApiUrl('/api/admin/verify-secret'),
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-secret': secret
+            },
+            body: JSON.stringify({ adminSecret: secret })
           },
-          body: JSON.stringify({ adminSecret: secret })
-        });
+          { maxRetries: 0, timeoutMs: KY_CONFIG.SYNC.TIMEOUT_MS }
+        );
 
         const parsed = await KyApi.parseResponse(res);
         const data = parsed.data;
@@ -111,7 +116,7 @@ export function createAdminUiMethods(getApp) {
 
         if (notice) {
           notice.textContent = data.message || '✅ 密钥有效！';
-          notice.className = data.isCustomConfigured ? 'auth-notice success' : 'auth-notice warning';
+          notice.className = 'auth-notice success';
           notice.style.display = 'block';
         }
       } catch (err) {
@@ -139,8 +144,10 @@ export function createAdminUiMethods(getApp) {
 
     async handleAdminGenerateCode(e) {
       e.preventDefault();
-      const adminSecret = (document.getElementById('adminSecretKey').value || '').trim();
-      const username = (document.getElementById('adminTargetUsername').value || '').trim();
+      const secretEl = document.getElementById('adminSecretKey');
+      const targetUserEl = document.getElementById('adminTargetUsername');
+      const adminSecret = (secretEl ? secretEl.value : '').trim();
+      const username = (targetUserEl ? targetUserEl.value : '').trim();
       const notice = document.getElementById('adminNotice');
       const resultBox = document.getElementById('adminResultBox');
       const codeDisplay = document.getElementById('adminGeneratedCode');
@@ -148,25 +155,33 @@ export function createAdminUiMethods(getApp) {
       const clearLink = document.getElementById('adminClearSecretLink');
 
       if (!adminSecret || !username) {
-        notice.textContent = '请输入管理员密钥与学员账号';
-        notice.className = 'auth-notice error';
-        notice.style.display = 'block';
+        if (notice) {
+          notice.textContent = '请输入管理员密钥与学员账号';
+          notice.className = 'auth-notice error';
+          notice.style.display = 'block';
+        }
         return;
       }
 
       try {
-        submitBtn.disabled = true;
-        submitBtn.textContent = '生成中...';
-        notice.style.display = 'none';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = '生成中...';
+        }
+        if (notice) notice.style.display = 'none';
 
-        const res = await fetch(this.getApiUrl('/api/admin/generate-reset-code'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-secret': adminSecret
+        const res = await KyApi.fetchWithRetry(
+          this.getApiUrl('/api/admin/generate-reset-code'),
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-admin-secret': adminSecret
+            },
+            body: JSON.stringify({ adminSecret, username })
           },
-          body: JSON.stringify({ adminSecret, username })
-        });
+          { maxRetries: 0, timeoutMs: KY_CONFIG.SYNC.TIMEOUT_MS }
+        );
 
         const parsed = await KyApi.parseResponse(res);
         const data = parsed.data;
@@ -177,11 +192,13 @@ export function createAdminUiMethods(getApp) {
         this._setSavedAdminSecret(adminSecret);
         if (clearLink) clearLink.style.display = 'inline';
 
-        codeDisplay.textContent = data.code;
-        resultBox.style.display = 'block';
-        notice.textContent = `学员「${data.nickname || data.username}」的 6 位重置码已生成！`;
-        notice.className = 'auth-notice success';
-        notice.style.display = 'block';
+        if (codeDisplay) codeDisplay.textContent = data.code;
+        if (resultBox) resultBox.style.display = 'block';
+        if (notice) {
+          notice.textContent = `学员「${data.nickname || data.username}」的 6 位重置码已生成！`;
+          notice.className = 'auth-notice success';
+          notice.style.display = 'block';
+        }
 
         this._lastAdminResult = {
           username: data.username,
@@ -189,13 +206,17 @@ export function createAdminUiMethods(getApp) {
           expiresIn: data.expiresInMinutes || 15
         };
       } catch (err) {
-        notice.textContent = err.message;
-        notice.className = 'auth-notice error';
-        notice.style.display = 'block';
-        resultBox.style.display = 'none';
+        if (notice) {
+          notice.textContent = err.message;
+          notice.className = 'auth-notice error';
+          notice.style.display = 'block';
+        }
+        if (resultBox) resultBox.style.display = 'none';
       } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = '⚡ 生成 6 位重置验证码';
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = '⚡ 生成 6 位重置验证码';
+        }
       }
     },
 

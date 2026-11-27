@@ -58,6 +58,12 @@ export const practiceViewMethods = {
 
   switchMode(newMode) {
     if (this.state.practiceMode === newMode) return;
+    if (this.state.practiceMode === 'mistakes_only' && !this.state.currentChapter && newMode !== 'mistakes_only') {
+      if (typeof this.showToast === 'function') {
+        this.showToast('⚠️ 全部错题特训不支持跨章切换全库模式，请返回大厅选择具体章节', 'warning', 3200);
+      }
+      return;
+    }
     const currentQ = this.state.questions && this.state.questions[this.state.currentIndex];
     const resumeQid = currentQ ? currentQ.id : null;
 
@@ -81,7 +87,8 @@ export const practiceViewMethods = {
       'instant': { icon: '⚡', text: '即做即判' },
       'exam': { icon: '📝', text: '模考自测' },
       'recite': { icon: '📖', text: '直接背题' },
-      'mistakes_only': { icon: '❌', text: '错题专训' }
+      'mistakes_only': { icon: '❌', text: '错题专训' },
+      'exam_review': { icon: '🔍', text: '模考复盘' }
     };
     const info = modeMap[mode] || { icon: '⚡', text: '做题模式' };
     if (mIcon) mIcon.textContent = info.icon;
@@ -92,16 +99,18 @@ export const practiceViewMethods = {
       if (opt) opt.classList.toggle('active', mode === k.toLowerCase());
     });
 
-    ['Instant', 'Exam', 'Recite', 'Mistakes'].forEach(k => {
-      const btn = document.getElementById(`qMoreMode${k}`);
-      if (btn) {
-        const isAct = k.toLowerCase() === mode || (k === 'Mistakes' && mode === 'mistakes_only');
-        btn.classList.toggle('active', isAct);
-      }
-    });
-
     const modeTag = document.getElementById('pModeTag');
-    if (modeTag) modeTag.style.display = mode === 'mistakes_only' ? 'inline-block' : 'none';
+    if (modeTag) {
+      if (mode === 'mistakes_only') {
+        modeTag.textContent = '错题专训';
+        modeTag.style.display = 'inline-block';
+      } else if (mode === 'exam_review') {
+        modeTag.textContent = '模考复盘（只读）';
+        modeTag.style.display = 'inline-block';
+      } else {
+        modeTag.style.display = 'none';
+      }
+    }
 
     const btnExamSubmit = document.getElementById('btnExamSubmit');
     const drawerExam = document.getElementById('drawerExamSubmitBtn');
@@ -207,10 +216,6 @@ export const practiceViewMethods = {
         mSpecTag.style.display = 'none';
       }
     }
-    const qMoreIcon = document.getElementById('qMoreFlagIcon');
-    const qMoreTitle = document.getElementById('qMoreFlagTitle');
-    if (qMoreIcon) qMoreIcon.textContent = this.state.isFlagged ? '★' : '☆';
-    if (qMoreTitle) qMoreTitle.textContent = this.state.isFlagged ? '已标记本题 (点击取消)' : '标记本题';
 
     document.getElementById('qStem').textContent = q.stem;
 
@@ -237,7 +242,7 @@ export const practiceViewMethods = {
         if (stdAns.includes(opt.key)) {
           extraClass += ' is-correct-std';
         }
-      } else if (mode === 'instant' || mode === 'mistakes_only') {
+      } else if (mode === 'instant' || mode === 'mistakes_only' || mode === 'exam_review') {
         if (this.state.isEvaluated) {
           if (stdAns.includes(opt.key)) {
             extraClass += ' is-correct-std';
@@ -248,8 +253,9 @@ export const practiceViewMethods = {
       }
 
       const safeKey = escapeHtml(opt.key);
+      const roleType = q.type === '单项选择题' ? 'radio' : 'checkbox';
       return `
-        <div class="option-item ${extraClass}" data-action="select-option" data-key="${safeKey}">
+        <div class="option-item ${extraClass}" role="${roleType}" tabindex="0" aria-checked="${isSelected ? 'true' : 'false'}" data-action="select-option" data-key="${safeKey}">
           <div class="option-key-badge">${safeKey}</div>
           <div class="option-text">${escapeHtml(opt.text)}</div>
         </div>
@@ -273,7 +279,7 @@ export const practiceViewMethods = {
     if (!q) return;
     const mode = this.state.practiceMode;
 
-    if (mode === 'recite') return;
+    if (mode === 'recite' || mode === 'exam_review') return;
     if ((mode === 'instant' || mode === 'mistakes_only') && this.state.isEvaluated) return;
 
     if (q.type === '单项选择题') {
@@ -357,8 +363,19 @@ export const practiceViewMethods = {
     card.classList.add(direction === 'left' ? 'anim-slide-left' : 'anim-slide-right');
   },
 
+  _persistCurrentQuestionElapsed() {
+    const curQ = this.getCurrentQuestion();
+    const mode = this.state.practiceMode;
+    if (!curQ || this.state.isEvaluated || mode === 'recite' || mode === 'exam_review') return;
+    curQ.user_time = this.state.questionSeconds;
+    if (mode === 'exam' && this.state.examDraftAnswers && this.state.examDraftAnswers[curQ.id]) {
+      this.state.examDraftAnswers[curQ.id].time_spent = this.state.questionSeconds;
+    }
+  },
+
   prevQuestion() {
     if (this.state.currentIndex > 0) {
+      this._persistCurrentQuestionElapsed();
       this.state.manualPeek = false;
       this.state.currentIndex--;
       this.renderQuestion();
@@ -367,6 +384,7 @@ export const practiceViewMethods = {
   },
 
   nextQuestion() {
+    if (!this.state.questions || this.state.questions.length === 0) return;
     const q = this.getCurrentQuestion();
     const mode = this.state.practiceMode;
 
@@ -376,6 +394,7 @@ export const practiceViewMethods = {
     }
 
     if (this.state.currentIndex < this.state.questions.length - 1) {
+      this._persistCurrentQuestionElapsed();
       this.state.manualPeek = false;
       this.state.currentIndex++;
       this.renderQuestion();
@@ -383,9 +402,15 @@ export const practiceViewMethods = {
     } else {
       if (mode === 'exam') {
         this.submitExam();
+      } else if (mode === 'exam_review') {
+        this.showToast('🔍 已浏览完本次模考全部复盘题目', 'info', 2600);
+        this.navigateTo('hub');
       } else if (this.state.isSingleMistakeRetry) {
         this.state.isSingleMistakeRetry = false;
         this.showToast('✅ 已完成该错题重刷！', 'success', 2600);
+        this.navigateTo('mistakes');
+      } else if (mode === 'mistakes_only') {
+        this.showToast('✅ 已完成本轮错题专训！', 'success', 2800);
         this.navigateTo('mistakes');
       } else {
         this.showToast('🎉 恭喜！你已完成本章节的所有题目！', 'success', 3200);
@@ -396,6 +421,7 @@ export const practiceViewMethods = {
 
   jumpToQuestion(index) {
     if (index >= 0 && index < this.state.questions.length) {
+      this._persistCurrentQuestionElapsed();
       this.state.manualPeek = false;
       const dir = index >= this.state.currentIndex ? 'left' : 'right';
       this.state.currentIndex = index;
@@ -412,6 +438,9 @@ export const practiceViewMethods = {
     this.state.isFlagged = !this.state.isFlagged;
     q.is_flagged = this.state.isFlagged;
     DB.toggleFlag(q.id);
+    if (this.state.practiceMode === 'exam' && this.state.examDraftAnswers && this.state.examDraftAnswers[q.id]) {
+      this.state.examDraftAnswers[q.id].is_flagged = this.state.isFlagged;
+    }
 
     const flagBtn = document.getElementById('pFlagBtn');
     const flagIcon = document.getElementById('flagIcon');
@@ -429,11 +458,6 @@ export const practiceViewMethods = {
       if (mFlagIcon) mFlagIcon.textContent = '☆';
     }
 
-    const qMoreIcon = document.getElementById('qMoreFlagIcon');
-    const qMoreTitle = document.getElementById('qMoreFlagTitle');
-    if (qMoreIcon) qMoreIcon.textContent = this.state.isFlagged ? '★' : '☆';
-    if (qMoreTitle) qMoreTitle.textContent = this.state.isFlagged ? '已标记本题 (点击取消)' : '标记本题';
-
     const sideFlagIcon = document.getElementById('sideFlagIcon');
     if (sideFlagIcon) sideFlagIcon.textContent = this.state.isFlagged ? '★' : '☆';
 
@@ -450,12 +474,38 @@ export const practiceViewMethods = {
       danger: false
     });
     if (!confirmed) return;
+    this._persistCurrentQuestionElapsed();
     if (this.state.questionTimerTimer) {
       clearInterval(this.state.questionTimerTimer);
       this.state.questionTimerTimer = null;
     }
 
     const data = DB.submitExam(this.state.currentPart, this.state.currentChapter, this.state.examDraftAnswers);
+    const resultByQid = new Map((data.results || []).map(r => [r.qid, r]));
+    const latestAnswers = (DB.getUserData && DB.getUserData().answers) ? DB.getUserData().answers : {};
+    this.state.lastExamSnapshot = {
+      part: this.state.currentPart,
+      chapter: this.state.currentChapter,
+      questions: this.state.questions.map(qItem => {
+        const r = resultByQid.get(qItem.id);
+        const draft = this.state.examDraftAnswers[qItem.id];
+        const liveAns = latestAnswers[qItem.id];
+        const rawQ = (DB.questionsMap && DB.questionsMap[qItem.id]) ? DB.questionsMap[qItem.id] : qItem;
+        return {
+          ...rawQ,
+          ...qItem,
+          answer: rawQ.answer || (r ? r.standard_ans : ''),
+          source: rawQ.source || '',
+          analysis: rawQ.analysis || '',
+          tips: rawQ.tips || '',
+          user_selected: draft ? [...draft.selected] : [],
+          user_time: draft ? (draft.time_spent || 0) : (qItem.user_time || 0),
+          is_correct: r ? Boolean(r.is_correct) : false,
+          is_flagged: Boolean(draft ? draft.is_flagged : (liveAns ? liveAns.is_flagged : qItem.is_flagged)),
+          exam_user_ans_text: r ? r.user_ans : '未作答'
+        };
+      })
+    };
     this.state.examDraftAnswers = {};
     if (typeof this.updateMistakeBadges === 'function') {
       this.updateMistakeBadges();
@@ -504,6 +554,27 @@ export const practiceViewMethods = {
 
   reviewExamQuestions() {
     this.closeModal('examReportModal');
+    const snap = this.state.lastExamSnapshot;
+    if (snap && Array.isArray(snap.questions) && snap.questions.length > 0) {
+      this.state.currentPart = snap.part;
+      this.state.currentChapter = snap.chapter;
+      this.state.currentType = '';
+      this.state.practiceMode = 'exam_review';
+      this.state.explanationVisible = true;
+      this.state.manualPeek = false;
+      this.state.isSingleMistakeRetry = false;
+      this.state.questions = snap.questions.map(item => ({
+        ...item,
+        user_selected: [...(item.user_selected || [])]
+      }));
+      this.state.currentIndex = 0;
+      const shortSub = this.getSubjectShortName(snap.part);
+      this.updateBreadcrumb(`${shortSub} · ${snap.chapter} (复盘)`);
+      this.navigateTo('practice');
+      this.updateModePillsUI();
+      this.renderQuestion();
+      return;
+    }
     this.startPractice(this.state.currentPart, this.state.currentChapter, '', 'instant');
   },
 

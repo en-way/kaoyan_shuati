@@ -1,15 +1,16 @@
--- 考研政治 1000 题 · Cloudflare D1 数据库架构规范 (v38 多题库兼容版)
+-- 考研政治 1000 题 · Cloudflare D1 数据库架构规范 (v38 多题库与安全加固版)
 
 -- 1. 用户主表。username 的 UNIQUE 约束已自动建立唯一索引，无需再建重复索引
---    （D1 把索引维护计入「行写入」，重复索引会让每次注册白白多 1 次写入）
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,               -- 用户UUID
     username TEXT UNIQUE NOT NULL,     -- 用户名/账号 (统一转小写)
     nickname TEXT NOT NULL,            -- 展示昵称
     password_hash TEXT NOT NULL,       -- PBKDF2 安全哈希值 (64位hex)
     salt TEXT NOT NULL,                -- 16字节安全随机盐 (32位hex)
+    token_version INTEGER NOT NULL DEFAULT 1, -- JWT 精确吊销版本号（改密即自增）
+    hash_iters INTEGER NOT NULL DEFAULT 20000, -- 每账号 PBKDF2 迭代次数
     created_at INTEGER NOT NULL,       -- 注册时间戳 (毫秒)
-    updated_at INTEGER NOT NULL        -- 最近改密/注册时间戳 (毫秒)，同时用作旧 JWT 吊销基准
+    updated_at INTEGER NOT NULL        -- 最近改密/注册时间戳 (毫秒)
 );
 
 -- 2. 刷题进度与错题同步表 (单用户单题库 1 行，复合主键避免冗余索引写入损耗)
@@ -34,6 +35,14 @@ CREATE TABLE IF NOT EXISTS password_resets (
     expires_at INTEGER NOT NULL,       -- 生成时间 + 15 分钟
     used INTEGER DEFAULT 0,
     failed_attempts INTEGER DEFAULT 0  -- 尝试计数(原子自增)，上限 5
+);
+
+-- 4. 认证与管理员接口防爆破限流表
+CREATE TABLE IF NOT EXISTS auth_rate_limits (
+    bucket TEXT PRIMARY KEY,
+    fail_count INTEGER NOT NULL DEFAULT 0,
+    window_start INTEGER NOT NULL,
+    locked_until INTEGER NOT NULL DEFAULT 0
 );
 
 -- 与实际查询 WHERE username = ? AND used = 0 匹配

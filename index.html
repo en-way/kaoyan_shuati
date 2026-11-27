@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   
   <!-- PWA & Mobile Web App Meta -->
   <link rel="manifest" href="manifest.json">
@@ -13,44 +13,19 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="考研政治">
   <meta name="theme-color" content="#0c1017">
-  <script>
-    try {
-      if (localStorage.getItem('kaoyan_theme_2027') === 'light') {
-        document.documentElement.setAttribute('data-theme', 'light');
-        var m = document.querySelector('meta[name="theme-color"]');
-        if (m) m.setAttribute('content', '#f6f4ef');
-      }
-    } catch (e) {}
-  </script>
+  <script>try{if(localStorage.getItem('kaoyan_theme_2027')==='light'){document.documentElement.setAttribute('data-theme','light');var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','#f6f4ef');}}catch(e){}</script>
 
   <title>2027 考研政治 1000 题 · 沉浸式做题系统</title>
 
   <!-- 极端缓存自愈与容错防护：若旧版缓存抛出 SyntaxError，自动秒级清理 Service Worker 缓存并恢复 -->
-  <script>
-    window.addEventListener('error', function(e) {
-      var isAppError = e && e.filename && (e.filename.indexOf('app.js') !== -1 || e.filename.indexOf('main.js') !== -1);
-      if (isAppError && e.message && (e.message.indexOf('SyntaxError') !== -1 || e.message.indexOf('Unexpected token') !== -1)) {
-        console.warn('[Self-Healing] Detected stale cached script issue, purging caches...');
-        if ('caches' in window) {
-          caches.keys().then(function(names) {
-            names.forEach(function(n) { if (n.indexOf('ky-quiz') !== -1) caches.delete(n); });
-          });
-        }
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(regs) {
-            regs.forEach(function(r) { r.unregister(); });
-          });
-        }
-      }
-    });
-  </script>
+  <script>window.addEventListener('error',function(e){var isAppError=e&&e.filename&&(e.filename.indexOf('app.js')!==-1||e.filename.indexOf('main.js')!==-1);if(isAppError&&e.message&&(e.message.indexOf('SyntaxError')!==-1||e.message.indexOf('Unexpected token')!==-1)){console.warn('[Self-Healing] Detected stale cached script issue, purging caches...');if('caches' in window){caches.keys().then(function(names){names.forEach(function(n){if(n.indexOf('ky-quiz')!==-1)caches.delete(n);});});}if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister();});});}}});</script>
 
-  <link rel="stylesheet" href="css/tokens.css?v=20271123_v38_10">
-  <link rel="stylesheet" href="css/base.css?v=20271123_v38_10">
-  <link rel="stylesheet" href="css/hub.css?v=20271123_v38_10">
-  <link rel="stylesheet" href="css/practice.css?v=20271123_v38_10">
-  <link rel="stylesheet" href="css/modals.css?v=20271123_v38_10">
-  <link rel="stylesheet" href="css/responsive.css?v=20271123_v38_10">
+  <link rel="stylesheet" href="css/tokens.css?v=20271123_v38_11">
+  <link rel="stylesheet" href="css/base.css?v=20271123_v38_11">
+  <link rel="stylesheet" href="css/hub.css?v=20271123_v38_11">
+  <link rel="stylesheet" href="css/practice.css?v=20271123_v38_11">
+  <link rel="stylesheet" href="css/modals.css?v=20271123_v38_11">
+  <link rel="stylesheet" href="css/responsive.css?v=20271123_v38_11">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -171,7 +146,7 @@
         <div class="hub-top-bar">
           <div class="hub-welcome">
             <h2 id="hubWelcomeTitle">考研政治 1000 题 · 官方全真题库</h2>
-            <p class="hub-desc" id="hubWelcomeDesc">肖秀荣《2027 考研政治 1000 题》全收录 · 配备全部 1,148 道官方标准答案、出处定位、详细简析与名师点拨</p>
+            <p class="hub-desc" id="hubWelcomeDesc">肖秀荣《2027 考研政治 1000 题》全收录 · 配备全量官方标准答案、出处定位、详细简析与名师点拨</p>
           </div>
           <!-- 多题库/年份卡片胶囊切换栏（桌面端与移动端统一入口） -->
           <div id="hubBankSwitcher" class="hub-bank-switcher" aria-label="题库版本切换栏"></div>
@@ -544,14 +519,14 @@
   </nav>
 
   <!-- MODAL: MOBILE MORE MENU (移动端设置与备份面板) -->
-  <div id="moreMenuModal" class="modal-backdrop">
+  <div id="moreMenuModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="moreMenuModalTitle">
     <div class="modal-card modal-bottom-sheet">
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">⚙️</span>
-          <h3>功能与数据管理</h3>
+          <h3 id="moreMenuModalTitle">功能与数据管理</h3>
         </div>
-        <button type="button" class="modal-close" data-action="close-modal-btn" data-modal-id="moreMenuModal">&times;</button>
+        <button type="button" class="modal-close" aria-label="关闭弹窗" data-action="close-modal-btn" data-modal-id="moreMenuModal">&times;</button>
       </div>
       <div class="modal-body sheet-body">
         <div class="sheet-timers-grid">
@@ -653,14 +628,14 @@
   </div>
 
   <!-- MODAL: MOBILE MODE SELECTOR (移动端做题模式切换面板) -->
-  <div id="modeSelectModal" class="modal-backdrop">
+  <div id="modeSelectModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modeSelectModalTitle">
     <div class="modal-card modal-bottom-sheet">
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">⚡</span>
-          <h3>选择刷题模式与字号</h3>
+          <h3 id="modeSelectModalTitle">选择刷题模式与字号</h3>
         </div>
-        <button type="button" class="modal-close" data-action="close-modal-btn" data-modal-id="modeSelectModal">&times;</button>
+        <button type="button" class="modal-close" aria-label="关闭弹窗" data-action="close-modal-btn" data-modal-id="modeSelectModal">&times;</button>
       </div>
       <div class="modal-body sheet-body">
         <div class="font-size-setting-card">
@@ -703,74 +678,15 @@
     </div>
   </div>
 
-  <!-- MODAL: MOBILE QUESTION MORE MENU (移动端做题快捷操作面板) -->
-  <div id="questionMoreModal" class="modal-backdrop">
-    <div class="modal-card modal-bottom-sheet">
-      <div class="modal-header">
-        <div class="modal-title">
-          <span class="modal-icon">⚙️</span>
-          <h3>做题操作与模式</h3>
-        </div>
-        <button type="button" class="modal-close" data-action="close-modal-btn" data-modal-id="questionMoreModal">&times;</button>
-      </div>
-      <div class="modal-body sheet-body">
-        <div class="q-more-section-title">切换做题模式</div>
-        <div class="q-more-modes-grid">
-          <button id="qMoreModeInstant" type="button" class="q-more-mode-btn active" data-action="switch-mode" data-mode="instant" data-close-menu="qmore">
-            <span class="q-mode-icon">⚡</span>
-            <span class="q-mode-name">即做即判</span>
-          </button>
-          <button id="qMoreModeExam" type="button" class="q-more-mode-btn" data-action="switch-mode" data-mode="exam" data-close-menu="qmore">
-            <span class="q-mode-icon">📝</span>
-            <span class="q-mode-name">模考自测</span>
-          </button>
-          <button id="qMoreModeRecite" type="button" class="q-more-mode-btn" data-action="switch-mode" data-mode="recite" data-close-menu="qmore">
-            <span class="q-mode-icon">📖</span>
-            <span class="q-mode-name">直接背题</span>
-          </button>
-          <button id="qMoreModeMistakes" type="button" class="q-more-mode-btn" data-action="start-mistakes-training" data-close-menu="qmore">
-            <span class="q-mode-icon">❌</span>
-            <span class="q-mode-name">错题专训</span>
-          </button>
-        </div>
-
-        <div class="q-more-section-title" style="margin-top: 14px;">题目快捷动作</div>
-        <div class="sheet-action-list">
-          <button type="button" class="sheet-btn" data-action="open-drawer" data-close-menu="qmore">
-            <span class="sheet-btn-icon">📋</span>
-            <div class="sheet-btn-info">
-              <span class="sheet-btn-title">答题卡全览 / 快速跳题</span>
-              <span class="sheet-btn-sub">查看所有题目完成度，点击可直接跳至任意题</span>
-            </div>
-          </button>
-          <button id="qMoreFlagBtn" type="button" class="sheet-btn" data-action="toggle-flag">
-            <span class="sheet-btn-icon" id="qMoreFlagIcon">☆</span>
-            <div class="sheet-btn-info">
-              <span class="sheet-btn-title" id="qMoreFlagTitle">标记本题</span>
-              <span class="sheet-btn-sub">标为重点题目，方便稍后在答题卡筛选攻克</span>
-            </div>
-          </button>
-          <button id="qMoreSubmitExamBtn" type="button" class="sheet-btn sheet-btn-danger" style="display:none;" data-action="submit-exam" data-close-menu="qmore">
-            <span class="sheet-btn-icon">📝</span>
-            <div class="sheet-btn-info">
-              <span class="sheet-btn-title color-coral">交卷并生成成绩单</span>
-              <span class="sheet-btn-sub">提前结束本次模考自测并查看考情分析</span>
-            </div>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- MODAL: EXAM SCORE REPORT (模考成绩单) -->
-  <div id="examReportModal" class="modal-backdrop">
+  <div id="examReportModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="examReportModalTitle">
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">🏆</span>
-          <h3>模考测评成绩单</h3>
+          <h3 id="examReportModalTitle">模考测评成绩单</h3>
         </div>
-        <button type="button" class="modal-close" data-action="close-modal-btn" data-modal-id="examReportModal">&times;</button>
+        <button type="button" class="modal-close" aria-label="关闭弹窗" data-action="close-modal-btn" data-modal-id="examReportModal">&times;</button>
       </div>
       
       <div class="modal-body">
@@ -816,11 +732,11 @@
   </div>
 
   <!-- DRAWER: QUESTION GRID (答题卡抽屉) -->
-  <div id="questionDrawer" class="drawer-backdrop">
+  <div id="questionDrawer" class="drawer-backdrop" role="dialog" aria-modal="true" aria-labelledby="questionDrawerTitle">
     <div class="drawer-panel">
       <div class="drawer-header">
-        <h3>答题卡导航</h3>
-        <button type="button" class="drawer-close" data-action="close-modal-btn" data-modal-id="questionDrawer">&times;</button>
+        <h3 id="questionDrawerTitle">答题卡导航</h3>
+        <button type="button" class="drawer-close" aria-label="关闭答题卡" data-action="close-modal-btn" data-modal-id="questionDrawer">&times;</button>
       </div>
 
       <div class="drawer-legend">
@@ -849,7 +765,7 @@
           <span class="modal-icon">⚠️</span>
           <h3 id="confirmDialogTitle">操作确认</h3>
         </div>
-        <button type="button" class="modal-close" data-action="close-modal-btn" data-modal-id="confirmDialogModal">&times;</button>
+        <button type="button" class="modal-close" aria-label="关闭弹窗" data-action="close-modal-btn" data-modal-id="confirmDialogModal">&times;</button>
       </div>
       <div class="modal-body">
         <p id="confirmDialogMessage" class="confirm-dialog-message"></p>
@@ -862,20 +778,20 @@
   </div>
 
   <!-- MODAL: AUTH MODAL (登录 / 注册 / 密码重置三合一) -->
-  <div id="authModal" class="modal-backdrop">
+  <div id="authModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
     <div class="modal-card auth-card">
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">🔐</span>
           <h3 id="authModalTitle">考研政治 · 云端账号</h3>
         </div>
-        <button type="button" class="modal-close" data-action="close-modal-btn" data-modal-id="authModal">&times;</button>
+        <button type="button" class="modal-close" aria-label="关闭弹窗" data-action="close-modal-btn" data-modal-id="authModal">&times;</button>
       </div>
 
-      <div class="auth-tabs">
-        <button id="authTabLogin" type="button" class="auth-tab-btn active" data-action="auth-tab" data-tab="login">用户登录</button>
-        <button id="authTabRegister" type="button" class="auth-tab-btn" data-action="auth-tab" data-tab="register">新用户注册</button>
-        <button id="authTabReset" type="button" class="auth-tab-btn" data-action="auth-tab" data-tab="reset">重置密码</button>
+      <div class="auth-tabs" role="tablist" aria-label="账号操作选项卡">
+        <button id="authTabLogin" type="button" role="tab" class="auth-tab-btn active" data-action="auth-tab" data-tab="login">用户登录</button>
+        <button id="authTabRegister" type="button" role="tab" class="auth-tab-btn" data-action="auth-tab" data-tab="register">新用户注册</button>
+        <button id="authTabReset" type="button" role="tab" class="auth-tab-btn" data-action="auth-tab" data-tab="reset">重置密码</button>
       </div>
 
       <div class="modal-body auth-body">
@@ -883,12 +799,12 @@
 
         <form id="formLogin" data-submit-action="auth-login">
           <div class="form-group">
-            <label>账号 / 用户名</label>
+            <label for="loginUsername">账号 / 用户名</label>
             <input type="text" id="loginUsername" class="form-control" placeholder="请输入你的账号" autocomplete="username" required>
           </div>
           <div class="form-group">
             <div class="label-row">
-              <label>密码</label>
+              <label for="loginPassword">密码</label>
               <a href="javascript:void(0)" class="link-sub" data-action="auth-tab" data-tab="reset">忘记密码？</a>
             </div>
             <input type="password" id="loginPassword" class="form-control" placeholder="请输入密码" autocomplete="current-password" required>
@@ -903,15 +819,15 @@
 
         <form id="formRegister" style="display:none;" data-submit-action="auth-register">
           <div class="form-group">
-            <label>注册账号 (用于登录)</label>
+            <label for="regUsername">注册账号 (用于登录)</label>
             <input type="text" id="regUsername" class="form-control" placeholder="英文字母或数字，3~32位" autocomplete="username" required>
           </div>
           <div class="form-group">
-            <label>用户昵称 (界面展示)</label>
+            <label for="regNickname">用户昵称 (界面展示)</label>
             <input type="text" id="regNickname" class="form-control" placeholder="例如：政治冲刺80+ / 昵称" required>
           </div>
           <div class="form-group">
-            <label>设置密码</label>
+            <label for="regPassword">设置密码</label>
             <input type="password" id="regPassword" class="form-control" placeholder="至少6位密码" autocomplete="new-password" required>
           </div>
           <button type="submit" id="btnRegSubmit" class="btn-primary btn-block" style="margin-top:16px;">
@@ -927,15 +843,15 @@
             ℹ️ 请联系管理员获取 6 位专属重置码，输入后可直接设置新密码并登录。
           </div>
           <div class="form-group">
-            <label>账号 / 用户名</label>
+            <label for="resetUsername">账号 / 用户名</label>
             <input type="text" id="resetUsername" class="form-control" placeholder="请输入绑定的账号" required>
           </div>
           <div class="form-group">
-            <label>6 位密码重置码</label>
+            <label for="resetCode">6 位密码重置码</label>
             <input type="text" id="resetCode" class="form-control" placeholder="管理员发送的 6 位纯数字验证码" maxlength="6" required>
           </div>
           <div class="form-group">
-            <label>设置新密码</label>
+            <label for="resetNewPassword">设置新密码</label>
             <input type="password" id="resetNewPassword" class="form-control" placeholder="至少6位新密码" required>
           </div>
           <button type="submit" id="btnResetSubmit" class="btn-primary btn-block" style="margin-top:16px;">
@@ -956,14 +872,14 @@
   </div>
 
   <!-- MODAL: ADMIN CODE GENERATOR (管理员专属重置码发放面板) -->
-  <div id="adminModal" class="modal-backdrop">
+  <div id="adminModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle">
     <div class="modal-card auth-card">
       <div class="modal-header">
         <div class="modal-title">
           <span class="modal-icon">🛠️</span>
-          <h3>管理员密码重置码发放</h3>
+          <h3 id="adminModalTitle">管理员密码重置码发放</h3>
         </div>
-        <button type="button" class="modal-close" data-action="close-modal-btn" data-modal-id="adminModal">&times;</button>
+        <button type="button" class="modal-close" aria-label="关闭弹窗" data-action="close-modal-btn" data-modal-id="adminModal">&times;</button>
       </div>
 
       <div class="modal-body auth-body">
@@ -976,7 +892,7 @@
         <form data-submit-action="admin-generate">
           <div class="form-group">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <label style="margin-bottom:0;">管理员密钥 (ADMIN_SECRET)</label>
+              <label for="adminSecretKey" style="margin-bottom:0;">管理员密钥 (ADMIN_SECRET)</label>
               <div style="font-size:12px; display:flex; gap:8px;">
                 <a href="javascript:void(0)" data-action="admin-verify" style="color:var(--accent-blue); text-decoration:none;">🔍 测试密钥</a>
                 <a href="javascript:void(0)" data-action="admin-clear-secret" id="adminClearSecretLink" style="color:var(--text-muted); text-decoration:none; display:none;">清除记忆</a>
@@ -988,7 +904,7 @@
             </div>
           </div>
           <div class="form-group" style="margin-top:12px;">
-            <label>学员账号 / 用户名</label>
+            <label for="adminTargetUsername">学员账号 / 用户名</label>
             <input type="text" id="adminTargetUsername" class="form-control" placeholder="需找回密码的学员账号" required>
           </div>
           <button type="submit" id="btnAdminGenerate" class="btn-primary btn-block" style="margin-top:16px;">
@@ -1007,6 +923,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=20271123_v38_10"></script>
+  <script type="module" src="js/main.js?v=20271123_v38_11"></script>
 </body>
 </html>

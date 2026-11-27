@@ -27,7 +27,9 @@ export const App = {
     explanationVisible: true,
     manualPeek: false,
     examDraftAnswers: {},
+    lastExamSnapshot: null,
     isSingleMistakeRetry: false,
+    pendingSwReload: false,
 
     questionSeconds: 0,
     sessionSeconds: 0,

@@ -1,9 +1,10 @@
 /**
- * 多题库云端同步调度、指纹防抖、409 乐观锁合并与登出清理模块 (js/core/cloud-sync.js)
+ * 多题库云端同步调度、指纹防抖、409 乐观锁合并、跨标签协同与登出清理模块 (js/core/cloud-sync.js)
  */
 import { KY_CONFIG } from '../config.js';
 import { KyApi } from '../api.js';
 import { DB } from '../state/store.js';
+import { computeDataFingerprint as quizComputeDataFingerprint } from './quiz.js';
 
 export function createCloudSyncMethods(getApp) {
   return {
@@ -43,6 +44,47 @@ export function createCloudSyncMethods(getApp) {
       return DB.getActiveKeys(bankId);
     },
 
+    /**
+     * 清理全部或跨题库同步元数据（防止登录切换账号/重置后遗留旧脏标记或旧题库进度）
+     */
+    purgeBankSyncMeta({ clearActiveProgress = false, clearOtherBanksProgress = false, activeBankId = DB.currentBankId } = {}) {
+      const activeKeys = this.getActiveSyncKeys(activeBankId);
+      const exactSyncKeys = new Set([
+        KY_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME,
+        KY_CONFIG.STORAGE_KEYS.LAST_UPLOAD_HASH,
+        KY_CONFIG.STORAGE_KEYS.IS_DIRTY
+      ]);
+      const syncPrefixes = [
+        'kaoyan_last_sync_time_',
+        'kaoyan_last_upload_hash_',
+        'kaoyan_is_dirty_',
+        'kaoyan_cloud_version_',
+        'kaoyan_pending_overwrite_',
+        'kaoyan_pending_reset_'
+      ];
+
+      try {
+        if (typeof localStorage === 'undefined') return;
+        const allKeys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k) allKeys.push(k);
+        }
+        for (const k of allKeys) {
+          if (exactSyncKeys.has(k) || syncPrefixes.some(p => k.startsWith(p))) {
+            localStorage.removeItem(k);
+            continue;
+          }
+          const isActiveProgressKey = k === activeKeys.PROGRESS || (activeKeys.LEGACY_PROGRESS && k === activeKeys.LEGACY_PROGRESS);
+          if (k.startsWith('kaoyan_progress_') || k === KY_CONFIG.STORAGE_KEYS.USER_DATA) {
+            if (isActiveProgressKey ? clearActiveProgress : clearOtherBanksProgress) {
+              localStorage.removeItem(k);
+            }
+          }
+        }
+      } catch (_) {}
+    },
+
     refreshBankSyncState(bankId = DB.currentBankId) {
       const keys = this.getActiveSyncKeys(bankId);
       const rawTime = this._lsGet(keys.LAST_SYNC_TIME);
@@ -53,29 +95,108 @@ export function createCloudSyncMethods(getApp) {
         const currentHash = this.computeDataFingerprint(compactData);
         const lastUploadHash = this._lsGet(keys.LAST_UPLOAD_HASH);
         const isExplicitDirty = this._lsGet(keys.IS_DIRTY) === '1';
-        this.isDirty = Boolean(isExplicitDirty || (lastUploadHash && currentHash !== lastUploadHash));
+        const hasPendingReset = DB.hasPendingOverwrite(bankId) || Boolean(DB.getPendingChapterReset(bankId));
+        this.isDirty = Boolean(isExplicitDirty || hasPendingReset || (lastUploadHash && currentHash !== lastUploadHash));
       } catch (e) {
         this.isDirty = false;
       }
       this.updateSyncUI();
     },
 
-    init() {
-      document.addEventListener('click', (e) => {
-        if (e && e.target && typeof e.target.closest === 'function' && e.target.closest('#userDropdownMenu, [data-action="auth-toggle-menu"]')) {
+    async syncAllDirtyBanks() {
+      if (!this.token || this.isSyncing) return;
+      const candidateIds = new Set([DB.currentBankId]);
+      const banks = (DB.catalog && Array.isArray(DB.catalog.banks)) ? DB.catalog.banks : [];
+      for (const b of banks) {
+        if (b && b.id) candidateIds.add(b.id);
+      }
+
+      for (const bId of candidateIds) {
+        const keys = this.getActiveSyncKeys(bId);
+        const dirtyFlag = this._lsGet(keys.IS_DIRTY) === '1';
+        const hasPending = DB.hasPendingOverwrite(bId) || Boolean(DB.getPendingChapterReset(bId));
+        const isCurrentDirty = (bId === DB.currentBankId) && (this.isDirty || this.isNetworkWeak);
+        if (dirtyFlag || hasPending || isCurrentDirty) {
+          await this.uploadToCloud(true, bId);
+        }
+      }
+    },
+
+    handleStorageEvent(e) {
+      if (!e || typeof localStorage === 'undefined') return;
+      const App = getApp();
+
+      if (e.key === KY_CONFIG.STORAGE_KEYS.TOKEN) {
+        if (!e.newValue) {
+          this.token = null;
+          this.currentUser = null;
+          this.isDirty = false;
+          this.lastSyncTime = null;
+          this.isNetworkWeak = false;
+          this.renderAuthUI();
+          if (App && typeof App.loadOverview === 'function' && App.state && App.state.currentView === 'hub') {
+            App.loadOverview();
+          }
           return;
         }
-        this.closeUserMenu();
-      });
+        if (e.newValue !== this.token) {
+          this.token = e.newValue;
+          const rawUser = this._lsGet(KY_CONFIG.STORAGE_KEYS.USER_INFO);
+          try {
+            this.currentUser = rawUser ? JSON.parse(rawUser) : null;
+          } catch (_) {
+            this.currentUser = null;
+          }
+          this.refreshBankSyncState(DB.currentBankId);
+          this.renderAuthUI();
+          if (App && typeof App.loadOverview === 'function' && App.state && App.state.currentView === 'hub') {
+            App.loadOverview();
+          }
+        }
+        return;
+      }
 
-      window.addEventListener('online', () => {
-        console.log('[Network] Connection restored to online.');
-        if (this.token && (this.isDirty || this.isNetworkWeak)) {
-          this.uploadToCloud(true).catch(e => {
-            console.warn('[Network] Auto-resume upload deferred:', e);
+      if (e.key === KY_CONFIG.STORAGE_KEYS.USER_INFO && this.token) {
+        try {
+          this.currentUser = e.newValue ? JSON.parse(e.newValue) : null;
+          this.renderAuthUI();
+        } catch (_) {}
+        return;
+      }
+
+      const activeKeys = this.getActiveSyncKeys(DB.currentBankId);
+      if (e.key === activeKeys.PROGRESS || e.key === activeKeys.IS_DIRTY || e.key === activeKeys.LAST_SYNC_TIME) {
+        this.refreshBankSyncState(DB.currentBankId);
+      }
+    },
+
+    init() {
+      if (typeof document !== 'undefined') {
+        document.addEventListener('click', (e) => {
+          if (e && e.target && typeof e.target.closest === 'function' && e.target.closest('#userDropdownMenu, [data-action="auth-toggle-menu"]')) {
+            return;
+          }
+          this.closeUserMenu();
+        });
+      }
+
+      if (typeof window !== 'undefined') {
+        if (!this._onlineListenerBound) {
+          this._onlineListenerBound = true;
+          window.addEventListener('online', () => {
+            console.log('[Network] Connection restored to online.');
+            if (this.token) {
+              this.syncAllDirtyBanks().catch(e => {
+                console.warn('[Network] Auto-resume upload deferred:', e);
+              });
+            }
           });
         }
-      });
+        if (!this._storageListenerBound) {
+          this._storageListenerBound = true;
+          window.addEventListener('storage', (e) => this.handleStorageEvent(e));
+        }
+      }
 
       this.refreshBankSyncState(DB.currentBankId);
 
@@ -88,10 +209,13 @@ export function createCloudSyncMethods(getApp) {
     },
 
     markDirty(bankId = DB.currentBankId) {
-      const keys = this.getActiveSyncKeys(bankId);
-      this.isDirty = true;
+      const targetId = bankId || DB.currentBankId;
+      const keys = this.getActiveSyncKeys(targetId);
       this._lsSet(keys.IS_DIRTY, '1');
-      this.updateSyncUI();
+      if (targetId === DB.currentBankId) {
+        this.isDirty = true;
+        this.updateSyncUI();
+      }
     },
 
     purgeAllUserData(reason) {
@@ -100,39 +224,22 @@ export function createCloudSyncMethods(getApp) {
         KY_CONFIG.STORAGE_KEYS.TOKEN,
         KY_CONFIG.STORAGE_KEYS.USER_INFO,
         KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK,
-        KY_CONFIG.STORAGE_KEYS.USER_DATA,
         KY_CONFIG.STORAGE_KEYS.CURRENT_BANK_ID,
         KY_CONFIG.STORAGE_KEYS.MIGRATED_V38,
         'kaoyan_admin_secret_saved'
       ]);
-      const bankPrefixes = [
-        'kaoyan_progress_',
-        'kaoyan_last_sync_time_',
-        'kaoyan_last_upload_hash_',
-        'kaoyan_is_dirty_',
-        'kaoyan_cloud_version_',
-        'kaoyan_pending_overwrite_'
-      ];
 
-      try {
-        const allKeys = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k) allKeys.push(k);
-        }
-        for (const k of allKeys) {
-          if (exactKeys.has(k) || bankPrefixes.some(p => k.startsWith(p))) {
-            localStorage.removeItem(k);
-          }
-        }
-      } catch (_) {}
-
+      this.purgeBankSyncMeta({ clearActiveProgress: true, clearOtherBanksProgress: true });
+      for (const k of exactKeys) {
+        this._lsRemove(k);
+      }
       this._setSavedAdminSecret('');
 
       this.token = null;
       this.currentUser = null;
       this.isDirty = false;
       this.lastSyncTime = null;
+      this.isNetworkWeak = false;
 
       if (App && App.state) {
         App.state.questions = [];
@@ -140,6 +247,7 @@ export function createCloudSyncMethods(getApp) {
         App.state.overview = null;
         App.state.currentIndex = 0;
         App.state.selectedOptions = [];
+        App.state.examDraftAnswers = {};
         App.state.isEvaluated = false;
         App.state.isFlagged = false;
       }
@@ -149,7 +257,7 @@ export function createCloudSyncMethods(getApp) {
       if (reason && App && typeof App.showToast === 'function') {
         App.showToast(reason, 'info', 2000);
         setTimeout(() => location.reload(), 650);
-      } else {
+      } else if (typeof location !== 'undefined') {
         location.reload();
       }
     },
@@ -162,7 +270,7 @@ export function createCloudSyncMethods(getApp) {
       this._lsRemove(KY_CONFIG.STORAGE_KEYS.USER_INFO);
       this._lsRemove(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK);
       this.renderAuthUI();
-      if (!isSilent) {
+      if (!isSilent && App && typeof App.showToast === 'function') {
         App.showToast('🔑 您的登录凭证已过期或失效，本地做题记录已完整保留，请重新登录！', 'warning', 4200);
         this.openAuthModal('login');
       }
@@ -200,19 +308,11 @@ export function createCloudSyncMethods(getApp) {
       this.renderAuthUI();
     },
 
+    /**
+     * 复用 quiz.js 中无时间戳干扰且按题号排序的确定性 FNV-1a 指纹
+     */
     computeDataFingerprint(compactData) {
-      if (!compactData) return '0';
-      const answers = compactData.answers || {};
-      const mistakes = compactData.mistakes || {};
-      const contentStr = JSON.stringify({ a: answers, m: mistakes });
-      let hash = 5381;
-      for (let i = 0; i < contentStr.length; i++) {
-        hash = ((hash << 5) + hash) + contentStr.charCodeAt(i);
-        hash |= 0;
-      }
-      const ansCount = Object.keys(answers).length;
-      const misCount = Object.keys(mistakes).length;
-      return `${ansCount}_${misCount}_${hash}`;
+      return quizComputeDataFingerprint(compactData);
     },
 
     async checkSession() {
@@ -245,10 +345,11 @@ export function createCloudSyncMethods(getApp) {
           return;
         }
 
-        const res = await fetch(this.getApiUrl('/api/auth/me'), {
-          headers: { 'Authorization': `Bearer ${this.token}` },
-          signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(KY_CONFIG.SYNC.TIMEOUT_MS) : undefined
-        });
+        const res = await KyApi.fetchWithRetry(
+          this.getApiUrl('/api/auth/me'),
+          { headers: { 'Authorization': `Bearer ${this.token}` } },
+          { maxRetries: 0, timeoutMs: KY_CONFIG.SYNC.TIMEOUT_MS }
+        );
 
         if (res.status === 401) {
           this.handleSessionExpired(true);
@@ -303,7 +404,9 @@ export function createCloudSyncMethods(getApp) {
       const keys = this.getActiveSyncKeys();
       this._lsRemove(keys.PROGRESS);
       if (keys.LEGACY_PROGRESS) this._lsRemove(keys.LEGACY_PROGRESS);
+      DB._storageWriteBlocked = false;
       DB.saveUserData({ answers: {}, mistakes: {} });
+      DB.clearPendingChapterReset();
       DB.setPendingOverwrite(true);
       this._lsRemove(keys.LAST_SYNC_TIME);
       this._lsRemove(keys.LAST_UPLOAD_HASH);
@@ -317,6 +420,7 @@ export function createCloudSyncMethods(getApp) {
         App.state.overview = null;
         App.state.currentIndex = 0;
         App.state.selectedOptions = [];
+        App.state.examDraftAnswers = {};
         App.state.isEvaluated = false;
         App.state.isFlagged = false;
       }
@@ -325,29 +429,64 @@ export function createCloudSyncMethods(getApp) {
       setTimeout(() => location.reload(), 700);
     },
 
+    _applyLocalChapterReset(bankId, resetInfo) {
+      if (!resetInfo || !Array.isArray(resetInfo.qids) || resetInfo.qids.length === 0) return;
+      const curData = DB.getUserData(bankId);
+      let changed = false;
+      for (const qid of resetInfo.qids) {
+        const ans = curData.answers && curData.answers[qid];
+        const ansTime = ans && ans.updated_at ? (Date.parse(ans.updated_at) || 0) : 0;
+        if (ans && ansTime <= resetInfo.resetAt) {
+          delete curData.answers[qid];
+          changed = true;
+        }
+        const mis = curData.mistakes && curData.mistakes[qid];
+        const misTime = mis && mis.last_wrong_time ? (Date.parse(mis.last_wrong_time) || 0) : 0;
+        if (mis && misTime <= resetInfo.resetAt) {
+          delete curData.mistakes[qid];
+          changed = true;
+        }
+      }
+      if (changed) {
+        const keys = this.getActiveSyncKeys(bankId);
+        const s = JSON.stringify(curData);
+        DB._lsSet(keys.PROGRESS, s);
+        if (keys.LEGACY_PROGRESS) DB._lsSet(keys.LEGACY_PROGRESS, s);
+      }
+    },
+
     /**
-     * ☁️ 上传当前题库进度到云端（支持 bankId、expectedVersion 乐观锁 409 自动拉取合并重试、overwrite 快照覆盖）
+     * ☁️ 上传指定题库进度到云端（支持 bankId、expectedVersion 乐观锁 409 局部合并重试、整库 overwrite）
      */
-    async uploadToCloud(isSilent = false) {
+    async uploadToCloud(isSilent = false, targetBankId = null) {
       const App = getApp();
       if (!this.token) {
         if (!isSilent) this.openAuthModal('login');
         return;
       }
 
-      const bankId = DB.currentBankId;
+      const bankId = targetBankId || DB.currentBankId;
       const keys = this.getActiveSyncKeys(bankId);
-      const compactData = DB.toCompact(bankId);
-      const currentHash = this.computeDataFingerprint(compactData);
-      const lastUploadHash = this._lsGet(keys.LAST_UPLOAD_HASH);
 
-      if (!this.isDirty && lastUploadHash && lastUploadHash === currentHash) {
-        if (!isSilent) {
-          App.showToast('💡 当前做题进度已与云端一致，无需重复保存！', 'info');
+      try {
+        const preCompact = DB.toCompact(bankId);
+        const preHash = this.computeDataFingerprint(preCompact);
+        const lastUploadHash = this._lsGet(keys.LAST_UPLOAD_HASH);
+        const isBankDirty = this._lsGet(keys.IS_DIRTY) === '1' || (bankId === DB.currentBankId && this.isDirty);
+        const hasPendingReset = DB.hasPendingOverwrite(bankId) || Boolean(DB.getPendingChapterReset(bankId));
+
+        if (!isBankDirty && !hasPendingReset && lastUploadHash && lastUploadHash === preHash) {
+          if (!isSilent) {
+            App.showToast('💡 当前做题进度已与云端一致，无需重复保存！', 'info');
+          }
+          if (bankId === DB.currentBankId) {
+            this.isNetworkWeak = false;
+            this.updateSyncUI();
+          }
+          return;
         }
-        this.isNetworkWeak = false;
-        this.updateSyncUI();
-        return;
+      } catch (e) {
+        console.warn('[CloudSync] Pre-upload check skipped:', e);
       }
 
       if (!isSilent) {
@@ -368,10 +507,13 @@ export function createCloudSyncMethods(getApp) {
         this.retryStatusText = '';
         this.updateSyncUI();
 
+        // 在确认弹窗后现取最新数据，避免确认期间切换或新写入导致过期载荷
+        const compactData = DB.toCompact(bankId);
         const shouldOverwrite = DB.hasPendingOverwrite(bankId);
+        const chapterReset = shouldOverwrite ? null : DB.getPendingChapterReset(bankId);
         const expectedVersion = DB.getCloudVersion(bankId);
 
-        const doPost = async (payloadCompact, ver, overwriteFlag) => {
+        const doPost = async (payloadCompact, ver, overwriteFlag, resetInfo = null) => {
           const bodyObj = {
             bankId,
             ...payloadCompact,
@@ -380,6 +522,10 @@ export function createCloudSyncMethods(getApp) {
           };
           if (ver !== null && ver !== undefined) {
             bodyObj.expectedVersion = ver;
+          }
+          if (!overwriteFlag && resetInfo && Array.isArray(resetInfo.qids) && resetInfo.qids.length > 0) {
+            bodyObj.resetQids = resetInfo.qids;
+            bodyObj.resetAt = resetInfo.resetAt;
           }
           return this.fetchWithRetry(
             this.getApiUrl('/api/progress/sync'),
@@ -400,7 +546,7 @@ export function createCloudSyncMethods(getApp) {
           );
         };
 
-        let res = await doPost(compactData, expectedVersion, shouldOverwrite);
+        let res = await doPost(compactData, expectedVersion, shouldOverwrite, chapterReset);
 
         if (res.status === 401) {
           this.handleSessionExpired(isSilent);
@@ -417,11 +563,22 @@ export function createCloudSyncMethods(getApp) {
         if (res.status === 409 && data && data.code === 'VERSION_CONFLICT') {
           if (shouldOverwrite) {
             DB.setCloudVersion(data.version, bankId);
-            res = await doPost(compactData, data.version, true);
+            res = await doPost(compactData, data.version, true, null);
           } else {
             DB.mergeFromCompact(data, bankId);
+            if (chapterReset) {
+              this._applyLocalChapterReset(bankId, chapterReset);
+            }
             const mergedCompact = DB.toCompact(bankId);
-            res = await doPost(mergedCompact, data.version, false);
+            res = await doPost(mergedCompact, data.version, false, chapterReset);
+          }
+          if (res.status === 401) {
+            this.handleSessionExpired(isSilent);
+            return;
+          }
+          if (res.status === 404) {
+            await this.handleUserDeleted();
+            return;
           }
           parsed = await KyApi.parseResponse(res);
           data = parsed.data;
@@ -433,19 +590,27 @@ export function createCloudSyncMethods(getApp) {
 
         if (data.answers && data.mistakes && !shouldOverwrite) {
           DB.mergeFromCompact(data, bankId);
+          if (chapterReset) {
+            this._applyLocalChapterReset(bankId, chapterReset);
+          }
         }
         if (Number.isFinite(data.version)) {
           DB.setCloudVersion(data.version, bankId);
         }
         DB.setPendingOverwrite(false, bankId);
+        DB.clearPendingChapterReset(bankId);
 
-        this.lastSyncTime = data.updatedAt || Date.now();
-        this._lsSet(keys.LAST_SYNC_TIME, String(this.lastSyncTime));
+        const syncTime = data.updatedAt || Date.now();
+        this._lsSet(keys.LAST_SYNC_TIME, String(syncTime));
         const updatedCompact = DB.toCompact(bankId);
         this._lsSet(keys.LAST_UPLOAD_HASH, this.computeDataFingerprint(updatedCompact));
         this._lsRemove(keys.IS_DIRTY);
-        this.isDirty = false;
-        this.isNetworkWeak = false;
+
+        if (bankId === DB.currentBankId) {
+          this.lastSyncTime = syncTime;
+          this.isDirty = false;
+          this.isNetworkWeak = false;
+        }
         this.retryStatusText = '';
         this.updateSyncUI();
 
@@ -458,8 +623,11 @@ export function createCloudSyncMethods(getApp) {
         }
       } catch (err) {
         console.error('Upload failed:', err);
-        this.isNetworkWeak = true;
-        this.isDirty = true;
+        this._lsSet(keys.IS_DIRTY, '1');
+        if (bankId === DB.currentBankId) {
+          this.isNetworkWeak = true;
+          this.isDirty = true;
+        }
         this.retryStatusText = '';
         this.updateSyncUI();
 
@@ -481,10 +649,12 @@ export function createCloudSyncMethods(getApp) {
     /**
      * 📥 从云端下载当前题库进度
      */
-    async downloadFromCloud(isSilent = false) {
+    async downloadFromCloud(isSilent = false, options = {}) {
+      const { forceFull = false, throwOnError = false, bankId: explicitBankId = null } = options || {};
       const App = getApp();
       if (!this.token) {
         if (!isSilent) this.openAuthModal('login');
+        if (throwOnError) throw new Error('尚未登录');
         return;
       }
 
@@ -499,9 +669,12 @@ export function createCloudSyncMethods(getApp) {
         if (!ok) return;
       }
 
-      if (this.isSyncing) return;
+      if (this.isSyncing) {
+        if (throwOnError) throw new Error('同步正在进行中，请稍后重试');
+        return;
+      }
 
-      const bankId = DB.currentBankId;
+      const bankId = explicitBankId || DB.currentBankId;
       const keys = this.getActiveSyncKeys(bankId);
 
       try {
@@ -509,8 +682,10 @@ export function createCloudSyncMethods(getApp) {
         this.retryStatusText = '';
         this.updateSyncUI();
 
-        // 仅静默同步且本机无未上传修改时利用 clientTime 节流；显式覆盖或有脏数据时强制全量拉取
-        const clientTime = (isSilent && !this.isDirty && this.lastSyncTime) ? this.lastSyncTime : 0;
+        const isBankDirty = this._lsGet(keys.IS_DIRTY) === '1' || (bankId === DB.currentBankId && this.isDirty);
+        const bankLastSync = parseInt(this._lsGet(keys.LAST_SYNC_TIME) || '0', 10) || (bankId === DB.currentBankId ? this.lastSyncTime : 0);
+        const clientTime = (isSilent && !forceFull && !isBankDirty && bankLastSync) ? bankLastSync : 0;
+
         const qs = new URLSearchParams({
           bankId,
           clientTime: String(clientTime)
@@ -533,10 +708,12 @@ export function createCloudSyncMethods(getApp) {
 
         if (res.status === 401) {
           this.handleSessionExpired(isSilent);
+          if (throwOnError) throw new Error('登录凭证已失效，请重新登录');
           return;
         }
         if (res.status === 404) {
           await this.handleUserDeleted();
+          if (throwOnError) throw new Error('账号不存在或已被删除');
           return;
         }
 
@@ -551,8 +728,10 @@ export function createCloudSyncMethods(getApp) {
         }
 
         if (data.notModified) {
-          this.isNetworkWeak = false;
-          this.updateSyncUI();
+          if (bankId === DB.currentBankId) {
+            this.isNetworkWeak = false;
+            this.updateSyncUI();
+          }
           if (!isSilent) {
             App.showToast('💡 云端数据与本机一致（无更新），无需重复覆盖！', 'info');
           }
@@ -560,14 +739,27 @@ export function createCloudSyncMethods(getApp) {
         }
 
         DB.setFromCloud(data, bankId);
+        if (!DB.wasLastSaveOk()) {
+          this.retryStatusText = '';
+          this.updateSyncUI();
+          if (throwOnError) throw new Error('本地存储写入失败（存储空间可能已满）');
+          return;
+        }
+
         DB.setPendingOverwrite(false, bankId);
-        this.lastSyncTime = data.updatedAt || Date.now();
-        this._lsSet(keys.LAST_SYNC_TIME, String(this.lastSyncTime));
+        DB.clearPendingChapterReset(bankId);
+
+        const syncTime = data.updatedAt || Date.now();
+        this._lsSet(keys.LAST_SYNC_TIME, String(syncTime));
         const newCompact = DB.toCompact(bankId);
         this._lsSet(keys.LAST_UPLOAD_HASH, this.computeDataFingerprint(newCompact));
         this._lsRemove(keys.IS_DIRTY);
-        this.isDirty = false;
-        this.isNetworkWeak = false;
+
+        if (bankId === DB.currentBankId) {
+          this.lastSyncTime = syncTime;
+          this.isDirty = false;
+          this.isNetworkWeak = false;
+        }
         this.retryStatusText = '';
         this.updateSyncUI();
 
@@ -577,8 +769,10 @@ export function createCloudSyncMethods(getApp) {
         }
       } catch (err) {
         console.error('Download failed:', err);
-        this.isNetworkWeak = true;
-        this.updateSyncUI();
+        if (bankId === DB.currentBankId) {
+          this.isNetworkWeak = true;
+          this.updateSyncUI();
+        }
 
         if (!isSilent) {
           const isTimeout = err && (err.name === 'TimeoutError' || (err.message && err.message.toLowerCase().includes('timeout')));
@@ -588,6 +782,7 @@ export function createCloudSyncMethods(getApp) {
             App.showToast(`⚠️ 从云端下载失败: ${err.message || '网络不稳定'}`, 'warning', 4000);
           }
         }
+        if (throwOnError) throw err;
       } finally {
         this.isSyncing = false;
         this.retryStatusText = '';

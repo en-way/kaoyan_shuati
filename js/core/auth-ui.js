@@ -242,11 +242,15 @@ export function createAuthUiMethods(getApp) {
         submitBtn.textContent = '登录中...';
         this.showNotice('', 'none');
 
-        const res = await fetch(this.getApiUrl('/api/auth/login'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
+        const res = await KyApi.fetchWithRetry(
+          this.getApiUrl('/api/auth/login'),
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+          },
+          { maxRetries: 0, timeoutMs: KY_CONFIG.SYNC.TIMEOUT_MS }
+        );
 
         const parsed = await KyApi.parseResponse(res);
         const data = parsed.data;
@@ -257,17 +261,29 @@ export function createAuthUiMethods(getApp) {
         this.setSession(data.token, data.user);
         this.closeAuthModal();
 
-        const keys = this.getActiveSyncKeys();
+        // 先清除旧账号各题库同步元信息与非当前题库进度，但不提前抹除当前题库本地进度；
+        // 等云端明确拉取成功后，再原子覆盖当前本地缓存。
+        this.purgeBankSyncMeta({ clearActiveProgress: false, clearOtherBanksProgress: true });
         this.lastSyncTime = null;
-        safeStorageRemove(keys.LAST_SYNC_TIME);
-        safeStorageRemove(keys.PROGRESS);
-        if (keys.LEGACY_PROGRESS) safeStorageRemove(keys.LEGACY_PROGRESS);
-
+        this.isDirty = false;
+        this.isNetworkWeak = false;
         safeStorageSet(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, Date.now());
-        await this.downloadFromCloud(true);
+
+        let downloadOk = false;
+        try {
+          await this.downloadFromCloud(true, { forceFull: true, throwOnError: true });
+          downloadOk = true;
+        } catch (syncErr) {
+          console.warn('[Login] Initial cloud hydration failed, preserving local data:', syncErr);
+        }
+
         this.renderAuthUI();
         App.loadOverview();
-        App.showToast(`👋 欢迎回来，${data.user.nickname || data.user.username}！已载入您的云端学习进度`, 'success', 3600);
+        if (downloadOk) {
+          App.showToast(`👋 欢迎回来，${data.user.nickname || data.user.username}！已载入您的云端学习进度`, 'success', 3600);
+        } else {
+          App.showToast(`👋 登录成功，但暂时无法拉取云端进度，已保留本机记录，可稍后点击同步`, 'warning', 4500);
+        }
       } catch (err) {
         this.showNotice(err.message, 'error');
       } finally {
@@ -294,11 +310,15 @@ export function createAuthUiMethods(getApp) {
         submitBtn.textContent = '注册中...';
         this.showNotice('', 'none');
 
-        const res = await fetch(this.getApiUrl('/api/auth/register'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, nickname, password })
-        });
+        const res = await KyApi.fetchWithRetry(
+          this.getApiUrl('/api/auth/register'),
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, nickname, password })
+          },
+          { maxRetries: 0, timeoutMs: KY_CONFIG.SYNC.TIMEOUT_MS }
+        );
 
         const parsed = await KyApi.parseResponse(res);
         const data = parsed.data;
@@ -309,15 +329,16 @@ export function createAuthUiMethods(getApp) {
         this.setSession(data.token, data.user);
         this.closeAuthModal();
 
+        this.purgeBankSyncMeta({ clearActiveProgress: true, clearOtherBanksProgress: true });
         const keys = this.getActiveSyncKeys();
-        safeStorageRemove(keys.PROGRESS);
-        if (keys.LEGACY_PROGRESS) safeStorageRemove(keys.LEGACY_PROGRESS);
-        DB.setFromCloud({ answers: {}, mistakes: {}, version: 1, updatedAt: Date.now() });
-        this.lastSyncTime = Date.now();
+        const serverTs = Number.isFinite(data.updatedAt) && data.updatedAt > 0 ? data.updatedAt : Date.now();
+        DB.setFromCloud({ answers: {}, mistakes: {}, version: 1, updatedAt: serverTs });
+        this.lastSyncTime = serverTs;
         safeStorageSet(keys.LAST_SYNC_TIME, this.lastSyncTime);
-        safeStorageSet(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, this.lastSyncTime);
+        safeStorageSet(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, Date.now());
         safeStorageSet(keys.LAST_UPLOAD_HASH, this.computeDataFingerprint(DB.toCompact()));
         this.isDirty = false;
+        this.isNetworkWeak = false;
         this.updateSyncUI();
         App.loadOverview();
         App.showToast('🎉 注册成功！已自动登录，新账号初始进度为 0，开始刷题吧！', 'success', 3600);
@@ -347,11 +368,15 @@ export function createAuthUiMethods(getApp) {
         submitBtn.textContent = '重置中...';
         this.showNotice('', 'none');
 
-        const res = await fetch(this.getApiUrl('/api/auth/reset-password'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, code, newPassword })
-        });
+        const res = await KyApi.fetchWithRetry(
+          this.getApiUrl('/api/auth/reset-password'),
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, code, newPassword })
+          },
+          { maxRetries: 0, timeoutMs: KY_CONFIG.SYNC.TIMEOUT_MS }
+        );
 
         const parsed = await KyApi.parseResponse(res);
         const data = parsed.data;
@@ -362,16 +387,27 @@ export function createAuthUiMethods(getApp) {
         this.setSession(data.token, data.user);
         this.closeAuthModal();
 
-        const keys = this.getActiveSyncKeys();
+        this.purgeBankSyncMeta({ clearActiveProgress: false, clearOtherBanksProgress: true });
         this.lastSyncTime = null;
-        safeStorageRemove(keys.LAST_SYNC_TIME);
-        safeStorageRemove(keys.PROGRESS);
-        if (keys.LEGACY_PROGRESS) safeStorageRemove(keys.LEGACY_PROGRESS);
+        this.isDirty = false;
+        this.isNetworkWeak = false;
         safeStorageSet(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, Date.now());
-        await this.downloadFromCloud(true);
+
+        let downloadOk = false;
+        try {
+          await this.downloadFromCloud(true, { forceFull: true, throwOnError: true });
+          downloadOk = true;
+        } catch (syncErr) {
+          console.warn('[ResetPassword] Initial cloud hydration failed, preserving local data:', syncErr);
+        }
+
         this.renderAuthUI();
         App.loadOverview();
-        App.showToast('✅ 密码重置成功！已自动登录并载入云端学习记录', 'success', 3600);
+        if (downloadOk) {
+          App.showToast('✅ 密码重置成功！已自动登录并载入云端学习记录', 'success', 3600);
+        } else {
+          App.showToast('✅ 密码重置成功，但暂时无法拉取云端进度，已保留本机记录', 'warning', 4500);
+        }
       } catch (err) {
         this.showNotice(err.message, 'error');
       } finally {

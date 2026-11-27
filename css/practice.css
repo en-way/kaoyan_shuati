@@ -585,7 +585,7 @@
 }
 
 .btn-submit-multi {
-  background: var(--accent-amber);
+  background: var(--btn-solid-amber-bg, #b45309);
   color: #ffffff;
   border: none;
   font-size: 13.5px;
@@ -767,7 +767,7 @@
 }
 
 .btn-exam-finish {
-  background: var(--accent-green);
+  background: var(--btn-solid-green-bg, #047857);
   color: #ffffff;
   border: none;
 }

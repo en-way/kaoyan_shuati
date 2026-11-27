@@ -6,12 +6,82 @@ import { KY_CONFIG } from '../config.js';
 import { DB } from '../state/store.js';
 
 export const modalMethods = {
+  _lastFocusedEl: null,
+
+  _getFocusableElements(container) {
+    if (!container || typeof container.querySelectorAll !== 'function') return [];
+    const selector = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    return Array.from(container.querySelectorAll(selector)).filter((node) => {
+      if (node.closest && node.closest('[hidden]')) return false;
+      const style = typeof window !== 'undefined' && typeof window.getComputedStyle === 'function'
+        ? window.getComputedStyle(node)
+        : null;
+      return !style || (style.display !== 'none' && style.visibility !== 'hidden');
+    });
+  },
+
+  _trapFocusInActiveDialog(e, dialogBackdrop) {
+    if (!e || e.key !== 'Tab' || !dialogBackdrop) return;
+    const focusables = this._getFocusableElements(dialogBackdrop);
+    if (focusables.length === 0) {
+      e.preventDefault();
+      if (typeof dialogBackdrop.focus === 'function') dialogBackdrop.focus();
+      return;
+    }
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = typeof document !== 'undefined' ? document.activeElement : null;
+    if (e.shiftKey) {
+      if (!active || active === first || !dialogBackdrop.contains(active)) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (!active || active === last || !dialogBackdrop.contains(active)) {
+      e.preventDefault();
+      first.focus();
+    }
+  },
+
+  _restoreFocusAfterDialog() {
+    if (typeof document === 'undefined') return;
+    const anyStillOpen = Array.from(document.querySelectorAll('.modal-backdrop, .drawer-backdrop')).some(node => node.classList.contains('is-open'));
+    if (anyStillOpen) return;
+    const prev = this._lastFocusedEl;
+    this._lastFocusedEl = null;
+    if (prev && typeof prev.focus === 'function' && prev.isConnected !== false) {
+      try { prev.focus(); } catch (_) {}
+    }
+  },
+
   // ================== 统一弹窗/抽屉控制器 (.is-open + 滚动锁管理) ==================
   openModal(id) {
     const el = document.getElementById(id);
     if (!el) return;
+    if (typeof document !== 'undefined' && document.activeElement && !this._lastFocusedEl) {
+      const cur = document.activeElement;
+      if (cur !== document.body && cur !== document.documentElement) {
+        this._lastFocusedEl = cur;
+      }
+    }
     el.classList.add('is-open');
     this.updateBodyScrollLock();
+
+    const focusFirst = () => {
+      if (!el.classList.contains('is-open')) return;
+      const focusables = this._getFocusableElements(el);
+      const target = el.querySelector('input:not([disabled]):not([type="hidden"])') || focusables[0] || el;
+      if (target && typeof target.focus === 'function') {
+        if (!target.hasAttribute('tabindex') && target === el) {
+          el.setAttribute('tabindex', '-1');
+        }
+        try { target.focus({ preventScroll: true }); } catch (_) { try { target.focus(); } catch (__) {} }
+      }
+    };
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(focusFirst);
+    } else {
+      focusFirst();
+    }
   },
 
   closeModal(id, event) {
@@ -28,11 +98,14 @@ export const modalMethods = {
     if (!el) return false;
     el.classList.remove('is-open');
     this.updateBodyScrollLock();
+    this._restoreFocusAfterDialog();
     return true;
   },
 
   closeAllModals() {
     if (typeof document === 'undefined') return;
+    const examReport = document.getElementById('examReportModal');
+    const wasExamReportOpen = Boolean(examReport && examReport.classList.contains('is-open'));
     document.querySelectorAll('.modal-backdrop, .drawer-backdrop').forEach(el => {
       el.classList.remove('is-open');
     });
@@ -43,6 +116,10 @@ export const modalMethods = {
       this.auth.showNotice('', 'none');
     }
     this.updateBodyScrollLock();
+    this._restoreFocusAfterDialog();
+    if (wasExamReportOpen && typeof this.navigateTo === 'function') {
+      this.navigateTo('hub');
+    }
   },
 
   _confirmResolver: null,
@@ -310,37 +387,6 @@ export const modalMethods = {
     this.switchMode(mode);
   },
 
-  // ================== MOBILE QUESTION MORE MENU ==================
-  openQuestionMoreMenu() {
-    const modal = document.getElementById('questionMoreModal');
-    if (!modal) return;
-
-    const mode = this.state.practiceMode;
-    ['Instant', 'Exam', 'Recite', 'Mistakes'].forEach(k => {
-      const btn = document.getElementById(`qMoreMode${k}`);
-      if (btn) {
-        const isAct = k.toLowerCase() === mode || (k === 'Mistakes' && mode === 'mistakes_only');
-        btn.classList.toggle('active', isAct);
-      }
-    });
-
-    const qMoreIcon = document.getElementById('qMoreFlagIcon');
-    const qMoreTitle = document.getElementById('qMoreFlagTitle');
-    if (qMoreIcon) qMoreIcon.textContent = this.state.isFlagged ? '★' : '☆';
-    if (qMoreTitle) qMoreTitle.textContent = this.state.isFlagged ? '已标记本题 (点击取消)' : '标记本题';
-
-    const submitBtn = document.getElementById('qMoreSubmitExamBtn');
-    if (submitBtn) {
-      submitBtn.style.display = (mode === 'exam') ? 'flex' : 'none';
-    }
-
-    this.openModal('questionMoreModal');
-  },
-
-  closeQuestionMoreMenu(event) {
-    this.closeModal('questionMoreModal', event);
-  },
-
   // ================== PWA & SERVICE WORKER ==================
   deferredInstallPrompt: null,
 
@@ -428,6 +474,18 @@ export const modalMethods = {
       let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!refreshing && hadPreviousController) {
+          const isActiveExam = this.state.currentView === 'practice' && this.state.practiceMode === 'exam'
+            && this.state.examDraftAnswers && Object.keys(this.state.examDraftAnswers).length > 0;
+          const isUnsubmittedMulti = this.state.currentView === 'practice'
+            && (this.state.practiceMode === 'instant' || this.state.practiceMode === 'mistakes_only')
+            && this.state.selectedOptions && this.state.selectedOptions.length > 0 && !this.state.isEvaluated;
+          if (isActiveExam || isUnsubmittedMulti) {
+            this.state.pendingSwReload = true;
+            if (typeof this.showToast === 'function') {
+              this.showToast('🆕 发现新版本，交卷或返回大厅后将自动更新生效', 'info', 4000);
+            }
+            return;
+          }
           refreshing = true;
           window.location.reload();
         }

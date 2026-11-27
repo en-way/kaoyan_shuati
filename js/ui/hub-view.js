@@ -48,6 +48,8 @@ export const hubViewMethods = {
       const qCount = b.questionCount ? `${b.questionCount}题` : '';
       return `
         <button type="button"
+                role="tab"
+                aria-selected="${isAct ? 'true' : 'false'}"
                 class="bank-pill-btn ${activeClass}"
                 data-action="switch-bank"
                 data-bank-id="${escapeHtml(b.id)}"
@@ -70,10 +72,12 @@ export const hubViewMethods = {
   async switchQuestionBank(targetBankId) {
     if (!targetBankId || targetBankId === DB.currentBankId) return;
 
-    // 切换前若当前已登录且当前题库有未同步进度，静默触发一次后台保存
-    if (this.auth && this.auth.token && this.auth.isDirty && !this.auth.isSyncing) {
+    // 切换前若当前已登录且当前题库有未同步进度，尽量先等待或触发上传；即便仍在同步中也由 dirty 标记保证后续多题库补传不丢失
+    if (this.auth && this.auth.token && (this.auth.isDirty || DB.getPendingChapterReset(DB.currentBankId).length > 0)) {
       try {
-        await this.auth.uploadToCloud(true);
+        if (!this.auth.isSyncing) {
+          await this.auth.uploadToCloud(true);
+        }
       } catch (_) {}
     }
 
@@ -86,6 +90,8 @@ export const hubViewMethods = {
     this.state.activeSubjectIndex = 0;
     this.state.questions = [];
     this.state.currentIndex = 0;
+    this.state.examDraftAnswers = {};
+    this.state.lastExamSnapshot = null;
     this.state.filterPart = '';
     this.state.filterChapter = '';
 
@@ -112,6 +118,13 @@ export const hubViewMethods = {
     if (viewName !== 'practice' && this.state.questionTimerTimer) {
       clearInterval(this.state.questionTimerTimer);
       this.state.questionTimerTimer = null;
+    }
+    if ((viewName === 'hub' || viewName === 'mistakes') && this.state.pendingSwReload) {
+      this.state.pendingSwReload = false;
+      if (typeof window !== 'undefined' && window.location && typeof window.location.reload === 'function') {
+        window.location.reload();
+        return;
+      }
     }
     this.state.currentView = viewName;
     const mDrawerBtn = document.getElementById('mHeaderDrawerBtn');

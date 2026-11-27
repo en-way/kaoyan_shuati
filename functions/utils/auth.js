@@ -6,6 +6,8 @@ import {
   JWT_TTL_SECONDS,
   LEGACY_DEFAULT_JWT_SECRET,
   PBKDF2_ITERATIONS,
+  DUMMY_SALT_HEX,
+  DUMMY_PASSWORD_HASH,
   MAX_PASSWORD_LENGTH
 } from './constants.js';
 import { ErrorCode } from './http.js';
@@ -94,11 +96,48 @@ export async function timingSafeEqualStr(a, b) {
   return diff === 0;
 }
 
-// 单次 PBKDF2 校验，且改用恒定时间比较哈希
-export async function verifyPassword(password, saltHex, targetHash) {
-  if (typeof password !== 'string' || password.length > MAX_PASSWORD_LENGTH) return false;
-  const hash = await hashPassword(password, saltHex, PBKDF2_ITERATIONS);
+// 单次 PBKDF2 校验，且改用恒定时间比较哈希（支持每账号独立 iterations）
+export async function verifyPassword(password, saltHex, targetHash, iterations = PBKDF2_ITERATIONS) {
+  if (
+    typeof password !== 'string' ||
+    password.length > MAX_PASSWORD_LENGTH ||
+    typeof saltHex !== 'string' ||
+    saltHex.length === 0 ||
+    saltHex.length % 2 !== 0 ||
+    !/^[0-9a-fA-F]+$/.test(saltHex) ||
+    typeof targetHash !== 'string'
+  ) {
+    return false;
+  }
+  const iters = Number.isFinite(iterations) && iterations >= 1000 ? Math.floor(iterations) : PBKDF2_ITERATIONS;
+  const hash = await hashPassword(password, saltHex, iters);
   return timingSafeEqualStr(hash, targetHash);
+}
+
+// 账号不存在时执行等耗时口令校验，防止登录接口时序枚举用户名
+export async function verifyDummyPassword(password) {
+  const safePass = (typeof password === 'string' && password.length > 0 && password.length <= MAX_PASSWORD_LENGTH)
+    ? password
+    : 'dummy_constant_time_probe';
+  return verifyPassword(safePass, DUMMY_SALT_HEX, DUMMY_PASSWORD_HASH, PBKDF2_ITERATIONS);
+}
+
+/**
+ * 统一 JWT 吊销校验（0 秒时间窗）：
+ * - 优先使用 token_version (tv)：严格比对 tv === user.token_version；
+ * - 兼容尚未升级的无 tv 历史 Token：若密码已被改过（token_version > 1）立即吊销，否则严格校验 iat。
+ */
+export function isTokenRevoked(authUser, userUpdatedAt, userTokenVersion = null) {
+  if (!authUser) return true;
+  const hasUserTv = typeof userTokenVersion === 'number' && Number.isFinite(userTokenVersion);
+  const hasTokenTv = typeof authUser.tv === 'number' && Number.isFinite(authUser.tv);
+  if (hasUserTv) {
+    if (hasTokenTv) return authUser.tv !== userTokenVersion;
+    if (userTokenVersion > 1) return true;
+  }
+  if (!userUpdatedAt) return false;
+  if (!Number.isFinite(authUser.iat) || authUser.iat <= 0) return true;
+  return authUser.iat < Math.floor(userUpdatedAt / 1000);
 }
 
 // ---------- 随机重置码 ----------
@@ -203,18 +242,10 @@ export async function verifyJwt(token, secretOrEnv) {
   }
 }
 
-// 从请求头获取当前登录用户；JWT_SECRET 缺失时记录错误并按未登录处理（fail-closed）
+// 从请求头获取当前登录用户；ConfigError 向上抛出交由 handleError 转 500，避免服务端配置问题误发 401 清空用户本地进度
 export async function getAuthUser(request, env) {
   const authHeader = request.headers.get('Authorization') || '';
   if (!authHeader.startsWith('Bearer ')) return null;
   const token = authHeader.substring(7).trim();
-  try {
-    return await verifyJwt(token, env);
-  } catch (e) {
-    if (e instanceof ConfigError) {
-      console.error('[getAuthUser] 配置错误:', e.message);
-      return null;
-    }
-    throw e;
-  }
+  return verifyJwt(token, env);
 }

@@ -31,7 +31,7 @@ export const practiceControlMethods = {
     this.updateQuestionTimerDisplay();
 
     const isEvaluated = currentQ && (currentQ.is_correct !== null && currentQ.is_correct !== undefined);
-    if (!currentQ || isEvaluated || this.state.practiceMode === 'recite') {
+    if (!currentQ || isEvaluated || this.state.practiceMode === 'recite' || this.state.practiceMode === 'exam_review') {
       return;
     }
 
@@ -58,15 +58,29 @@ export const practiceControlMethods = {
 
     let touchStartX = 0;
     let touchStartY = 0;
+    let isSingleTouch = false;
 
     card.addEventListener('touchstart', (e) => {
       if (e.touches && e.touches.length === 1) {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
+        isSingleTouch = true;
+      } else {
+        isSingleTouch = false;
       }
     }, { passive: true });
 
+    card.addEventListener('touchcancel', () => {
+      isSingleTouch = false;
+    }, { passive: true });
+
     card.addEventListener('touchend', (e) => {
+      if (!isSingleTouch) return;
+      isSingleTouch = false;
+      if (!this.state.questions || this.state.questions.length === 0) return;
+      const sel = typeof window !== 'undefined' && typeof window.getSelection === 'function' ? window.getSelection() : null;
+      if (sel && sel.toString && sel.toString().trim().length > 0) return;
+
       if (e.changedTouches && e.changedTouches.length === 1) {
         const touchEndX = e.changedTouches[0].clientX;
         const touchEndY = e.changedTouches[0].clientY;
@@ -87,29 +101,54 @@ export const practiceControlMethods = {
   // ================== GLOBAL KEYBOARD SHORTCUTS ==================
   bindGlobalKeys() {
     window.addEventListener('keydown', (e) => {
-      const tag = (e.target.tagName || '').toLowerCase();
+      if (!e.key || e.ctrlKey || e.metaKey || e.altKey) {
+        return;
+      }
+
+      const tag = (e.target && e.target.tagName ? e.target.tagName : '').toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') {
         if (e.key === 'Escape') {
           this.closeAllModals();
+        } else if (e.key === 'Tab') {
+          const activeDialog = Array.from(document.querySelectorAll('.modal-backdrop, .drawer-backdrop')).find(el => el.classList.contains('is-open'));
+          if (activeDialog && typeof this._trapFocusInActiveDialog === 'function') {
+            this._trapFocusInActiveDialog(e, activeDialog);
+          }
         }
         return;
       }
 
       if (e.key === 'Escape') {
-        this.closeAllModals();
+        const examReport = document.getElementById('examReportModal');
+        if (examReport && examReport.classList.contains('is-open')) {
+          this.closeExamReportModal();
+        } else {
+          this.closeAllModals();
+        }
         return;
       }
 
-      const anyBackdrop = Array.from(document.querySelectorAll('.modal-backdrop, .drawer-backdrop')).find(el => {
-        return el.classList.contains('is-open');
-      });
-      if (anyBackdrop) {
+      const activeModal = Array.from(document.querySelectorAll('.modal-backdrop')).find(el => el.classList.contains('is-open'));
+      if (activeModal) {
+        if (e.key === 'Tab' && typeof this._trapFocusInActiveDialog === 'function') {
+          this._trapFocusInActiveDialog(e, activeModal);
+        }
+        return;
+      }
+
+      const key = e.key.toUpperCase();
+      const activeDrawer = Array.from(document.querySelectorAll('.drawer-backdrop')).find(el => el.classList.contains('is-open'));
+      if (activeDrawer) {
+        if (key === 'M') {
+          e.preventDefault();
+          this.closeDrawer();
+        } else if (e.key === 'Tab' && typeof this._trapFocusInActiveDialog === 'function') {
+          this._trapFocusInActiveDialog(e, activeDrawer);
+        }
         return;
       }
 
       if (this.state.currentView === 'practice') {
-        const key = e.key.toUpperCase();
-
         if (['A', 'B', 'C', 'D'].includes(key)) {
           e.preventDefault();
           this.onOptionClick(key);
@@ -136,12 +175,7 @@ export const practiceControlMethods = {
 
         if (key === 'M' || e.key === 'Tab') {
           e.preventDefault();
-          const drawer = document.getElementById('questionDrawer');
-          if (drawer && drawer.classList.contains('is-open')) {
-            this.closeDrawer();
-          } else {
-            this.openDrawer();
-          }
+          this.openDrawer();
           return;
         }
 
@@ -155,8 +189,31 @@ export const practiceControlMethods = {
           this.nextQuestion();
           return;
         }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+          if (activeEl && activeEl.classList && activeEl.classList.contains('option-item')) {
+            const opts = Array.from(document.querySelectorAll('#qOptions .option-item'));
+            const curIdx = opts.indexOf(activeEl);
+            if (curIdx >= 0 && opts.length > 0) {
+              e.preventDefault();
+              const nextIdx = e.key === 'ArrowDown'
+                ? (curIdx + 1) % opts.length
+                : (curIdx - 1 + opts.length) % opts.length;
+              opts[nextIdx].focus();
+              return;
+            }
+          }
+        }
         if (e.key === 'Enter' || e.key === ' ') {
           const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+          if (activeEl && activeEl.getAttribute && activeEl.getAttribute('data-action') === 'select-option') {
+            const optKey = activeEl.getAttribute('data-key');
+            if (optKey) {
+              e.preventDefault();
+              this.onOptionClick(optKey);
+              return;
+            }
+          }
           const activeTag = activeEl && activeEl.tagName ? activeEl.tagName.toLowerCase() : '';
           const isInteractiveFocus = activeTag === 'button' || activeTag === 'a' || activeTag === 'summary'
             || (activeEl && typeof activeEl.getAttribute === 'function' && activeEl.getAttribute('role') === 'button');

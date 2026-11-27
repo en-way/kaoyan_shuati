@@ -1,20 +1,17 @@
 import {
   getAuthUser,
+  isTokenRevoked,
   jsonResponse,
   errorResponse
 } from '../../utils/auth.js';
-import { readJsonBody, handleError, ErrorCode } from '../../utils/http.js';
-import { MAX_SYNC_BODY_BYTES, JWT_CLOCK_SKEW_MS } from '../../utils/constants.js';
-import { resolveBankId } from '../../utils/validate.js';
+import { readJsonBody, handleError, HttpError, ErrorCode } from '../../utils/http.js';
+import { MAX_SYNC_BODY_BYTES, MAX_FUTURE_CLOCK_SKEW_MS } from '../../utils/constants.js';
+import { resolveBankId, isSafeQid } from '../../utils/validate.js';
 import { ensureMultiBankSchema } from '../../utils/db-migrate.js';
 
-function isTokenRevoked(authUser, userUpdatedAt) {
-  return Boolean(
-    authUser &&
-    authUser.iat &&
-    userUpdatedAt &&
-    authUser.iat * 1000 + JWT_CLOCK_SKEW_MS < userUpdatedAt
-  );
+function clampItemTime(ts, now = Date.now()) {
+  if (!Number.isFinite(ts) || ts < 0) return 0;
+  return Math.min(ts, now + MAX_FUTURE_CLOCK_SKEW_MS);
 }
 
 export async function onRequestOptions() {
@@ -22,84 +19,78 @@ export async function onRequestOptions() {
 }
 
 // 辅助：从作答条目中提取时间戳（兼容紧凑数组 [choice, isCorrect, time, isFlagged] 与对象格式）
-export function getItemTime(item) {
+export function getItemTime(item, now = Date.now()) {
   if (!item) return 0;
-  if (Array.isArray(item)) return Number.isFinite(item[2]) ? item[2] : 0;
+  if (Array.isArray(item)) return clampItemTime(Number.isFinite(item[2]) ? item[2] : 0, now);
   if (typeof item === 'object') {
-    if (Number.isFinite(item.time)) return item.time;
-    if (item.time && !isNaN(Date.parse(item.time))) return Date.parse(item.time);
-    if (item.updated_at && !isNaN(Date.parse(item.updated_at))) return Date.parse(item.updated_at);
-    if (item.last_wrong_time && !isNaN(Date.parse(item.last_wrong_time))) return Date.parse(item.last_wrong_time);
+    if (Number.isFinite(item.time)) return clampItemTime(item.time, now);
+    if (item.time && !isNaN(Date.parse(item.time))) return clampItemTime(Date.parse(item.time), now);
+    if (item.updated_at && !isNaN(Date.parse(item.updated_at))) return clampItemTime(Date.parse(item.updated_at), now);
+    if (item.last_wrong_time && !isNaN(Date.parse(item.last_wrong_time))) return clampItemTime(Date.parse(item.last_wrong_time), now);
   }
   return 0;
 }
 
 // 辅助：标准化为紧凑数组格式 [choice, isCorrect (-1|0|1), time, isFlagged (1|0)]
-export function toCompactAnswer(item) {
-  if (!item) return null;
+export function toCompactAnswer(item, now = Date.now()) {
+  if (!item || typeof item !== 'object') return null;
   if (Array.isArray(item)) {
     const choice = typeof item[0] === 'string' ? item[0] : '';
     const isCorr = item[1] === 1 ? 1 : (item[1] === 0 ? 0 : -1);
-    const time = Number.isFinite(item[2]) ? item[2] : Date.now();
+    const time = clampItemTime(Number.isFinite(item[2]) ? item[2] : now, now);
     const isFlagged = item[3] ? 1 : 0;
     return [choice, isCorr, time, isFlagged];
   }
   const choice = Array.isArray(item.choice) ? item.choice.join('') : (Array.isArray(item.selected) ? item.selected.join('') : (item.choice || item.selected || ''));
   const isCorr = (item.is_correct === true || item.correct === true) ? 1 : ((item.is_correct === false || item.correct === false) ? 0 : -1);
-  const time = Number.isFinite(item.time) ? item.time : (item.time && !isNaN(Date.parse(item.time)) ? Date.parse(item.time) : (item.updated_at && !isNaN(Date.parse(item.updated_at)) ? Date.parse(item.updated_at) : Date.now()));
+  const rawTime = Number.isFinite(item.time) ? item.time : (item.time && !isNaN(Date.parse(item.time)) ? Date.parse(item.time) : (item.updated_at && !isNaN(Date.parse(item.updated_at)) ? Date.parse(item.updated_at) : now));
+  const time = clampItemTime(rawTime, now);
   const isFlagged = (item.is_flagged || item.flagged) ? 1 : 0;
   return [typeof choice === 'string' ? choice : '', isCorr, time, isFlagged];
 }
 
 // 辅助：标准化为紧凑错题格式 [count, lastChoice, time, mastered (1|0)]
-export function toCompactMistake(item) {
-  if (!item) return null;
+export function toCompactMistake(item, now = Date.now()) {
+  if (!item || typeof item !== 'object') return null;
   if (Array.isArray(item)) {
     return [
-      Number.isFinite(item[0]) ? item[0] : 1,
+      Number.isFinite(item[0]) && item[0] > 0 ? item[0] : 1,
       typeof item[1] === 'string' ? item[1] : '',
-      Number.isFinite(item[2]) ? item[2] : 0,
+      clampItemTime(Number.isFinite(item[2]) ? item[2] : 0, now),
       item[3] ? 1 : 0
     ];
   }
-  const count = Number.isFinite(item.count) ? item.count : (Number.isFinite(item.wrong_count) ? item.wrong_count : 1);
+  const count = Number.isFinite(item.count) && item.count > 0 ? item.count : (Number.isFinite(item.wrong_count) && item.wrong_count > 0 ? item.wrong_count : 1);
   const lastChoice = item.lastChoice || (Array.isArray(item.last_selected) ? item.last_selected.join('') : (item.last_selected || ''));
-  const time = Number.isFinite(item.time) ? item.time : (item.time && !isNaN(Date.parse(item.time)) ? Date.parse(item.time) : (item.last_wrong_time && !isNaN(Date.parse(item.last_wrong_time)) ? Date.parse(item.last_wrong_time) : Date.now()));
+  const rawTime = Number.isFinite(item.time) ? item.time : (item.time && !isNaN(Date.parse(item.time)) ? Date.parse(item.time) : (item.last_wrong_time && !isNaN(Date.parse(item.last_wrong_time)) ? Date.parse(item.last_wrong_time) : now));
+  const time = clampItemTime(rawTime, now);
   const mastered = item.mastered ? 1 : 0;
   return [count, typeof lastChoice === 'string' ? lastChoice : '', time, mastered];
 }
-
-const validQid = (qid) =>
-  typeof qid === 'string' &&
-  qid.length > 0 &&
-  qid.length <= 64 &&
-  /^[a-zA-Z0-9_-]+$/.test(qid) &&
-  qid !== '__proto__' &&
-  qid !== 'constructor';
 
 // GET: 拉取指定题库 (bankId，默认 '2027_1000') 的云端最新刷题进度
 export async function onRequestGet(context) {
   const { request, env } = context;
 
-  const authUser = await getAuthUser(request, env);
-  if (!authUser) {
-    return errorResponse('未登录或登录已失效，请先登录', 401);
-  }
-
-  if (!env.DB) {
-    return errorResponse('Cloudflare D1 数据库未绑定', 500);
-  }
-
   try {
+    const authUser = await getAuthUser(request, env);
+    if (!authUser) {
+      return errorResponse('未登录或登录已失效，请先登录', 401);
+    }
+
+    if (!env.DB) {
+      return errorResponse('Cloudflare D1 数据库未绑定', 500, ErrorCode.CONFIG_ERROR);
+    }
+
     await ensureMultiBankSchema(env.DB);
     const url = new URL(request.url);
     const bankId = resolveBankId(url.searchParams.get('bankId'));
     const clientTimeParam = url.searchParams.get('clientTime');
     const clientTime = clientTimeParam ? parseInt(clientTimeParam, 10) : 0;
 
-    // 单次 LEFT JOIN 合并查询：同时检查用户存在性、Token 吊销时间点与该题库进度
+    // 单次 LEFT JOIN 合并查询：同时检查用户存在性、Token 吊销状态与该题库进度
     const row = await env.DB.prepare(`
-      SELECT u.id AS uid, u.updated_at AS user_updated_at, p.answers_data, p.mistakes_data, p.version, p.updated_at
+      SELECT u.id AS uid, u.updated_at AS user_updated_at, u.token_version AS user_token_version, p.answers_data, p.mistakes_data, p.version, p.updated_at
       FROM users u
       LEFT JOIN user_progress p ON u.id = p.user_id AND p.bank_id = ?
       WHERE u.id = ?
@@ -113,10 +104,11 @@ export async function onRequestGet(context) {
       }, 404);
     }
 
-    if (isTokenRevoked(authUser, row.user_updated_at)) {
+    if (isTokenRevoked(authUser, row.user_updated_at, row.user_token_version)) {
       return errorResponse('密码已变更，请重新登录', 401, ErrorCode.TOKEN_REVOKED);
     }
 
+    const hasProgressRow = row.updated_at !== null && row.updated_at !== undefined;
     const updatedAt = row.updated_at || 0;
     const version = Number.isFinite(row.version) && row.version > 0 ? row.version : 1;
 
@@ -132,7 +124,7 @@ export async function onRequestGet(context) {
       });
     }
 
-    if (!row.updated_at) {
+    if (!hasProgressRow) {
       return jsonResponse({
         success: true,
         bankId,
@@ -155,34 +147,28 @@ export async function onRequestGet(context) {
       version,
       answers,
       mistakes,
-      updatedAt: row.updated_at
+      updatedAt
     });
   } catch (err) {
     return handleError(err, 'progress/sync:get');
   }
 }
 
-// POST: 多题库云端进度同步（支持单题时间戳智能合并、显式 overwrite 快照覆盖、version 乐观锁 409 检测）
+// POST: 多题库云端进度同步（支持单题时间戳智能合并、显式 overwrite 快照覆盖、局部章节 resetQids、version 乐观锁 409 检测）
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  const authUser = await getAuthUser(request, env);
-  if (!authUser) {
-    return errorResponse('未登录或登录已失效，请先登录', 401);
-  }
-
-  if (!env.DB) {
-    return errorResponse('Cloudflare D1 数据库未绑定', 500);
-  }
-
-  let body;
   try {
-    body = await readJsonBody(request, MAX_SYNC_BODY_BYTES);
-  } catch (e) {
-    return handleError(e, 'progress/sync:parse');
-  }
+    const authUser = await getAuthUser(request, env);
+    if (!authUser) {
+      return errorResponse('未登录或登录已失效，请先登录', 401);
+    }
 
-  try {
+    if (!env.DB) {
+      return errorResponse('Cloudflare D1 数据库未绑定', 500, ErrorCode.CONFIG_ERROR);
+    }
+
+    const body = await readJsonBody(request, MAX_SYNC_BODY_BYTES);
     await ensureMultiBankSchema(env.DB);
     const url = new URL(request.url);
     const rawBankId = (body && body.bankId !== undefined) ? body.bankId : url.searchParams.get('bankId');
@@ -191,16 +177,28 @@ export async function onRequestPost(context) {
     const {
       answers: localAnswers,
       mistakes: localMistakes,
-      overwrite = false
+      overwrite = false,
+      resetQids = null,
+      resetAt = 0
     } = body || {};
 
     const expectedVersionRaw = body && (body.expectedVersion !== undefined ? body.expectedVersion : body.version);
     const hasExpectedVersion = expectedVersionRaw !== undefined && expectedVersionRaw !== null && expectedVersionRaw !== '';
-    const expectedVersion = hasExpectedVersion ? parseInt(expectedVersionRaw, 10) : null;
+    let expectedVersion = null;
+    if (hasExpectedVersion) {
+      const trimmedVer = String(expectedVersionRaw).trim();
+      if (!/^\d+$/.test(trimmedVer)) {
+        throw new HttpError(400, '无效的版本号 expectedVersion', ErrorCode.BAD_REQUEST);
+      }
+      expectedVersion = parseInt(trimmedVer, 10);
+      if (!Number.isFinite(expectedVersion) || expectedVersion <= 0) {
+        throw new HttpError(400, '无效的版本号 expectedVersion', ErrorCode.BAD_REQUEST);
+      }
+    }
 
     // 单次 LEFT JOIN 查询：确认用户存活、Token 未吊销并获取该题库现有进度
     const existing = await env.DB.prepare(`
-      SELECT u.id AS uid, u.updated_at AS user_updated_at, p.version, p.updated_at, p.answers_data, p.mistakes_data
+      SELECT u.id AS uid, u.updated_at AS user_updated_at, u.token_version AS user_token_version, p.version, p.updated_at, p.answers_data, p.mistakes_data
       FROM users u
       LEFT JOIN user_progress p ON u.id = p.user_id AND p.bank_id = ?
       WHERE u.id = ?
@@ -214,7 +212,7 @@ export async function onRequestPost(context) {
       }, 404);
     }
 
-    if (isTokenRevoked(authUser, existing.user_updated_at)) {
+    if (isTokenRevoked(authUser, existing.user_updated_at, existing.user_token_version)) {
       return errorResponse('密码已变更，请重新登录', 401, ErrorCode.TOKEN_REVOKED);
     }
 
@@ -231,7 +229,7 @@ export async function onRequestPost(context) {
     }
 
     // 乐观锁冲突检测：当客户端显式携带 expectedVersion / version 且与云端已有版本不一致时，返回 409 Conflict
-    if (hasExpectedVersion && Number.isFinite(expectedVersion) && hasCloudRow && expectedVersion !== cloudVersion) {
+    if (hasExpectedVersion && hasCloudRow && expectedVersion !== cloudVersion) {
       return jsonResponse({
         success: false,
         code: 'VERSION_CONFLICT',
@@ -244,21 +242,23 @@ export async function onRequestPost(context) {
       }, 409);
     }
 
+    const now = Date.now();
+
     // 规范化客户端上传的 answers 与 mistakes
     const sanitizedLocalAnswers = {};
-    if (localAnswers && typeof localAnswers === 'object') {
+    if (localAnswers && typeof localAnswers === 'object' && !Array.isArray(localAnswers)) {
       for (const [qid, item] of Object.entries(localAnswers)) {
-        if (!validQid(qid)) continue;
-        const compact = toCompactAnswer(item);
+        if (!isSafeQid(qid)) continue;
+        const compact = toCompactAnswer(item, now);
         if (compact) sanitizedLocalAnswers[qid] = compact;
       }
     }
 
     const sanitizedLocalMistakes = {};
-    if (localMistakes && typeof localMistakes === 'object') {
+    if (localMistakes && typeof localMistakes === 'object' && !Array.isArray(localMistakes)) {
       for (const [qid, item] of Object.entries(localMistakes)) {
-        if (!validQid(qid)) continue;
-        const compact = toCompactMistake(item);
+        if (!isSafeQid(qid)) continue;
+        const compact = toCompactMistake(item, now);
         if (compact) sanitizedLocalMistakes[qid] = compact;
       }
     }
@@ -267,32 +267,46 @@ export async function onRequestPost(context) {
     let finalMistakes = {};
 
     if (overwrite === true) {
-      // 显式快照权威覆盖模式（如重置章节、清空本地重做）
+      // 显式快照权威覆盖模式（如清空本机后同步清空云端）
       finalAnswers = sanitizedLocalAnswers;
       finalMistakes = sanitizedLocalMistakes;
     } else {
       // 默认：单题最新时间戳双向智能合并（防止多设备做题互相冲掉进度）
       for (const [qid, item] of Object.entries(cloudAnswers)) {
-        if (!validQid(qid)) continue;
-        const compact = toCompactAnswer(item);
+        if (!isSafeQid(qid)) continue;
+        const compact = toCompactAnswer(item, now);
         if (compact) finalAnswers[qid] = compact;
       }
       for (const [qid, localCompact] of Object.entries(sanitizedLocalAnswers)) {
         const cloudCompact = finalAnswers[qid];
-        if (!cloudCompact || getItemTime(localCompact) >= getItemTime(cloudCompact)) {
+        if (!cloudCompact || getItemTime(localCompact, now) >= getItemTime(cloudCompact, now)) {
           finalAnswers[qid] = localCompact;
         }
       }
 
       for (const [qid, item] of Object.entries(cloudMistakes)) {
-        if (!validQid(qid)) continue;
-        const compact = toCompactMistake(item);
+        if (!isSafeQid(qid)) continue;
+        const compact = toCompactMistake(item, now);
         if (compact) finalMistakes[qid] = compact;
       }
       for (const [qid, localCompact] of Object.entries(sanitizedLocalMistakes)) {
         const cloudCompact = finalMistakes[qid];
-        if (!cloudCompact || getItemTime(localCompact) >= getItemTime(cloudCompact)) {
+        if (!cloudCompact || getItemTime(localCompact, now) >= getItemTime(cloudCompact, now)) {
           finalMistakes[qid] = localCompact;
+        }
+      }
+
+      // 局部章节重置标记：仅删除指定章节中被重置且早于 resetAt 的题目记录，不影响他端其他章节
+      if (Array.isArray(resetQids) && resetQids.length > 0) {
+        const clampedResetAt = clampItemTime(Number.isFinite(resetAt) && resetAt > 0 ? resetAt : now, now);
+        for (const rawQid of resetQids.slice(0, 500)) {
+          if (!isSafeQid(rawQid)) continue;
+          if (finalAnswers[rawQid] && getItemTime(finalAnswers[rawQid], now) <= clampedResetAt) {
+            delete finalAnswers[rawQid];
+          }
+          if (finalMistakes[rawQid] && getItemTime(finalMistakes[rawQid], now) <= clampedResetAt) {
+            delete finalMistakes[rawQid];
+          }
         }
       }
     }
@@ -309,12 +323,11 @@ export async function onRequestPost(context) {
         version: cloudVersion,
         answers: finalAnswers,
         mistakes: finalMistakes,
-        updatedAt: existing.updated_at || Date.now(),
+        updatedAt: existing.updated_at || now,
         message: '数据与云端一致，无需重复写入'
       });
     }
 
-    const now = Date.now();
     const nextVersion = hasCloudRow ? cloudVersion + 1 : 1;
 
     // 写入 D1：原子 CAS 乐观锁更新 / 首次互斥插入，防止高并发下静默覆盖

@@ -150,4 +150,44 @@ describe('js/state/store.js 多题库状态隔离与 v37 旧数据无损迁移',
       DB.questionsMap = prevQuestionsMap;
     }
   });
+
+  it('resetChapter 使用部分章节重置队列 (PENDING_CHAPTER_RESET) 且不设置全库 overwrite；saveAnswer 攻克错题同步更新 last_wrong_time；QuotaExceeded 返回 saveOk=false', () => {
+    const sampleBank = JSON.parse(fs.readFileSync(new URL('../data/questions.sample.json', import.meta.url), 'utf8'));
+    const prevQuestionsData = DB.questionsData;
+    const prevQuestionsMap = DB.questionsMap;
+    try {
+      DB.questionsData = sampleBank;
+      DB.questionsMap = Object.fromEntries(sampleBank.questions.map(q => [q.id, q]));
+
+      // 1. Q_0001 标准答案为 B：先错选 A，回退历史时间后重刷选对 B，mastered 更新且 last_wrong_time 同步推进
+      DB.saveAnswer('Q_0001', ['A'], 5, false, true);
+      const seeded = DB.getUserData('2027_1000');
+      seeded.mistakes.Q_0001.last_wrong_time = '2026-01-01T00:00:00.000Z';
+      DB.saveUserData(seeded, '2027_1000');
+      DB.saveAnswer('Q_0001', ['B'], 4, false, true);
+      const afterMaster = DB.getUserData('2027_1000').mistakes.Q_0001;
+      assert.equal(afterMaster.mastered, true);
+      assert.ok(afterMaster.last_wrong_time > '2026-01-01T00:00:00.000Z');
+
+      // 2. resetChapter 仅写 PENDING_CHAPTER_RESET，不置 PENDING_OVERWRITE
+      DB.resetChapter('第一部分 马克思主义基本原理', '导论');
+      assert.equal(DB.hasPendingOverwrite('2027_1000'), false);
+      const resetMeta = DB.getPendingChapterReset('2027_1000');
+      assert.ok(resetMeta);
+      assert.deepEqual(resetMeta.qids, ['Q_0001', 'Q_0002']);
+
+      // 3. QuotaExceededError 写入失败时 wasLastSaveOk() 为 false
+      DB._customStorage = {
+        getItem: () => null,
+        setItem: () => { throw new DOMException('Quota exceeded', 'QuotaExceededError'); },
+        removeItem: () => {}
+      };
+      const savedOk = DB.saveUserData({ answers: {}, mistakes: {} }, '2027_1000');
+      assert.equal(savedOk, false);
+      assert.equal(DB.wasLastSaveOk(), false);
+    } finally {
+      DB.questionsData = prevQuestionsData;
+      DB.questionsMap = prevQuestionsMap;
+    }
+  });
 });

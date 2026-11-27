@@ -2,7 +2,7 @@
  * 前端统一配置模块 (ES Module + 全局 window.KY_CONFIG 双向兼容)
  */
 export const APP_VERSION = 'v38';
-export const ASSET_VERSION = `20271123_${APP_VERSION}_10`;
+export const ASSET_VERSION = `20271123_${APP_VERSION}_11`;
 export const DEFAULT_BANK_ID = '2027_1000';
 
 export const STORAGE_KEYS = Object.freeze({
@@ -34,7 +34,8 @@ export function getBankStorageKeys(bankId = DEFAULT_BANK_ID) {
     LAST_UPLOAD_HASH: isDefault ? STORAGE_KEYS.LAST_UPLOAD_HASH : `kaoyan_last_upload_hash_${safeId}`,
     IS_DIRTY: isDefault ? STORAGE_KEYS.IS_DIRTY : `kaoyan_is_dirty_${safeId}`,
     CLOUD_VERSION: `kaoyan_cloud_version_${safeId}`,
-    PENDING_OVERWRITE: `kaoyan_pending_overwrite_${safeId}`
+    PENDING_OVERWRITE: `kaoyan_pending_overwrite_${safeId}`,
+    PENDING_CHAPTER_RESET: `kaoyan_pending_reset_${safeId}`
   });
 }
 

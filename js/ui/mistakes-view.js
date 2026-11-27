@@ -223,12 +223,19 @@ export const mistakesViewMethods = {
     const shortSub = this.getSubjectShortName(q.part);
     this.updateBreadcrumb(`${shortSub} · 错题精练`);
 
-    const qCopy = { ...q, user_selected: [], user_time: 0, is_flagged: false, is_correct: null, in_mistakes: true };
+    const savedAns = (DB.getUserData && DB.getUserData().answers) ? DB.getUserData().answers[q.id] : null;
+    const qCopy = {
+      ...q,
+      user_selected: [],
+      user_time: 0,
+      is_flagged: Boolean(savedAns ? savedAns.is_flagged : q.is_flagged),
+      is_correct: null,
+      in_mistakes: true
+    };
     this.state.questions = [qCopy];
 
     this.navigateTo('practice');
     this.updateModePillsUI();
-    this.renderQuestion();
   },
 
   markMistakeMastered(qid) {

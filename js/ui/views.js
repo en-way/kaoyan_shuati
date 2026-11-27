@@ -19,7 +19,6 @@ export const viewMethods = {
   _closeMenuIfNeeded(actionEl) {
     const closeMenu = actionEl.getAttribute('data-close-menu');
     if (closeMenu === 'more') this.closeMoreMenu();
-    else if (closeMenu === 'qmore') this.closeQuestionMoreMenu();
     else if (closeMenu === 'user' && this.auth) this.auth.closeUserMenu();
   },
 
@@ -141,9 +140,6 @@ export const viewMethods = {
           if (mode) this.selectModeFromSheet(mode);
           break;
         }
-        case 'open-question-more':
-          this.openQuestionMoreMenu();
-          break;
         case 'switch-mode': {
           const mode = actionEl.getAttribute('data-mode');
           if (mode) this.switchMode(mode);

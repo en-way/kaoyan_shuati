@@ -556,7 +556,7 @@
 }
 
 .drawer-footer .btn-block {
-  background: var(--accent-green);
+  background: var(--btn-solid-green-bg, #047857);
   color: #ffffff;
 }
 

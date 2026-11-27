@@ -3,6 +3,23 @@
  * 零 DOM 依赖、零全局状态耦合，所有函数均可直接在 Node.js (node:test) 中进行单元测试。
  */
 
+const FORBIDDEN_PROTO_KEYS = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+  'toString',
+  'valueOf',
+  'hasOwnProperty',
+  'isPrototypeOf',
+  'propertyIsEnumerable',
+  'toLocaleString',
+  'toJSON'
+]);
+
+export function isSafeQid(qid) {
+  return typeof qid === 'string' && qid.length > 0 && qid.length <= 64 && !FORBIDDEN_PROTO_KEYS.has(qid);
+}
+
 /**
  * 规范化选项数组或字符串为按字母排序的大写字符串，如 ['C', 'A'] -> 'AC'
  */
@@ -139,13 +156,13 @@ export function toCompactPayload(userData) {
   const mistakes = (userData && userData.mistakes) || {};
 
   for (const [qid, rec] of Object.entries(answers)) {
-    if (!rec) continue;
+    if (!rec || !isSafeQid(qid)) continue;
     const encoded = encodeCompactAnswer(rec);
     if (encoded) compactAnswers[qid] = encoded;
   }
 
   for (const [qid, rec] of Object.entries(mistakes)) {
-    if (!rec) continue;
+    if (!rec || !isSafeQid(qid)) continue;
     const encoded = encodeCompactMistake(rec);
     if (encoded) compactMistakes[qid] = encoded;
   }
@@ -165,7 +182,7 @@ export function mergeFromCompactPayload(userData, cloudData) {
   const cloudMistakes = (cloudData && cloudData.mistakes) || {};
 
   for (const [qid, cloudArr] of Object.entries(cloudAnswers)) {
-    if (!cloudArr) continue;
+    if (!cloudArr || !isSafeQid(qid)) continue;
     const cloudTime = Array.isArray(cloudArr) ? (cloudArr[2] || 0) : (cloudArr.time || 0);
     const localRec = merged.answers[qid];
     const localTime = localRec && localRec.updated_at ? Date.parse(localRec.updated_at) || 0 : 0;
@@ -176,7 +193,7 @@ export function mergeFromCompactPayload(userData, cloudData) {
   }
 
   for (const [qid, cloudArr] of Object.entries(cloudMistakes)) {
-    if (!cloudArr) continue;
+    if (!cloudArr || !isSafeQid(qid)) continue;
     const cloudTime = Array.isArray(cloudArr) ? (cloudArr[2] || 0) : (cloudArr.time || 0);
     const localRec = merged.mistakes[qid];
     const localTime = localRec && localRec.last_wrong_time ? Date.parse(localRec.last_wrong_time) || 0 : 0;
@@ -198,12 +215,12 @@ export function snapshotFromCompactPayload(cloudData) {
   const cloudMistakes = (cloudData && cloudData.mistakes) || {};
 
   for (const [qid, cloudArr] of Object.entries(cloudAnswers)) {
-    if (!cloudArr) continue;
+    if (!cloudArr || !isSafeQid(qid)) continue;
     newUserData.answers[qid] = decodeCompactAnswer(cloudArr, null);
   }
 
   for (const [qid, cloudArr] of Object.entries(cloudMistakes)) {
-    if (!cloudArr) continue;
+    if (!cloudArr || !isSafeQid(qid)) continue;
     newUserData.mistakes[qid] = decodeCompactMistake(cloudArr, qid);
   }
 
@@ -281,9 +298,10 @@ export function computeOverview(questionsData, userData) {
         .map(q => q.id);
 
       const chAnswered = chQIds.filter(qid => answers[qid] && answers[qid].selected && answers[qid].selected.length > 0).length;
+      const chGraded = chQIds.filter(qid => answers[qid] && (answers[qid].is_correct === true || answers[qid].is_correct === false)).length;
       const chCorrect = chQIds.filter(qid => answers[qid] && answers[qid].is_correct === true).length;
       const chMistakes = chQIds.filter(qid => mistakes[qid] && !mistakes[qid].mastered).length;
-      const chAccuracy = chAnswered > 0 ? Math.round((chCorrect / chAnswered) * 1000) / 10 : 0;
+      const chAccuracy = chGraded > 0 ? Math.round((chCorrect / chGraded) * 1000) / 10 : 0;
 
       subjectInfo.chapters.push({
         name: chName,
@@ -291,6 +309,7 @@ export function computeOverview(questionsData, userData) {
         single_count: singleCnt,
         multi_count: multiCnt,
         answered: chAnswered,
+        graded: chGraded,
         correct: chCorrect,
         mistakes: chMistakes,
         accuracy: chAccuracy,
@@ -299,20 +318,23 @@ export function computeOverview(questionsData, userData) {
 
       subjectInfo.total += chTotal;
       subjectInfo.answered += chAnswered;
+      subjectInfo.graded = (subjectInfo.graded || 0) + chGraded;
       subjectInfo.correct += chCorrect;
       subjectInfo.mistakes += chMistakes;
     }
 
-    subjectInfo.accuracy = subjectInfo.answered > 0
-      ? Math.round((subjectInfo.correct / subjectInfo.answered) * 1000) / 10
+    subjectInfo.accuracy = (subjectInfo.graded || 0) > 0
+      ? Math.round((subjectInfo.correct / subjectInfo.graded) * 1000) / 10
       : 0;
     subjects.push(subjectInfo);
   }
 
-  const totalAnswered = Object.values(answers).filter(a => a && a.selected && a.selected.length > 0).length;
-  const totalCorrect = Object.values(answers).filter(a => a && a.is_correct === true).length;
-  const totalMistakes = Object.values(mistakes).filter(m => m && !m.mastered).length;
-  const overallAccuracy = totalAnswered > 0 ? Math.round((totalCorrect / totalAnswered) * 1000) / 10 : 0;
+  const validQidSet = new Set(questionsData.questions.map(q => q.id));
+  const totalAnswered = Object.entries(answers).filter(([qid, a]) => validQidSet.has(qid) && a && a.selected && a.selected.length > 0).length;
+  const totalGraded = Object.entries(answers).filter(([qid, a]) => validQidSet.has(qid) && a && (a.is_correct === true || a.is_correct === false)).length;
+  const totalCorrect = Object.entries(answers).filter(([qid, a]) => validQidSet.has(qid) && a && a.is_correct === true).length;
+  const totalMistakes = Object.entries(mistakes).filter(([qid, m]) => validQidSet.has(qid) && m && !m.mastered).length;
+  const overallAccuracy = totalGraded > 0 ? Math.round((totalCorrect / totalGraded) * 1000) / 10 : 0;
 
   return {
     total_questions: questionsData.total || questionsData.questions.length,

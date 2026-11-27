@@ -16,6 +16,23 @@ export const DEFAULT_BANK_ID = '2027_1000';
 const USERNAME_RE = /^[\p{L}\p{N}_.@-]+$/u;
 // 题库 ID：仅允许字母、数字、下划线、短横线，长度 1~32
 const BANK_ID_RE = /^[a-zA-Z0-9_-]{1,32}$/;
+const QID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+export const FORBIDDEN_PROTO_KEYS = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+  'toString',
+  'valueOf',
+  'hasOwnProperty',
+  'isPrototypeOf',
+  'propertyIsEnumerable',
+  'toLocaleString',
+  'toJSON'
+]);
+
+export function isSafeQid(qid) {
+  return typeof qid === 'string' && QID_RE.test(qid) && !FORBIDDEN_PROTO_KEYS.has(qid);
+}
 
 export function normalizeUsername(raw) {
   return typeof raw === 'string' ? raw.trim().toLowerCase() : '';
@@ -63,7 +80,7 @@ export function resolveBankId(raw) {
   if (!trimmed) {
     return DEFAULT_BANK_ID;
   }
-  if (!BANK_ID_RE.test(trimmed) || trimmed === '__proto__' || trimmed === 'constructor') {
+  if (!BANK_ID_RE.test(trimmed) || FORBIDDEN_PROTO_KEYS.has(trimmed)) {
     throw new HttpError(400, '题库标识仅允许字母、数字、下划线与短横线（长度 ≤ 32）', 'INVALID_BANK_ID');
   }
   return trimmed;
