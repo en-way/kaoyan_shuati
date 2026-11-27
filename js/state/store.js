@@ -435,9 +435,49 @@ export const DB = {
     return userData.answers[qid].is_flagged;
   },
 
-  submitExam(part, chapter) {
+  submitExam(part, chapter, examDraftAnswers = null) {
     const userData = this.getUserData();
-    const report = gradeChapterExam(this.questionsData, userData, part, chapter);
+    if (!examDraftAnswers || typeof examDraftAnswers !== 'object') {
+      const report = gradeChapterExam(this.questionsData, userData, part, chapter);
+      this.saveUserData(userData);
+      return report;
+    }
+
+    // 考场草稿隔离判分：仅计入本次模考真实作答过的题目，绝不误判历史日常记录
+    const isolatedSession = { answers: {}, mistakes: {} };
+    for (const [qid, draft] of Object.entries(examDraftAnswers)) {
+      if (draft && Array.isArray(draft.selected) && draft.selected.length > 0) {
+        isolatedSession.answers[qid] = {
+          selected: [...draft.selected],
+          time_spent: Number.isFinite(draft.time_spent) ? draft.time_spent : 0,
+          is_flagged: Boolean(draft.is_flagged)
+        };
+      }
+    }
+
+    const report = gradeChapterExam(this.questionsData, isolatedSession, part, chapter);
+
+    // 交卷后将本次有效作答与错题结果批量合并回本地持久化档案
+    for (const [qid, gradedAns] of Object.entries(isolatedSession.answers)) {
+      userData.answers[qid] = { ...(userData.answers[qid] || {}), ...gradedAns };
+    }
+    for (const [qid, gradedMis] of Object.entries(isolatedSession.mistakes)) {
+      const prev = userData.mistakes[qid];
+      userData.mistakes[qid] = {
+        question_id: qid,
+        wrong_count: (prev ? (prev.wrong_count || 0) : 0) + (gradedMis.wrong_count || 1),
+        last_selected: gradedMis.last_selected,
+        standard_answer: gradedMis.standard_answer,
+        mastered: false,
+        last_wrong_time: gradedMis.last_wrong_time
+      };
+    }
+    for (const r of report.results) {
+      if (r.is_correct && userData.mistakes[r.id]) {
+        userData.mistakes[r.id].mastered = true;
+      }
+    }
+
     this.saveUserData(userData);
     return report;
   },

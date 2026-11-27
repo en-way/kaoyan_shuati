@@ -1,5 +1,6 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { DB } from '../js/state/store.js';
 import { KY_CONFIG, DEFAULT_BANK_ID, getBankStorageKeys } from '../js/config.js';
 
@@ -107,5 +108,46 @@ describe('js/state/store.js 多题库状态隔离与 v37 旧数据无损迁移',
     // 3. 非法 JSON 容错拦截
     const badRes = DB.importBackupPayload('not a json');
     assert.equal(badRes.success, false);
+  });
+
+  it('submitExam 考场草稿隔离：仅对本次模考作答判分，不误计历史日常记录也不漏改未答历史题', () => {
+    const sampleBank = JSON.parse(fs.readFileSync(new URL('../data/questions.sample.json', import.meta.url), 'utf8'));
+    const prevQuestionsData = DB.questionsData;
+    const prevQuestionsMap = DB.questionsMap;
+    try {
+      DB.questionsData = sampleBank;
+      DB.questionsMap = Object.fromEntries(sampleBank.questions.map(q => [q.id, q]));
+
+      // 考前：Q_0001 在即做即判模式已做错（选 A）
+      DB.saveUserData({
+        answers: { Q_0001: { selected: ['A'], is_correct: false, updated_at: '2026-11-01T00:00:00.000Z' } },
+        mistakes: { Q_0001: { question_id: 'Q_0001', wrong_count: 1, last_selected: ['A'], mastered: false } }
+      }, '2027_1000');
+
+      // 本次模考仅作答 Q_0002（多选正确 ABD），刻意留空 Q_0001
+      const examDraft = {
+        Q_0002: { selected: ['A', 'B', 'D'], time_spent: 18, is_flagged: false }
+      };
+      const report = DB.submitExam('第一部分 马克思主义基本原理', '导论', examDraft);
+
+      // 成绩单：仅 Q_0002 计分 (2/3 分)，Q_0001 计为未作答，不得误判考前错选 A
+      assert.equal(report.total, 2);
+      assert.equal(report.correct_count, 1);
+      assert.equal(report.wrong_count, 0);
+      assert.equal(report.unanswered_count, 1);
+      assert.equal(report.earned_points, 2);
+      assert.equal(report.results.find(r => r.id === 'Q_0001').user_ans, '未作答');
+
+      // 本地存档：原 Q_0001 历史作答与错题完整保留，Q_0002 写入存档
+      const saved = DB.getUserData('2027_1000');
+      assert.deepEqual(saved.answers.Q_0001.selected, ['A']);
+      assert.equal(saved.answers.Q_0001.is_correct, false);
+      assert.equal(saved.mistakes.Q_0001.mastered, false);
+      assert.deepEqual(saved.answers.Q_0002.selected, ['A', 'B', 'D']);
+      assert.equal(saved.answers.Q_0002.is_correct, true);
+    } finally {
+      DB.questionsData = prevQuestionsData;
+      DB.questionsMap = prevQuestionsMap;
+    }
   });
 });

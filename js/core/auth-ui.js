@@ -2,7 +2,20 @@
  * 用户认证弹窗、顶栏与移动端账号状态 UI 模块 (js/core/auth-ui.js)
  */
 import { KY_CONFIG } from '../config.js';
+import { KyApi } from '../api.js';
 import { DB } from '../state/store.js';
+
+function safeStorageSet(key, val) {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, String(val));
+  } catch (_) {}
+}
+
+function safeStorageRemove(key) {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(key);
+  } catch (_) {}
+}
 
 export function createAuthUiMethods(getApp) {
   return {
@@ -235,9 +248,10 @@ export function createAuthUiMethods(getApp) {
           body: JSON.stringify({ username, password })
         });
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || '登录失败，请检查账号密码');
+        const parsed = await KyApi.parseResponse(res);
+        const data = parsed.data;
+        if (!parsed.ok || !data.user) {
+          throw new Error(parsed.error || data.error || '登录失败，请检查账号密码');
         }
 
         this.setSession(data.token, data.user);
@@ -245,11 +259,11 @@ export function createAuthUiMethods(getApp) {
 
         const keys = this.getActiveSyncKeys();
         this.lastSyncTime = null;
-        localStorage.removeItem(keys.LAST_SYNC_TIME);
-        localStorage.removeItem(keys.PROGRESS);
-        if (keys.LEGACY_PROGRESS) localStorage.removeItem(keys.LEGACY_PROGRESS);
+        safeStorageRemove(keys.LAST_SYNC_TIME);
+        safeStorageRemove(keys.PROGRESS);
+        if (keys.LEGACY_PROGRESS) safeStorageRemove(keys.LEGACY_PROGRESS);
 
-        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, String(Date.now()));
+        safeStorageSet(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, Date.now());
         await this.downloadFromCloud(true);
         this.renderAuthUI();
         App.loadOverview();
@@ -286,22 +300,23 @@ export function createAuthUiMethods(getApp) {
           body: JSON.stringify({ username, nickname, password })
         });
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || '注册失败');
+        const parsed = await KyApi.parseResponse(res);
+        const data = parsed.data;
+        if (!parsed.ok || !data.user) {
+          throw new Error(parsed.error || data.error || '注册失败');
         }
 
         this.setSession(data.token, data.user);
         this.closeAuthModal();
 
         const keys = this.getActiveSyncKeys();
-        localStorage.removeItem(keys.PROGRESS);
-        if (keys.LEGACY_PROGRESS) localStorage.removeItem(keys.LEGACY_PROGRESS);
+        safeStorageRemove(keys.PROGRESS);
+        if (keys.LEGACY_PROGRESS) safeStorageRemove(keys.LEGACY_PROGRESS);
         DB.setFromCloud({ answers: {}, mistakes: {}, version: 1, updatedAt: Date.now() });
         this.lastSyncTime = Date.now();
-        localStorage.setItem(keys.LAST_SYNC_TIME, String(this.lastSyncTime));
-        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, String(this.lastSyncTime));
-        localStorage.setItem(keys.LAST_UPLOAD_HASH, this.computeDataFingerprint(DB.toCompact()));
+        safeStorageSet(keys.LAST_SYNC_TIME, this.lastSyncTime);
+        safeStorageSet(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, this.lastSyncTime);
+        safeStorageSet(keys.LAST_UPLOAD_HASH, this.computeDataFingerprint(DB.toCompact()));
         this.isDirty = false;
         this.updateSyncUI();
         App.loadOverview();
@@ -338,9 +353,10 @@ export function createAuthUiMethods(getApp) {
           body: JSON.stringify({ username, code, newPassword })
         });
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || '重置密码失败');
+        const parsed = await KyApi.parseResponse(res);
+        const data = parsed.data;
+        if (!parsed.ok || !data.user) {
+          throw new Error(parsed.error || data.error || '重置密码失败');
         }
 
         this.setSession(data.token, data.user);
@@ -348,10 +364,10 @@ export function createAuthUiMethods(getApp) {
 
         const keys = this.getActiveSyncKeys();
         this.lastSyncTime = null;
-        localStorage.removeItem(keys.LAST_SYNC_TIME);
-        localStorage.removeItem(keys.PROGRESS);
-        if (keys.LEGACY_PROGRESS) localStorage.removeItem(keys.LEGACY_PROGRESS);
-        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, String(Date.now()));
+        safeStorageRemove(keys.LAST_SYNC_TIME);
+        safeStorageRemove(keys.PROGRESS);
+        if (keys.LEGACY_PROGRESS) safeStorageRemove(keys.LEGACY_PROGRESS);
+        safeStorageSet(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, Date.now());
         await this.downloadFromCloud(true);
         this.renderAuthUI();
         App.loadOverview();

@@ -26,6 +26,8 @@ export const App = {
     isEvaluated: false,
     explanationVisible: true,
     manualPeek: false,
+    examDraftAnswers: {},
+    isSingleMistakeRetry: false,
 
     questionSeconds: 0,
     sessionSeconds: 0,

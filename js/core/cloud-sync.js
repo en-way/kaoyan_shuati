@@ -7,6 +7,30 @@ import { DB } from '../state/store.js';
 
 export function createCloudSyncMethods(getApp) {
   return {
+    _lsGet(key) {
+      try {
+        return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+      } catch (_) {
+        return null;
+      }
+    },
+
+    _lsSet(key, value) {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(key, String(value));
+        }
+      } catch (_) {}
+    },
+
+    _lsRemove(key) {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem(key);
+        }
+      } catch (_) {}
+    },
+
     fetchWithRetry(url, options = {}, maxRetries, timeoutMs, onRetry = null) {
       return KyApi.fetchWithRetry(url, options, { maxRetries, timeoutMs, onRetry });
     },
@@ -21,14 +45,14 @@ export function createCloudSyncMethods(getApp) {
 
     refreshBankSyncState(bankId = DB.currentBankId) {
       const keys = this.getActiveSyncKeys(bankId);
-      const rawTime = localStorage.getItem(keys.LAST_SYNC_TIME);
+      const rawTime = this._lsGet(keys.LAST_SYNC_TIME);
       this.lastSyncTime = rawTime ? parseInt(rawTime, 10) : null;
 
       try {
         const compactData = DB.toCompact(bankId);
         const currentHash = this.computeDataFingerprint(compactData);
-        const lastUploadHash = localStorage.getItem(keys.LAST_UPLOAD_HASH);
-        const isExplicitDirty = localStorage.getItem(keys.IS_DIRTY) === '1';
+        const lastUploadHash = this._lsGet(keys.LAST_UPLOAD_HASH);
+        const isExplicitDirty = this._lsGet(keys.IS_DIRTY) === '1';
         this.isDirty = Boolean(isExplicitDirty || (lastUploadHash && currentHash !== lastUploadHash));
       } catch (e) {
         this.isDirty = false;
@@ -66,7 +90,7 @@ export function createCloudSyncMethods(getApp) {
     markDirty(bankId = DB.currentBankId) {
       const keys = this.getActiveSyncKeys(bankId);
       this.isDirty = true;
-      localStorage.setItem(keys.IS_DIRTY, '1');
+      this._lsSet(keys.IS_DIRTY, '1');
       this.updateSyncUI();
     },
 
@@ -134,9 +158,9 @@ export function createCloudSyncMethods(getApp) {
       const App = getApp();
       this.token = null;
       this.currentUser = null;
-      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.TOKEN);
-      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_INFO);
-      localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK);
+      this._lsRemove(KY_CONFIG.STORAGE_KEYS.TOKEN);
+      this._lsRemove(KY_CONFIG.STORAGE_KEYS.USER_INFO);
+      this._lsRemove(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK);
       this.renderAuthUI();
       if (!isSilent) {
         App.showToast('🔑 您的登录凭证已过期或失效，本地做题记录已完整保留，请重新登录！', 'warning', 4200);
@@ -146,32 +170,32 @@ export function createCloudSyncMethods(getApp) {
 
     async handleUserDeleted() {
       const App = getApp();
-      const keep = await App.showConfirm({
+      const shouldPurge = await App.showConfirm({
         title: '账号云端状态异常',
-        message: '您的账号在云端已被注销或不存在。\n\n点击「保留本地继续离线」：完整保留本地做题记录并转为离线访客模式；\n点击「清空本地缓存」：清空本地所有答题记录与缓存。',
-        confirmText: '保留本地继续离线',
-        cancelText: '清空本地缓存',
+        message: '您的账号在云端已被注销或不存在。\n\n如需完整保留当前做题记录并转为离线访客模式，请点击「保留本地继续离线」；如确认清空本机所有答题缓存，请点击「清空本地缓存」。',
+        confirmText: '清空本地缓存',
+        cancelText: '保留本地继续离线',
         danger: true
       });
-      if (keep) {
+      if (shouldPurge) {
+        this.purgeAllUserData('账号已在云端注销，本地数据已清空');
+      } else {
         this.token = null;
         this.currentUser = null;
-        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.TOKEN);
-        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.USER_INFO);
-        localStorage.removeItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK);
+        this._lsRemove(KY_CONFIG.STORAGE_KEYS.TOKEN);
+        this._lsRemove(KY_CONFIG.STORAGE_KEYS.USER_INFO);
+        this._lsRemove(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK);
         this.renderAuthUI();
         App.showToast('已保留本地做题记录，当前转为离线访客模式', 'info', 3500);
-      } else {
-        this.purgeAllUserData('账号已在云端注销，本地数据已清空');
       }
     },
 
     setSession(token, user) {
       this.token = token;
       this.currentUser = user;
-      localStorage.setItem(KY_CONFIG.STORAGE_KEYS.TOKEN, token);
+      this._lsSet(KY_CONFIG.STORAGE_KEYS.TOKEN, token);
       if (user) {
-        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.USER_INFO, JSON.stringify(user));
+        this._lsSet(KY_CONFIG.STORAGE_KEYS.USER_INFO, JSON.stringify(user));
       }
       this.renderAuthUI();
     },
@@ -194,7 +218,7 @@ export function createCloudSyncMethods(getApp) {
     async checkSession() {
       if (!this.token) return;
       try {
-        const cachedUser = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.USER_INFO);
+        const cachedUser = this._lsGet(KY_CONFIG.STORAGE_KEYS.USER_INFO);
         if (cachedUser) {
           try {
             this.currentUser = JSON.parse(cachedUser);
@@ -216,7 +240,7 @@ export function createCloudSyncMethods(getApp) {
         }
 
         const now = Date.now();
-        const lastCheck = parseInt(localStorage.getItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK) || '0', 10);
+        const lastCheck = parseInt(this._lsGet(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK) || '0', 10);
         if (lastCheck && (now - lastCheck < KY_CONFIG.SESSION.CHECK_INTERVAL_MS) && this.currentUser) {
           return;
         }
@@ -236,11 +260,12 @@ export function createCloudSyncMethods(getApp) {
         }
 
         if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.user) {
+          const parsed = await KyApi.parseResponse(res);
+          const data = parsed.data;
+          if (parsed.ok && data.user) {
             this.currentUser = data.user;
-            localStorage.setItem(KY_CONFIG.STORAGE_KEYS.USER_INFO, JSON.stringify(data.user));
-            localStorage.setItem(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, String(now));
+            this._lsSet(KY_CONFIG.STORAGE_KEYS.USER_INFO, JSON.stringify(data.user));
+            this._lsSet(KY_CONFIG.STORAGE_KEYS.LAST_SESSION_CHECK, String(now));
             this.renderAuthUI();
           }
         }
@@ -276,13 +301,13 @@ export function createCloudSyncMethods(getApp) {
       if (!confirmed) return;
 
       const keys = this.getActiveSyncKeys();
-      localStorage.removeItem(keys.PROGRESS);
-      if (keys.LEGACY_PROGRESS) localStorage.removeItem(keys.LEGACY_PROGRESS);
+      this._lsRemove(keys.PROGRESS);
+      if (keys.LEGACY_PROGRESS) this._lsRemove(keys.LEGACY_PROGRESS);
       DB.saveUserData({ answers: {}, mistakes: {} });
       DB.setPendingOverwrite(true);
-      localStorage.removeItem(keys.LAST_SYNC_TIME);
-      localStorage.removeItem(keys.LAST_UPLOAD_HASH);
-      localStorage.setItem(keys.IS_DIRTY, '1');
+      this._lsRemove(keys.LAST_SYNC_TIME);
+      this._lsRemove(keys.LAST_UPLOAD_HASH);
+      this._lsSet(keys.IS_DIRTY, '1');
       this.isDirty = true;
       this.lastSyncTime = null;
 
@@ -314,7 +339,7 @@ export function createCloudSyncMethods(getApp) {
       const keys = this.getActiveSyncKeys(bankId);
       const compactData = DB.toCompact(bankId);
       const currentHash = this.computeDataFingerprint(compactData);
-      const lastUploadHash = localStorage.getItem(keys.LAST_UPLOAD_HASH);
+      const lastUploadHash = this._lsGet(keys.LAST_UPLOAD_HASH);
 
       if (!this.isDirty && lastUploadHash && lastUploadHash === currentHash) {
         if (!isSilent) {
@@ -386,7 +411,8 @@ export function createCloudSyncMethods(getApp) {
           return;
         }
 
-        let data = await res.json();
+        let parsed = await KyApi.parseResponse(res);
+        let data = parsed.data;
 
         if (res.status === 409 && data && data.code === 'VERSION_CONFLICT') {
           if (shouldOverwrite) {
@@ -397,11 +423,12 @@ export function createCloudSyncMethods(getApp) {
             const mergedCompact = DB.toCompact(bankId);
             res = await doPost(mergedCompact, data.version, false);
           }
-          data = await res.json();
+          parsed = await KyApi.parseResponse(res);
+          data = parsed.data;
         }
 
-        if (!res.ok || !data.success) {
-          throw new Error((data && data.error) || '上传保存失败');
+        if (!parsed.ok) {
+          throw new Error(parsed.error || (data && data.error) || '上传保存失败');
         }
 
         if (data.answers && data.mistakes && !shouldOverwrite) {
@@ -413,10 +440,10 @@ export function createCloudSyncMethods(getApp) {
         DB.setPendingOverwrite(false, bankId);
 
         this.lastSyncTime = data.updatedAt || Date.now();
-        localStorage.setItem(keys.LAST_SYNC_TIME, String(this.lastSyncTime));
+        this._lsSet(keys.LAST_SYNC_TIME, String(this.lastSyncTime));
         const updatedCompact = DB.toCompact(bankId);
-        localStorage.setItem(keys.LAST_UPLOAD_HASH, this.computeDataFingerprint(updatedCompact));
-        localStorage.removeItem(keys.IS_DIRTY);
+        this._lsSet(keys.LAST_UPLOAD_HASH, this.computeDataFingerprint(updatedCompact));
+        this._lsRemove(keys.IS_DIRTY);
         this.isDirty = false;
         this.isNetworkWeak = false;
         this.retryStatusText = '';
@@ -482,7 +509,8 @@ export function createCloudSyncMethods(getApp) {
         this.retryStatusText = '';
         this.updateSyncUI();
 
-        const clientTime = this.lastSyncTime || 0;
+        // 仅静默同步且本机无未上传修改时利用 clientTime 节流；显式覆盖或有脏数据时强制全量拉取
+        const clientTime = (isSilent && !this.isDirty && this.lastSyncTime) ? this.lastSyncTime : 0;
         const qs = new URLSearchParams({
           bankId,
           clientTime: String(clientTime)
@@ -512,9 +540,10 @@ export function createCloudSyncMethods(getApp) {
           return;
         }
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || '从云端下载失败');
+        const parsed = await KyApi.parseResponse(res);
+        const data = parsed.data;
+        if (!parsed.ok) {
+          throw new Error(parsed.error || data.error || '从云端下载失败');
         }
 
         if (Number.isFinite(data.version)) {
@@ -533,10 +562,10 @@ export function createCloudSyncMethods(getApp) {
         DB.setFromCloud(data, bankId);
         DB.setPendingOverwrite(false, bankId);
         this.lastSyncTime = data.updatedAt || Date.now();
-        localStorage.setItem(keys.LAST_SYNC_TIME, String(this.lastSyncTime));
+        this._lsSet(keys.LAST_SYNC_TIME, String(this.lastSyncTime));
         const newCompact = DB.toCompact(bankId);
-        localStorage.setItem(keys.LAST_UPLOAD_HASH, this.computeDataFingerprint(newCompact));
-        localStorage.removeItem(keys.IS_DIRTY);
+        this._lsSet(keys.LAST_UPLOAD_HASH, this.computeDataFingerprint(newCompact));
+        this._lsRemove(keys.IS_DIRTY);
         this.isDirty = false;
         this.isNetworkWeak = false;
         this.retryStatusText = '';

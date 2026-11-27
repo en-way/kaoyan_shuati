@@ -13,6 +13,11 @@ export const practiceViewMethods = {
     this.state.currentType = type;
     this.state.practiceMode = mode;
     this.state.explanationVisible = true;
+    this.state.manualPeek = false;
+    this.state.isSingleMistakeRetry = false;
+    if (mode === 'exam') {
+      this.state.examDraftAnswers = {};
+    }
 
     const shortSub = part ? this.getSubjectShortName(part) : '全科错题';
     const chTitle = chapter || (mode === 'mistakes_only' ? '专项特训' : '全部章节');
@@ -276,10 +281,15 @@ export const practiceViewMethods = {
       q.user_selected = [key];
       q.user_time = this.state.questionSeconds;
 
-      if (mode === 'instant' || mode === 'mistakes_only') {
+      if (mode === 'exam') {
+        this.state.examDraftAnswers[q.id] = {
+          selected: [...this.state.selectedOptions],
+          time_spent: this.state.questionSeconds,
+          is_flagged: this.state.isFlagged
+        };
+        this.renderQuestion();
+      } else if (mode === 'instant' || mode === 'mistakes_only') {
         this.submitAnswerNow(true);
-      } else if (mode === 'exam') {
-        this.submitAnswerNow(false);
       }
     } else {
       if (this.state.selectedOptions.includes(key)) {
@@ -292,10 +302,13 @@ export const practiceViewMethods = {
       q.user_time = this.state.questionSeconds;
 
       if (mode === 'exam') {
-        this.submitAnswerNow(false);
-      } else {
-        this.renderQuestion();
+        this.state.examDraftAnswers[q.id] = {
+          selected: [...this.state.selectedOptions],
+          time_spent: this.state.questionSeconds,
+          is_flagged: this.state.isFlagged
+        };
       }
+      this.renderQuestion();
     }
   },
 
@@ -328,6 +341,9 @@ export const practiceViewMethods = {
       if (this.state.questionTimerTimer) {
         clearInterval(this.state.questionTimerTimer);
         this.state.questionTimerTimer = null;
+      }
+      if (typeof this.updateMistakeBadges === 'function') {
+        this.updateMistakeBadges();
       }
     }
     this.renderQuestion();
@@ -367,6 +383,10 @@ export const practiceViewMethods = {
     } else {
       if (mode === 'exam') {
         this.submitExam();
+      } else if (this.state.isSingleMistakeRetry) {
+        this.state.isSingleMistakeRetry = false;
+        this.showToast('✅ 已完成该错题重刷！', 'success', 2600);
+        this.navigateTo('mistakes');
       } else {
         this.showToast('🎉 恭喜！你已完成本章节的所有题目！', 'success', 3200);
         this.navigateTo('hub');
@@ -435,7 +455,11 @@ export const practiceViewMethods = {
       this.state.questionTimerTimer = null;
     }
 
-    const data = DB.submitExam(this.state.currentPart, this.state.currentChapter);
+    const data = DB.submitExam(this.state.currentPart, this.state.currentChapter, this.state.examDraftAnswers);
+    this.state.examDraftAnswers = {};
+    if (typeof this.updateMistakeBadges === 'function') {
+      this.updateMistakeBadges();
+    }
 
     const accEl = document.getElementById('examReportAccuracy');
     if (accEl) accEl.textContent = `${data.score_rate}%`;

@@ -43,7 +43,7 @@ jobs:
           '
 
       - name: Run zero-dependency node:test suites
-        run: node --test tests/quiz.test.js tests/store.test.js tests/sync.test.js tests/api.test.js
+        run: node --test tests/quiz.test.js tests/store.test.js tests/sync.test.js tests/api.test.js tests/ui.test.js
 
       - name: Validate data/catalog.json & Question Bank JSON Schema
         run: |
@@ -66,6 +66,7 @@ jobs:
               console.log(`[Validated] ${path}: ${bank.total} questions OK`);
             };
             validateBank("data/questions.sample.json");
+            if (fs.existsSync("data/questions.json")) validateBank("data/questions.json");
             for (const b of catalog.banks) {
               if (fs.existsSync(b.file)) validateBank(b.file);
             }

@@ -114,6 +114,10 @@ export const hubViewMethods = {
       this.state.questionTimerTimer = null;
     }
     this.state.currentView = viewName;
+    const mDrawerBtn = document.getElementById('mHeaderDrawerBtn');
+    if (mDrawerBtn) {
+      mDrawerBtn.style.display = viewName === 'practice' ? 'inline-flex' : 'none';
+    }
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
     document.querySelectorAll('.m-nav-item').forEach(btn => btn.classList.remove('active'));
@@ -137,6 +141,7 @@ export const hubViewMethods = {
         const defaultPart = firstSub ? firstSub.name : '第一部分 马克思主义基本原理';
         const defaultCh = (firstSub && firstSub.chapters && firstSub.chapters[0]) ? firstSub.chapters[0].name : '导论';
         this.startPractice(defaultPart, defaultCh, '', 'instant');
+        return;
       } else {
         const currentQ = this.getCurrentQuestion();
         if (currentQ) {
@@ -165,10 +170,9 @@ export const hubViewMethods = {
     document.getElementById('hubMistakesQ').textContent = data.total_mistakes.toLocaleString();
     document.getElementById('hubAccuracyRate').textContent = `${data.overall_accuracy}%`;
 
-    const badge = document.getElementById('globalMistakeBadge');
-    if (badge) badge.textContent = data.total_mistakes;
-    const mBadge = document.getElementById('mGlobalMistakeBadge');
-    if (mBadge) mBadge.textContent = data.total_mistakes;
+    if (typeof this.updateMistakeBadges === 'function') {
+      this.updateMistakeBadges(data.total_mistakes);
+    }
 
     if (this.state.currentView === 'hub' && data.subjects && data.subjects[this.state.activeSubjectIndex]) {
       const curSub = data.subjects[this.state.activeSubjectIndex];

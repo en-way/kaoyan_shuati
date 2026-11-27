@@ -119,16 +119,23 @@ export const modalMethods = {
 
   // ================== 双主题（柔和暗黑 + 浅色护眼纸感）切换与持久化引擎 ==================
   initTheme() {
-    const saved = (typeof localStorage !== 'undefined' && localStorage.getItem(KY_CONFIG.STORAGE_KEYS.THEME)) || 'dark';
+    let saved = 'dark';
+    try {
+      if (typeof localStorage !== 'undefined') {
+        saved = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.THEME) || 'dark';
+      }
+    } catch (_) {}
     this.setTheme(saved, true);
   },
 
   setTheme(theme, silent = false) {
     const target = theme === 'light' ? 'light' : 'dark';
     this.state.theme = target;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(KY_CONFIG.STORAGE_KEYS.THEME, target);
-    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.THEME, target);
+      }
+    } catch (_) {}
 
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-theme', target);
@@ -171,7 +178,12 @@ export const modalMethods = {
 
   // ================== 四档阅读字号自适应与记忆引擎 ==================
   initFontSize() {
-    const saved = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.FONT_SIZE) || 'md';
+    let saved = 'md';
+    try {
+      if (typeof localStorage !== 'undefined') {
+        saved = localStorage.getItem(KY_CONFIG.STORAGE_KEYS.FONT_SIZE) || 'md';
+      }
+    } catch (_) {}
     this.setFontSize(saved, true);
   },
 
@@ -179,7 +191,11 @@ export const modalMethods = {
     const validSizes = ['sm', 'md', 'lg', 'xl'];
     const target = validSizes.includes(size) ? size : 'md';
     this.state.fontSize = target;
-    localStorage.setItem(KY_CONFIG.STORAGE_KEYS.FONT_SIZE, target);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(KY_CONFIG.STORAGE_KEYS.FONT_SIZE, target);
+      }
+    } catch (_) {}
 
     document.documentElement.setAttribute('data-font-size', target);
     if (document.body) {
@@ -382,7 +398,7 @@ export const modalMethods = {
   registerServiceWorker() {
     if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       const doRegister = () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
+        navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
           .then((reg) => {
             console.log('[PWA] Service Worker registered with scope:', reg.scope);
             reg.update().catch(() => {});

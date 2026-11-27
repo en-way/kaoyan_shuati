@@ -156,6 +156,13 @@ export const practiceControlMethods = {
           return;
         }
         if (e.key === 'Enter' || e.key === ' ') {
+          const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+          const activeTag = activeEl && activeEl.tagName ? activeEl.tagName.toLowerCase() : '';
+          const isInteractiveFocus = activeTag === 'button' || activeTag === 'a' || activeTag === 'summary'
+            || (activeEl && typeof activeEl.getAttribute === 'function' && activeEl.getAttribute('role') === 'button');
+          if (isInteractiveFocus) {
+            return;
+          }
           e.preventDefault();
           this.nextQuestion();
           return;

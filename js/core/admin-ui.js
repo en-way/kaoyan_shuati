@@ -1,6 +1,7 @@
 /**
  * 管理员密码重置码面板与会话级密钥管理模块 (js/core/admin-ui.js)
  */
+import { KyApi } from '../api.js';
 
 const ADMIN_SECRET_KEY = 'kaoyan_admin_secret_saved';
 
@@ -99,9 +100,10 @@ export function createAdminUiMethods(getApp) {
           body: JSON.stringify({ adminSecret: secret })
         });
 
-        const data = await res.json();
-        if (!res.ok || !data.isValid) {
-          throw new Error(data.error || '密钥校验失败');
+        const parsed = await KyApi.parseResponse(res);
+        const data = parsed.data;
+        if (!parsed.ok || !data.isValid) {
+          throw new Error(parsed.error || data.error || '密钥校验失败');
         }
 
         this._setSavedAdminSecret(secret);
@@ -166,9 +168,10 @@ export function createAdminUiMethods(getApp) {
           body: JSON.stringify({ adminSecret, username })
         });
 
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || '生成重置码失败');
+        const parsed = await KyApi.parseResponse(res);
+        const data = parsed.data;
+        if (!parsed.ok) {
+          throw new Error(parsed.error || data.error || '生成重置码失败');
         }
 
         this._setSavedAdminSecret(adminSecret);

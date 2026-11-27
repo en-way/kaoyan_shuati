@@ -7,6 +7,14 @@ import { escapeHtml } from './sanitize.js';
 
 export const mistakesViewMethods = {
   // ================== VIEW 3: MISTAKES VAULT ==================
+  updateMistakeBadges(count = null) {
+    const total = (count !== null && count !== undefined) ? count : DB.getMistakes('', '').count;
+    const globalBadge = document.getElementById('globalMistakeBadge');
+    if (globalBadge) globalBadge.textContent = total;
+    const mGlobalBadge = document.getElementById('mGlobalMistakeBadge');
+    if (mGlobalBadge) mGlobalBadge.textContent = total;
+  },
+
   loadMistakes() {
     const part = this.state.filterPart;
     const chapter = this.state.filterChapter;
@@ -17,10 +25,7 @@ export const mistakesViewMethods = {
     const mCountEl = document.getElementById('mMistakesCountText');
     if (mCountEl) mCountEl.textContent = `共 ${data.count} 道待攻克错题`;
 
-    const globalBadge = document.getElementById('globalMistakeBadge');
-    if (globalBadge) globalBadge.textContent = totalMistakesCount;
-    const mGlobalBadge = document.getElementById('mGlobalMistakeBadge');
-    if (mGlobalBadge) mGlobalBadge.textContent = totalMistakesCount;
+    this.updateMistakeBadges(totalMistakesCount);
 
     this.populateMistakeFilters();
     this.renderMistakesList();
@@ -89,8 +94,9 @@ export const mistakesViewMethods = {
         Object.entries(statsByPart).forEach(([pName, pStat]) => {
           const shortPart = this.getSubjectShortName(pName);
           Object.entries(pStat.chapters).forEach(([chName, count]) => {
-            const sel = chName === currentChapter ? 'selected' : '';
-            chHtml += `<option value="${escapeHtml(chName)}" ${sel}>${escapeHtml(shortPart)} · ${escapeHtml(chName)} (${count}题)</option>`;
+            const compoundVal = `${pName}:::${chName}`;
+            const sel = (pName === currentPart && chName === currentChapter) ? 'selected' : '';
+            chHtml += `<option value="${escapeHtml(compoundVal)}" ${sel}>${escapeHtml(shortPart)} · ${escapeHtml(chName)} (${count}题)</option>`;
           });
         });
       }
@@ -107,7 +113,14 @@ export const mistakesViewMethods = {
 
   onChapterFilterChange() {
     const chSelect = document.getElementById('mChapterFilter');
-    this.state.filterChapter = chSelect ? chSelect.value : '';
+    const rawVal = chSelect ? chSelect.value : '';
+    if (rawVal.includes(':::')) {
+      const splitIdx = rawVal.indexOf(':::');
+      this.state.filterPart = rawVal.slice(0, splitIdx);
+      this.state.filterChapter = rawVal.slice(splitIdx + 3);
+    } else {
+      this.state.filterChapter = rawVal;
+    }
     this.loadMistakes();
   },
 
@@ -204,6 +217,8 @@ export const mistakesViewMethods = {
     this.state.practiceMode = 'instant';
     this.state.currentIndex = 0;
     this.state.explanationVisible = true;
+    this.state.manualPeek = false;
+    this.state.isSingleMistakeRetry = true;
 
     const shortSub = this.getSubjectShortName(q.part);
     this.updateBreadcrumb(`${shortSub} · 错题精练`);

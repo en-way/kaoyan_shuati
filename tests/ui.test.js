@@ -145,4 +145,24 @@ test('UI 模块静态契约与防回归校验', async (t) => {
     const tokensCss = fs.readFileSync(path.resolve('css/tokens.css'), 'utf8');
     assert.match(tokensCss, /html\[data-theme="light"\]\s+body/);
   });
+
+  await t.test('CI 工作流、云同步安全与响应式规则防回归校验', () => {
+    const ci = fs.readFileSync(path.resolve('.github/workflows/ci.yml'), 'utf8');
+    assert.match(ci, /tests\/ui\.test\.js/);
+
+    const cloudSync = fs.readFileSync(path.resolve('js/core/cloud-sync.js'), 'utf8');
+    assert.match(cloudSync, /isSilent && !this\.isDirty && this\.lastSyncTime/);
+    assert.match(cloudSync, /if\s*\(shouldPurge\)\s*\{\s*this\.purgeAllUserData\(/);
+
+    const swContent = fs.readFileSync(path.resolve('sw.js'), 'utf8');
+    assert.match(swContent, /isPageNavigation\s*=\s*request\.mode\s*===\s*'navigate'/);
+    assert.match(swContent, /!\\?\/\\.\[\^\/\]\+\$\/\.test\(url\.pathname\)|!\/\\\.\[\^\/\]\+\$\/\.test\(url\.pathname\)/);
+
+    const respCss = fs.readFileSync(path.resolve('css/responsive.css'), 'utf8');
+    assert.match(respCss, /@media\s*\(min-width:\s*769px\)\s*and\s*\(max-width:\s*1024px\)[\s\S]*?\.header-center/);
+    assert.match(respCss, /grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)/);
+
+    const modalsCss = fs.readFileSync(path.resolve('css/modals.css'), 'utf8');
+    assert.match(modalsCss, /#confirmDialogModal\s*\{[\s\S]*z-index:\s*1100/);
+  });
 });

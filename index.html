@@ -45,12 +45,12 @@
     });
   </script>
 
-  <link rel="stylesheet" href="css/tokens.css?v=20271123_v38_7">
-  <link rel="stylesheet" href="css/base.css?v=20271123_v38_7">
-  <link rel="stylesheet" href="css/hub.css?v=20271123_v38_7">
-  <link rel="stylesheet" href="css/practice.css?v=20271123_v38_7">
-  <link rel="stylesheet" href="css/modals.css?v=20271123_v38_7">
-  <link rel="stylesheet" href="css/responsive.css?v=20271123_v38_7">
+  <link rel="stylesheet" href="css/tokens.css?v=20271123_v38_10">
+  <link rel="stylesheet" href="css/base.css?v=20271123_v38_10">
+  <link rel="stylesheet" href="css/hub.css?v=20271123_v38_10">
+  <link rel="stylesheet" href="css/practice.css?v=20271123_v38_10">
+  <link rel="stylesheet" href="css/modals.css?v=20271123_v38_10">
+  <link rel="stylesheet" href="css/responsive.css?v=20271123_v38_10">
 </head>
 <body class="theme-dark">
   <!-- Top Global Header -->
@@ -152,7 +152,7 @@
 
       <!-- Mobile Quick Actions -->
       <div class="mobile-only mobile-header-actions">
-        <button type="button" class="m-icon-btn" data-action="open-drawer" title="打开答题卡">
+        <button id="mHeaderDrawerBtn" type="button" class="m-icon-btn" data-action="open-drawer" title="打开答题卡" style="display:none;">
           📋 <span id="mHeaderProgress">1/10</span>
         </button>
         <button type="button" class="m-icon-btn" data-action="open-more-menu" title="设置与数据管理">
@@ -470,9 +470,9 @@
                   <span class="val color-cyan" id="sideExamAnsweredCount">0 题</span>
                 </div>
               </div>
-              <div class="exam-rules-list">
-                <div class="rule-item">✓ 单项选择题 16 题，每题 1 分</div>
-                <div class="rule-item">✓ 多项选择题 17 题，每题 2 分</div>
+              <div class="exam-rules-list" id="sideExamRulesList">
+                <div class="rule-item">✓ 按当前章节实有题量组卷</div>
+                <div class="rule-item">✓ 单选每题 1 分，多选每题 2 分</div>
                 <div class="rule-item">✓ 支持点击题卡快速跳题检查</div>
               </div>
             </div>
@@ -582,7 +582,7 @@
                 <span class="m-user-title" id="mUserNickname">考研学子</span>
                 <span class="user-account-pill" id="mUserAccount" data-action="auth-copy-username" title="点击复制登录账号">@username</span>
               </div>
-              <button type="button" class="btn-logout-compact" data-action="auth-logout" title="退出当前账号">
+              <button type="button" class="btn-logout-compact" data-action="auth-logout" data-close-menu="more" title="退出当前账号">
                 🚪 退出
               </button>
             </div>
@@ -590,11 +590,11 @@
               <span class="m-user-sub" id="mUserSyncStatus">云端已保存</span>
             </div>
             <div class="m-cloud-grid">
-              <button id="mBtnUploadCloud" type="button" class="m-cloud-btn m-cloud-btn-upload" data-action="auth-upload">
+              <button id="mBtnUploadCloud" type="button" class="m-cloud-btn m-cloud-btn-upload" data-action="auth-upload" data-close-menu="more">
                 <span class="m-cloud-icon" id="mCloudUploadIcon">☁️</span>
                 <span id="mCloudUploadText">上传云端</span>
               </button>
-              <button id="mBtnDownloadCloud" type="button" class="m-cloud-btn m-cloud-btn-download" data-action="auth-download">
+              <button id="mBtnDownloadCloud" type="button" class="m-cloud-btn m-cloud-btn-download" data-action="auth-download" data-close-menu="more">
                 <span class="m-cloud-icon">📥</span>
                 <span>下载云端</span>
               </button>
@@ -1007,6 +1007,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=20271123_v38_7"></script>
+  <script type="module" src="js/main.js?v=20271123_v38_10"></script>
 </body>
 </html>

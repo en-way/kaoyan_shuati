@@ -10,7 +10,13 @@ import { createCloudSyncMethods } from './cloud-sync.js';
 export function createAuthController(getApp) {
   return {
     currentUser: null,
-    token: (typeof localStorage !== 'undefined' && localStorage.getItem(KY_CONFIG.STORAGE_KEYS.TOKEN)) || null,
+    token: (() => {
+      try {
+        return (typeof localStorage !== 'undefined' && localStorage.getItem(KY_CONFIG.STORAGE_KEYS.TOKEN)) || null;
+      } catch (_) {
+        return null;
+      }
+    })(),
     isDirty: false,
     lastSyncTime: null,
     isSyncing: false,

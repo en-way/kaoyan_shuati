@@ -4,6 +4,7 @@
 :root,
 html[data-theme="dark"],
 body.theme-dark {
+  color-scheme: dark;
   --bg-main: #0c1017;
   --bg-card: #141923;
   --bg-card-hover: #1a2130;
@@ -81,6 +82,7 @@ body.theme-dark {
 html[data-theme="light"],
 html[data-theme="light"] body,
 body.theme-light {
+  color-scheme: light;
   --bg-main: #f6f4ef;
   --bg-card: #ffffff;
   --bg-card-hover: #fbfaf7;

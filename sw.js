@@ -8,7 +8,7 @@
  */
 
 const VERSION = 'v38';
-const ASSET_VER = `20271123_${VERSION}_7`;
+const ASSET_VER = `20271123_${VERSION}_10`;
 const CACHE_NAME = `ky-quiz-${ASSET_VER}`;
 
 // 移除 Cloudflare Pages 重定向产生的 redirected: true 标记，防止 Chromium/Edge PWA 拦截加载
@@ -134,8 +134,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 页面导航统一请求根路径 '/'，并剥离任何 redirected 标记以防 Chromium/Edge PWA 拦截
-  if (request.mode === 'navigate') {
+  // 仅对页面 HTML 导航（根路径、/index.html 或无扩展名路由）统一请求 '/'，避免拦截直接访问的 .json/.js 静态文件
+  const isPageNavigation = request.mode === 'navigate' && (
+    url.pathname === '/' ||
+    url.pathname === '/index.html' ||
+    !/\.[^/]+$/.test(url.pathname)
+  );
+  if (isPageNavigation) {
     event.respondWith(
       fetch('/', { cache: 'no-cache' })
         .then(async (networkResponse) => {

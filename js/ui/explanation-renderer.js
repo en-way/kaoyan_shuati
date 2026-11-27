@@ -103,6 +103,16 @@ export const explanationMethods = {
         const answeredCount = this.state.questions.filter(item => item.user_selected && item.user_selected.length > 0).length;
         const countEl = document.getElementById('sideExamAnsweredCount');
         if (countEl) countEl.textContent = `${answeredCount} 题`;
+        const rulesEl = document.getElementById('sideExamRulesList');
+        if (rulesEl) {
+          const singleCnt = this.state.questions.filter(item => item.type === '单项选择题').length;
+          const multiCnt = Math.max(0, this.state.questions.length - singleCnt);
+          rulesEl.innerHTML = `
+            <div class="rule-item">✓ 本章单选 ${singleCnt} 题，每题 1 分</div>
+            <div class="rule-item">✓ 本章多选 ${multiCnt} 题，每题 2 分</div>
+            <div class="rule-item">✓ 支持点击题卡快速跳题检查</div>
+          `;
+        }
       }
       return;
     }

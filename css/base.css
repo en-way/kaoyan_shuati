@@ -203,11 +203,12 @@ body.modal-open {
   gap: 6px;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: all 0.18s ease;
+  transition: none;
 }
 
 .nav-btn:hover { color: var(--text-primary); }
-.nav-btn.active {
+.nav-btn.active,
+.nav-btn.active:hover {
   background: var(--accent-cyan);
   color: var(--accent-on-primary);
   box-shadow: var(--glow-cyan);
